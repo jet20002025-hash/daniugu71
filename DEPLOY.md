@@ -81,7 +81,7 @@ export ADMIN_USERNAMES=admin
 ```bash
 cd /var/www/stock-app
 source venv/bin/activate
-gunicorn -w 4 -b 127.0.0.1:8080 "app:app"
+gunicorn -w 4 -b 127.0.0.1:8080 "wsgi:app"
 ```
 
 - `-w 4`：4 个 worker，可按 CPU 调整  

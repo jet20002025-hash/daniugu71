@@ -803,12 +803,17 @@ def register():
         elif len(password) < 6:
             error = "密码至少 6 位"
         else:
-            user = create_user(username, password)
-            if user:
-                session["user_id"] = user.id
-                session.permanent = True
-                return redirect(url_for("index"))
-            error = "用户名已被注册"
+            try:
+                user = create_user(username, password)
+                if user:
+                    session["user_id"] = user.id
+                    session.permanent = True
+                    return redirect(url_for("index"))
+                error = "用户名已被注册"
+            except Exception as e:
+                import traceback
+                traceback.print_exc()
+                error = "注册失败，请稍后重试或联系管理员"
     return render_template("register.html", error=error)
 
 

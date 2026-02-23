@@ -147,8 +147,8 @@
               <td>{{ row.code }}</td>
               <td>{{ row.name }}</td>
               <td class="score">{{ row.score }}</td>
-              <td>{{ row.latest_close }}</td>
-              <td class="pct">{{ row.change_pct }}</td>
+              <td>{{ "%.2f" % row.latest_close }}</td>
+              <td class="pct">{{ "%.2f" % row.change_pct }}</td>
             </tr>
             {% else %}
             <tr>

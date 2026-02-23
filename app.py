@@ -14,7 +14,16 @@ from flask import Flask, g, jsonify, redirect, render_template, request, session
 
 from app import sina, tencent
 from app.auth import admin_required, get_current_user, login_required, subscription_required
-from app.database import init_db, get_user_by_username, create_user, verify_password, set_activated, list_users
+from app.database import (
+    init_db,
+    get_user_by_username,
+    create_user,
+    verify_password,
+    set_activated,
+    set_activated_until,
+    downgrade_expired_subscriptions,
+    list_users,
+)
 from app.eastmoney import (
     KlineRow,
     fetch_index_kline,
@@ -76,6 +85,15 @@ scan_state = {
     "error": None,
     "source": "",
 }
+
+
+@app.before_request
+def _auto_downgrade_expired():
+    """每次请求前检查并自动降级已过期的收费会员"""
+    try:
+        downgrade_expired_subscriptions()
+    except Exception:
+        pass
 
 
 @app.before_request
@@ -850,13 +868,24 @@ def subscription_blocked():
 @admin_required
 def admin():
     users = list_users()
-    return render_template("admin.html", users=users)
+    free_count = sum(1 for u in users if not u.is_activated)
+    paid_count = sum(1 for u in users if u.is_activated)
+    return render_template(
+        "admin.html",
+        users=users,
+        free_count=free_count,
+        paid_count=paid_count,
+        is_super_admin=getattr(g.current_user, "is_super_admin", False),
+    )
 
 
 @app.route("/admin/activate/<int:user_id>", methods=["POST"])
 @admin_required
 def admin_activate(user_id):
-    set_activated(user_id, True)
+    activated_until = None
+    if getattr(g.current_user, "is_super_admin", False):
+        activated_until = (request.form.get("activated_until") or "").strip() or None
+    set_activated(user_id, True, activated_until=activated_until)
     return redirect(url_for("admin"))
 
 
@@ -864,6 +893,17 @@ def admin_activate(user_id):
 @admin_required
 def admin_deactivate(user_id):
     set_activated(user_id, False)
+    return redirect(url_for("admin"))
+
+
+@app.route("/admin/set_activated_until/<int:user_id>", methods=["POST"])
+@admin_required
+def admin_set_activated_until(user_id):
+    """超级管理员：修改收费会员截止日期"""
+    if not getattr(g.current_user, "is_super_admin", False):
+        return redirect(url_for("admin"))
+    date_str = (request.form.get("activated_until") or "").strip() or None
+    set_activated_until(user_id, date_str)
     return redirect(url_for("admin"))
 
 

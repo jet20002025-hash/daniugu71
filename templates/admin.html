@@ -13,9 +13,15 @@
     .badge-trial { background: rgba(47, 196, 178, 0.2); color: var(--accent-2); }
     .badge-activated { background: rgba(47, 196, 178, 0.3); color: #fff; }
     .badge-expired { background: rgba(240, 108, 108, 0.2); color: var(--danger); }
+    .badge-super { background: rgba(255, 180, 0, 0.3); color: #ffb; }
     .btn-sm { padding: 6px 12px; font-size: 13px; border-radius: 8px; border: none; cursor: pointer; }
     .btn-activate { background: var(--accent-2); color: #0e1116; }
     .btn-deactivate { background: var(--panel-light); color: var(--muted); border: 1px solid var(--border); }
+    .stats-row { display: flex; gap: 24px; margin-bottom: 16px; flex-wrap: wrap; }
+    .stats-row span { color: var(--muted); font-size: 14px; }
+    .stats-row strong { color: var(--text); margin-left: 4px; }
+    .inline-form { display: inline-flex; align-items: center; gap: 6px; }
+    .inline-form input[type=date] { padding: 4px 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--panel); color: var(--text); }
   </style>
 </head>
 <body>
@@ -26,6 +32,12 @@
         <h1>用户管理</h1>
         <a href="{{ url_for('index') }}">返回首页</a>
       </div>
+      <div class="stats-row">
+        <span>共 <strong>{{ users|length }}</strong> 人注册</span>
+        <span>免费会员 <strong>{{ free_count }}</strong> 人</span>
+        <span>收费会员 <strong>{{ paid_count }}</strong> 人</span>
+        {% if is_super_admin %}<span class="badge badge-super">超级管理员</span>{% endif %}
+      </div>
       <div class="table-wrap">
         <table>
           <thead>
@@ -35,6 +47,7 @@
               <th>注册时间</th>
               <th>试用截止</th>
               <th>状态</th>
+              <th>截止日期</th>
               <th>操作</th>
             </tr>
           </thead>
@@ -42,7 +55,7 @@
             {% for u in users %}
             <tr>
               <td>{{ u.id }}</td>
-              <td>{{ u.username }}{% if u.is_admin %} <span class="badge badge-trial">管理员</span>{% endif %}</td>
+              <td>{{ u.username }}{% if u.is_admin %} <span class="badge badge-trial">管理员</span>{% endif %}{% if u.is_super_admin %} <span class="badge badge-super">超级管理员</span>{% endif %}</td>
               <td>{{ u.created_at }}</td>
               <td>{{ u.trial_ends_at }}</td>
               <td>
@@ -55,15 +68,31 @@
                 {% endif %}
               </td>
               <td>
-                {% if not u.is_admin %}
+                {% if u.is_activated and u.activated_until %}{{ u.activated_until[:10] }}{% else %}—{% endif %}
+              </td>
+              <td>
+                {% if not u.is_admin and not u.is_super_admin %}
                   {% if u.is_activated %}
                     <form method="post" action="{{ url_for('admin_deactivate', user_id=u.id) }}" style="display:inline">
                       <button type="submit" class="btn-sm btn-deactivate">取消开通</button>
                     </form>
+                    {% if is_super_admin %}
+                    <form method="post" action="{{ url_for('admin_set_activated_until', user_id=u.id) }}" class="inline-form" style="margin-left:8px">
+                      <input type="date" name="activated_until" value="{{ u.activated_until[:10] if u.activated_until else '' }}" />
+                      <button type="submit" class="btn-sm btn-activate">改截止</button>
+                    </form>
+                    {% endif %}
                   {% else %}
+                    {% if is_super_admin %}
+                    <form method="post" action="{{ url_for('admin_activate', user_id=u.id) }}" class="inline-form">
+                      <input type="date" name="activated_until" placeholder="截止日期" />
+                      <button type="submit" class="btn-sm btn-activate">开通</button>
+                    </form>
+                    {% else %}
                     <form method="post" action="{{ url_for('admin_activate', user_id=u.id) }}" style="display:inline">
                       <button type="submit" class="btn-sm btn-activate">开通</button>
                     </form>
+                    {% endif %}
                   {% endif %}
                 {% else %}
                   —

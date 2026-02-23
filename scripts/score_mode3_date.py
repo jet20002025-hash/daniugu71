@@ -38,6 +38,91 @@ def _load_market_caps(path: str) -> Dict[str, float]:
     return mapping
 
 
+def get_results_for_date(
+    target_date: str,
+    stock_list: list,
+    market_caps: Dict[str, float],
+    cache_dir: str,
+    min_score: int = 100,
+    max_cap_yi: float = 150.0,
+    no_cap_filter: bool = False,
+) -> List[dict]:
+    """对指定日期跑 mode3 筛选，返回按 71 倍模型同分排名排序后的结果列表。"""
+    cap_limit = max_cap_yi * 1e8
+    cache_format = "code"
+    results: List[dict] = []
+    for item in stock_list:
+        rows = _load_rows(cache_dir, cache_format, item.market, item.code)
+        if not rows or len(rows) < 80:
+            continue
+        dates = [r.date for r in rows]
+        close = np.array([r.close for r in rows], dtype=float)
+        open_ = np.array([r.open for r in rows], dtype=float)
+        high = np.array([r.high for r in rows], dtype=float)
+        low = np.array([r.low for r in rows], dtype=float)
+        volume = np.array([r.volume for r in rows], dtype=float)
+        ma10 = _moving_mean(close, 10)
+        ma20 = _moving_mean(close, 20)
+        ma60 = _moving_mean(close, 60)
+        vol20 = _moving_mean(volume, 20)
+        ret20 = [None] * len(rows)
+        for i in range(20, len(rows)):
+            base = close[i - 20]
+            ret20[i] = (close[i] - base) / base * 100 if base else None
+
+        signals = _signals_mode3(
+            rows, dates, close, open_, high, low, volume,
+            ma10, ma20, ma60, vol20, ret20,
+            target_date, target_date,
+        )
+        for idx in signals:
+            if dates[idx] != target_date:
+                continue
+            score = _score_mode3(close, volume, ma10, ma20, ma60, vol20, idx)
+            if score < min_score:
+                continue
+            code = item.code
+            code_norm = code.zfill(6) if len(code) < 6 else code
+            cap_value = market_caps.get(code) or market_caps.get(code_norm)
+            if not no_cap_filter:
+                if cap_value is None:
+                    continue
+                if cap_value > cap_limit:
+                    continue
+            cap_yi = cap_value / 1e8 if cap_value is not None else None
+            vol_ratio = volume[idx] / vol20[idx] if vol20[idx] > 0 else 0.0
+            ma20_now, ma60_now = ma20[idx], ma60[idx]
+            close_gap = (close[idx] - ma20_now) / ma20_now if ma20_now > 0 else 0.0
+            ma20_gap = (ma10[idx] - ma20_now) / ma20_now if ma20_now > 0 else 0.0
+            ma60_gap = (ma20_now - ma60_now) / ma60_now if ma60_now > 0 else 0.0
+            ret20_val = ret20[idx] if ret20[idx] is not None else 0.0
+            results.append({
+                "date": target_date,
+                "code": code,
+                "name": item.name,
+                "score": score,
+                "market_cap_yi": round(cap_yi, 2) if cap_yi is not None else None,
+                "close": round(close[idx], 2),
+                "_vol_ratio": vol_ratio,
+                "_close_gap": close_gap,
+                "_ma20_gap": ma20_gap,
+                "_ma60_gap": ma60_gap,
+                "_ret20": ret20_val,
+            })
+
+    results.sort(
+        key=lambda x: (
+            -x["score"],
+            x["_close_gap"],
+            -x["_vol_ratio"],
+            -(x["_ma20_gap"] + x["_ma60_gap"]),
+            x["_ret20"],
+            x["code"],
+        )
+    )
+    return results
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="筛选指定日期 mode3 高分个股（含市值过滤）")
     parser.add_argument(
@@ -85,92 +170,24 @@ def main() -> None:
     args = parser.parse_args()
 
     target_date = args.date
-    min_score = args.min_score
-    cap_limit = args.max_cap * 1e8  # 亿 -> 元
-
     stock_list = stock_items_from_list_csv(args.stock_list)
     if not stock_list:
         raise RuntimeError("股票列表为空")
-
     market_caps = _load_market_caps(args.market_cap)
-    cache_format = "code"
     if not os.path.exists(args.cache_dir):
         raise RuntimeError(f"缓存目录不存在: {args.cache_dir}")
 
-    results: List[dict] = []
-    for item in stock_list:
-        rows = _load_rows(args.cache_dir, cache_format, item.market, item.code)
-        if not rows or len(rows) < 80:
-            continue
-        dates = [r.date for r in rows]
-        close = np.array([r.close for r in rows], dtype=float)
-        open_ = np.array([r.open for r in rows], dtype=float)
-        high = np.array([r.high for r in rows], dtype=float)
-        low = np.array([r.low for r in rows], dtype=float)
-        volume = np.array([r.volume for r in rows], dtype=float)
-        ma10 = _moving_mean(close, 10)
-        ma20 = _moving_mean(close, 20)
-        ma60 = _moving_mean(close, 60)
-        vol20 = _moving_mean(volume, 20)
-        ret20 = [None] * len(rows)
-        for i in range(20, len(rows)):
-            base = close[i - 20]
-            ret20[i] = (close[i] - base) / base * 100 if base else None
-
-        signals = _signals_mode3(
-            rows, dates, close, open_, high, low, volume,
-            ma10, ma20, ma60, vol20, ret20,
-            target_date, target_date,
-        )
-        for idx in signals:
-            if dates[idx] != target_date:
-                continue
-            score = _score_mode3(close, volume, ma10, ma20, ma60, vol20, idx)
-            if score < min_score:
-                continue
-            code = item.code
-            code_norm = code.zfill(6) if len(code) < 6 else code
-            cap_value = market_caps.get(code) or market_caps.get(code_norm)
-            if not args.no_cap_filter:
-                if cap_value is None:
-                    continue  # 无市值数据则排除
-                if cap_value > cap_limit:
-                    continue
-            cap_yi = cap_value / 1e8 if cap_value is not None else None
-            # 同分排名用：放量比、贴近MA20、均线间距、20日涨幅、代码
-            vol_ratio = volume[idx] / vol20[idx] if vol20[idx] > 0 else 0.0
-            ma20_now, ma60_now = ma20[idx], ma60[idx]
-            close_gap = (close[idx] - ma20_now) / ma20_now if ma20_now > 0 else 0.0
-            ma20_gap = (ma10[idx] - ma20_now) / ma20_now if ma20_now > 0 else 0.0
-            ma60_gap = (ma20_now - ma60_now) / ma60_now if ma60_now > 0 else 0.0
-            ret20_val = ret20[idx] if ret20[idx] is not None else 0.0
-            results.append({
-                "date": target_date,
-                "code": code,
-                "name": item.name,
-                "score": score,
-                "market_cap_yi": round(cap_yi, 2) if cap_yi is not None else None,
-                "close": round(close[idx], 2),
-                "_vol_ratio": vol_ratio,
-                "_close_gap": close_gap,
-                "_ma20_gap": ma20_gap,
-                "_ma60_gap": ma60_gap,
-                "_ret20": ret20_val,
-            })
-
-    # 71倍模型同分排名：分数降序 → 贴近MA20 → 放量大 → 均线间距大 → 20日涨幅小 → 代码
-    results.sort(
-        key=lambda x: (
-            -x["score"],
-            x["_close_gap"],
-            -x["_vol_ratio"],
-            -(x["_ma20_gap"] + x["_ma60_gap"]),
-            x["_ret20"],
-            x["code"],
-        )
+    results = get_results_for_date(
+        target_date,
+        stock_list,
+        market_caps,
+        args.cache_dir,
+        min_score=args.min_score,
+        max_cap_yi=args.max_cap,
+        no_cap_filter=args.no_cap_filter,
     )
 
-    print(f"\n{target_date} mode3 分数≥{min_score} 且市值≤{args.max_cap}亿 个股（共 {len(results)} 只）\n")
+    print(f"\n{target_date} mode3 分数≥{args.min_score} 且市值≤{args.max_cap}亿 个股（共 {len(results)} 只）\n")
     print(f"{'代码':<8} {'名称':<12} {'分数':<6} {'市值(亿)':<10} {'收盘价'}")
     print("-" * 50)
     for r in results:

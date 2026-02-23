@@ -941,7 +941,10 @@ def scan():
 @app.route("/status")
 @subscription_required
 def status():
-    return jsonify(scan_state)
+    data = dict(scan_state)
+    if data.get("source") == "gpt":
+        data["source"] = "本地"
+    return jsonify(data)
 
 
 @app.route("/score")

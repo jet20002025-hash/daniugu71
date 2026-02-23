@@ -38,7 +38,7 @@
         </div>
         <div class="status-row">
           <span>来源</span>
-          <strong id="status-source">{{ state.source or '未知' }}</strong>
+          <strong id="status-source">{{ '本地' if state.source == 'gpt' else (state.source or '未知') }}</strong>
         </div>
         <div class="status-row">
           <span>错误</span>

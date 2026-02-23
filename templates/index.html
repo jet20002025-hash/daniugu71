@@ -137,9 +137,8 @@
               <th>代码</th>
               <th>名称</th>
               <th>得分</th>
-              <th>最新价</th>
+              <th>当天收盘价</th>
               <th>涨跌幅%</th>
-              <th>理由</th>
             </tr>
           </thead>
           <tbody>
@@ -150,11 +149,10 @@
               <td class="score">{{ row.score }}</td>
               <td>{{ row.latest_close }}</td>
               <td class="pct">{{ row.change_pct }}</td>
-              <td class="reasons">{{ row.reasons }}</td>
             </tr>
             {% else %}
             <tr>
-              <td colspan="6" class="empty">暂无结果，点击上方按钮开始筛选。</td>
+              <td colspan="5" class="empty">暂无结果，点击上方按钮开始筛选。</td>
             </tr>
             {% endfor %}
           </tbody>

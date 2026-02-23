@@ -657,7 +657,8 @@ def run_mode3_scan(
     scan_state["running"] = True
     scan_state["error"] = None
     scan_state["source"] = (
-        f"remote/{remote_provider}" if data_source == "remote" else data_source
+        f"remote/{remote_provider}" if data_source == "remote"
+        else ("本地" if data_source == "gpt" else data_source)
     )
     try:
         market_caps = _load_market_caps(MARKET_CAP_PATH)

@@ -186,19 +186,22 @@ K 线缓存在 `GPT_DATA_DIR`（如 `/data/gpt/kline_cache_tencent`）。每天�
 
 - `scripts/update_kline_daily.sh`：调用 `scripts.prefetch_kline_tencent`，参数 `--count 100 --max-age-days 0`
 
-### 5.2 Cron
+### 5.2 Cron（每个交易日 15:10 自动更新）
+
+A 股收盘为 15:00，建议 15:10 后执行，仅限交易日（周一至周五）：
 
 ```bash
 crontab -e
 ```
 
-添加（时间可按 A 股收盘后调整，例如 18:05）：
+添加一行（日志写在项目目录，无需 root）：
 
 ```cron
-5 18 * * * export GPT_DATA_DIR=/data/gpt; /var/www/stock-app/scripts/update_kline_daily.sh >> /var/log/stock_kline.log 2>&1
+10 15 * * 1-5 GPT_DATA_DIR=/data/gpt /var/www/stock-app/scripts/update_kline_daily.sh >> /var/www/stock-app/kline_update.log 2>&1
 ```
 
-或先给脚本执行权限再在 cron 里只写脚本路径，并在脚本内保证 `GPT_DATA_DIR` 已设置。
+- `10 15 * * 1-5`：每周一至周五 15:10 执行（节假日仍会跑，可后续用 crontab 或脚本排除）。
+- 首次使用前给脚本执行权限：`chmod +x /var/www/stock-app/scripts/update_kline_daily.sh`
 
 ### 5.3 首次全量
 

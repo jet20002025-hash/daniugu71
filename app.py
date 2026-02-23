@@ -67,6 +67,17 @@ if _admin_usernames:
         conn.close()
 
 
+scan_state = {
+    "running": False,
+    "progress": 0,
+    "total": 0,
+    "message": "",
+    "last_run": None,
+    "error": None,
+    "source": "",
+}
+
+
 @app.before_request
 def _before_request():
     g.current_user = get_current_user()

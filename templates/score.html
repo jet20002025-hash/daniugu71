@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>个股评分</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+  <style>
+    .score-panel { max-width: 480px; margin: 2rem auto; padding: 1.5rem; }
+    .score-form { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+    .score-form input { flex: 1; padding: 0.5rem; }
+    .score-form button { padding: 0.5rem 1rem; }
+    .score-result { margin-top: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 8px; }
+    .score-result h3 { margin: 0 0 0.5rem 0; }
+    .score-result .meta { color: #666; font-size: 0.9rem; }
+    .score-result .breakdown { margin-top: 0.5rem; font-size: 0.9rem; }
+    .score-result .error { color: #c00; }
+    .nav-link { display: inline-block; margin-bottom: 1rem; color: #0066cc; }
+  </style>
+</head>
+<body>
+  <div class="score-panel">
+    <a href="/" class="nav-link">← 返回首页</a>
+    <h2>个股评分（mode3 71倍模型）</h2>
+    <form class="score-form" id="score-form">
+      <input type="text" name="code" id="code" placeholder="输入股票代码，如 300766" required />
+      <input type="date" name="date" id="date" placeholder="截止日期（可选）" />
+      <button type="submit">评分</button>
+    </form>
+    <div id="result" class="score-result" style="display:none;"></div>
+  </div>
+  <script>
+    document.getElementById('score-form').onsubmit = async (e) => {
+      e.preventDefault();
+      const code = document.getElementById('code').value.trim();
+      const date = document.getElementById('date').value || null;
+      const resultEl = document.getElementById('result');
+      resultEl.style.display = 'block';
+      resultEl.innerHTML = '加载中...';
+      try {
+        const url = '/score/query?code=' + encodeURIComponent(code) + (date ? '&date=' + date : '');
+        const r = await fetch(url);
+        const d = await r.json();
+        if (!r.ok) {
+          resultEl.innerHTML = '<span class="error">' + (d.error || '请求失败') + '</span>';
+          return;
+        }
+        let html = '<h3>' + d.code + ' ' + (d.name || '') + '</h3>';
+        if (d.score != null) {
+          html += '<p><strong>评分: ' + d.score + '</strong></p>';
+          if (d.has_signal) {
+            html += '<p class="meta">信号日: ' + d.signal_date + ' &nbsp; 买入日: ' + d.buy_date + '</p>';
+            html += '<p class="meta">放量: ' + (d.vol_ratio || '-') + 'x &nbsp; MA10-20: ' + (d.ma20_gap_pct != null ? d.ma20_gap_pct + '%' : '-') + ' &nbsp; MA20-60: ' + (d.ma60_gap_pct != null ? d.ma60_gap_pct + '%' : '-') + '</p>';
+            html += '<p class="meta">距MA20: ' + (d.close_gap_pct != null ? d.close_gap_pct + '%' : '-') + ' &nbsp; 20日涨幅: ' + (d.ret20_pct != null ? d.ret20_pct + '%' : '-') + '</p>';
+          } else {
+            html += '<p class="meta">状态: 无启动点信号</p>';
+            html += '<p class="meta">原因: ' + (d.reason || '') + '</p>';
+            if (d.latest_date) html += '<p class="meta">参考日期: ' + d.latest_date + '</p>';
+          }
+          if (d.breakdown && Object.keys(d.breakdown).length) {
+            html += '<div class="breakdown"><strong>评分明细:</strong> ';
+            html += Object.entries(d.breakdown).map(([k,v]) => k + ':+' + v).join(' &nbsp; ');
+            html += '</div>';
+          }
+        } else {
+          html += '<p class="error">' + (d.reason || '无法评分') + '</p>';
+        }
+        resultEl.innerHTML = html;
+      } catch (err) {
+        resultEl.innerHTML = '<span class="error">' + err.message + '</span>';
+      }
+    };
+  </script>
+</body>
+</html>

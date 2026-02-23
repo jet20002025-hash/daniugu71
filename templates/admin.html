@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>管理后台 - 强势股筛选器</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+  <style>
+    .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .admin-header a { color: var(--accent-2); }
+    th, td { padding: 10px 12px; }
+    .badge { padding: 4px 8px; border-radius: 8px; font-size: 12px; }
+    .badge-trial { background: rgba(47, 196, 178, 0.2); color: var(--accent-2); }
+    .badge-activated { background: rgba(47, 196, 178, 0.3); color: #fff; }
+    .badge-expired { background: rgba(240, 108, 108, 0.2); color: var(--danger); }
+    .btn-sm { padding: 6px 12px; font-size: 13px; border-radius: 8px; border: none; cursor: pointer; }
+    .btn-activate { background: var(--accent-2); color: #0e1116; }
+    .btn-deactivate { background: var(--panel-light); color: var(--muted); border: 1px solid var(--border); }
+  </style>
+</head>
+<body>
+  <div class="bg" aria-hidden="true"></div>
+  <main class="container">
+    <div class="panel">
+      <div class="admin-header">
+        <h1>用户管理</h1>
+        <a href="{{ url_for('index') }}">返回首页</a>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>用户名</th>
+              <th>注册时间</th>
+              <th>试用截止</th>
+              <th>状态</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for u in users %}
+            <tr>
+              <td>{{ u.id }}</td>
+              <td>{{ u.username }}{% if u.is_admin %} <span class="badge badge-trial">管理员</span>{% endif %}</td>
+              <td>{{ u.created_at }}</td>
+              <td>{{ u.trial_ends_at }}</td>
+              <td>
+                {% if u.is_activated %}
+                  <span class="badge badge-activated">已开通</span>
+                {% elif u.trial_ended %}
+                  <span class="badge badge-expired">试用已结束</span>
+                {% else %}
+                  <span class="badge badge-trial">试用中</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if not u.is_admin %}
+                  {% if u.is_activated %}
+                    <form method="post" action="{{ url_for('admin_deactivate', user_id=u.id) }}" style="display:inline">
+                      <button type="submit" class="btn-sm btn-deactivate">取消开通</button>
+                    </form>
+                  {% else %}
+                    <form method="post" action="{{ url_for('admin_activate', user_id=u.id) }}" style="display:inline">
+                      <button type="submit" class="btn-sm btn-activate">开通</button>
+                    </form>
+                  {% endif %}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

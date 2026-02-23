@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>强势股右侧筛选器</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="bg" aria-hidden="true"></div>
+  <main class="container">
+    <header class="hero">
+      <div>
+        <p class="eyebrow">超短线 · 右侧强势</p>
+        <h1>强势股筛选器</h1>
+        <p class="subtitle">按既定规则自动筛选符合强势特征的候选列表（不提供买点/荐股）。<a href="/score" style="margin-left:0.5em;">个股评分</a></p>
+        {% if user %}
+        <p class="user-bar" style="margin-top:10px;font-size:14px;color:var(--muted)">
+          {{ user.username }}
+          {% if user.is_activated %} · <span style="color:var(--accent-2)">已开通</span>{% elif not user.trial_ended %} · 试用中（{{ user.trial_ends_at[:10] }} 前）{% endif %}
+          <a href="{{ url_for('logout') }}" style="margin-left:12px;color:var(--accent-2)">退出</a>
+          {% if user.is_admin %} · <a href="{{ url_for('admin') }}" style="color:var(--accent)">管理后台</a>{% endif %}
+        </p>
+        {% endif %}
+      </div>
+      <div class="status-card">
+        <div class="status-row">
+          <span>状态</span>
+          <strong id="status-text">{{ '运行中' if state.running else '空闲' }}</strong>
+        </div>
+        <div class="status-row">
+          <span>进度</span>
+          <strong id="status-progress">{{ state.progress }}/{{ state.total }}</strong>
+        </div>
+        <div class="status-row">
+          <span>消息</span>
+          <strong id="status-message">{{ state.message }}</strong>
+        </div>
+        <div class="status-row">
+          <span>来源</span>
+          <strong id="status-source">{{ state.source or '未知' }}</strong>
+        </div>
+        <div class="status-row">
+          <span>错误</span>
+          <strong id="status-error">{{ state.error or '无' }}</strong>
+        </div>
+        <div class="status-row">
+          <span>模型</span>
+          <strong id="status-model">
+            {% if meta.model == 'ml_bull' %}
+              牛股ML
+            {% elif meta.model == 'ml' %}
+              ML
+            {% elif meta.model == 'mode3' %}
+              mode3
+            {% elif meta.model == 'mode3ok' %}
+              mode3ok
+            {% elif meta.model == 'mode3_avoid' %}
+              mode3(避大阳线)
+            {% elif meta.model == 'mode3_upper' %}
+              mode3(上影优先)
+            {% elif meta.model == 'mode3_upper_strict' %}
+              mode3(上影强过滤)
+            {% elif meta.model == 'mode3_upper_near' %}
+              mode3(上影+放量+贴近MA20)
+            {% elif meta.model == 'mode4' %}
+              mode4(避连续3板后跌停)
+            {% else %}
+              规则
+            {% endif %}
+          </strong>
+        </div>
+        <div class="status-row">
+          <span>上次更新</span>
+          <strong id="status-last">{{ meta.updated_at or '暂无' }}</strong>
+        </div>
+      </div>
+    </header>
+
+    <section class="panel">
+      <form class="form" method="post" action="/scan" id="scan-form">
+        <label>
+          开始日期
+          <input type="date" name="start_date" id="start_date" />
+        </label>
+        <label>
+          截止日期
+          <input type="date" name="cutoff_date" id="cutoff_date" />
+        </label>
+        <label>
+          数据源
+          <select name="data_source" id="data_source">
+            <option value="gpt" selected>gpt股票本地库</option>
+            <option value="remote">在线更新</option>
+          </select>
+        </label>
+        <label>
+          来源
+          <select name="remote_provider" id="remote_provider">
+            <option value="eastmoney" selected>东财</option>
+            <option value="tencent">腾讯</option>
+            <option value="sina">新浪</option>
+            <option value="netease">网易（待接入）</option>
+          </select>
+        </label>
+        <label>
+          优先本地
+          <div class="toggle-row">
+            <input type="checkbox" name="prefer_local" id="prefer_local" />
+            <span>已有缓存则不联网</span>
+          </div>
+        </label>
+        <label>
+          模型
+          <select name="mode" id="mode">
+            <option value="rule" selected>规则版</option>
+            <option value="ml">ML 版（量化买点）</option>
+            <option value="ml_bull">ML 版（牛股·高精度）</option>
+            <option value="mode3">mode3（启动点·71倍模型）</option>
+            <option value="mode3ok">mode3ok（mode3 保存版）</option>
+            <option value="mode3_avoid">mode3（避大阳线）</option>
+            <option value="mode3_upper">mode3（放量长上影优先）</option>
+            <option value="mode3_upper_strict">mode3（放量长上影过滤）</option>
+            <option value="mode3_upper_near">mode3（上影优先+放量+贴近MA20）</option>
+            <option value="mode4">mode4（避连续3板后跌停）</option>
+          </select>
+        </label>
+        <label>
+          信号强度
+          <select name="signal_type" id="signal_type">
+            <option value="aggressive" selected>激进</option>
+            <option value="relaxed">宽松</option>
+          </select>
+        </label>
+        <label>
+          最低分数
+          <input type="number" name="min_score" id="min_score" value="70" min="0" max="200" />
+        </label>
+        <label>
+          市值上限(亿)
+          <input type="number" name="max_market_cap" id="max_market_cap" value="150" min="0" step="1" />
+        </label>
+        <label>
+          输出数量
+          <input type="number" name="max_results" id="max_results" value="200" min="10" max="2000" />
+        </label>
+        <label>
+          并发线程
+          <input type="number" name="workers" id="workers" value="6" min="1" max="12" />
+        </label>
+        <button type="submit" class="primary">开始筛选</button>
+      </form>
+      <div class="cap-hint">当前市值上限: <strong id="cap-display">150</strong> 亿（填 0 代表不启用）</div>
+      <p class="hint">首次运行可能需要较长时间，结果会保存在本地。牛股高精度模式会使用训练得到的高阈值，可能出现当日无结果。开始/截止日期可限定区间筛选。</p>
+    </section>
+
+    <section class="panel table-panel">
+      <div class="table-header">
+        <h2>候选列表（{{ meta.count }}）</h2>
+        <span>{{ '按概率降序' if meta.model in ['ml', 'ml_bull'] else '按得分降序' }}</span>
+      </div>
+      {% if meta.score_buckets %}
+      <div class="bucket-row">
+        <span>分数统计</span>
+        <strong>≥120: {{ meta.score_buckets.ge_120 }}</strong>
+        <strong>≥140: {{ meta.score_buckets.ge_140 }}</strong>
+        <strong>≥160: {{ meta.score_buckets.ge_160 }}</strong>
+        <strong>≥180: {{ meta.score_buckets.ge_180 }}</strong>
+      </div>
+      {% endif %}
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>代码</th>
+              <th>名称</th>
+              <th>得分</th>
+              <th>最新价</th>
+              <th>涨跌幅%</th>
+              <th>理由</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in results %}
+            <tr>
+              <td>{{ row.code }}</td>
+              <td>{{ row.name }}</td>
+              <td class="score">{{ row.score }}</td>
+              <td>{{ row.latest_close }}</td>
+              <td class="pct">{{ row.change_pct }}</td>
+              <td class="reasons">{{ row.reasons }}</td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="6" class="empty">暂无结果，点击上方按钮开始筛选。</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const STORAGE_KEY = 'stock_scanner_filters_v1';
+    let lastRunning = {{ 'true' if state.running else 'false' }};
+
+    function loadFilters() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) return;
+        const data = JSON.parse(raw);
+        if (data.cutoff_date !== undefined) document.getElementById('cutoff_date').value = data.cutoff_date;
+        if (data.start_date !== undefined) document.getElementById('start_date').value = data.start_date;
+        if (data.data_source) {
+          const source = data.data_source === 'cache' ? 'gpt' : data.data_source;
+          document.getElementById('data_source').value = source;
+        }
+        if (data.remote_provider) document.getElementById('remote_provider').value = data.remote_provider;
+        if (data.prefer_local !== undefined) document.getElementById('prefer_local').checked = data.prefer_local;
+        if (data.mode) document.getElementById('mode').value = data.mode;
+        if (data.signal_type) document.getElementById('signal_type').value = data.signal_type;
+        if (data.min_score) document.getElementById('min_score').value = data.min_score;
+        if (data.max_market_cap !== undefined) document.getElementById('max_market_cap').value = data.max_market_cap;
+        if (data.max_results) document.getElementById('max_results').value = data.max_results;
+        if (data.workers) document.getElementById('workers').value = data.workers;
+      } catch (err) {
+        // ignore
+      }
+    }
+
+    function saveFilters() {
+      const payload = {
+        cutoff_date: document.getElementById('cutoff_date').value,
+        start_date: document.getElementById('start_date').value,
+        data_source: document.getElementById('data_source').value,
+        remote_provider: document.getElementById('remote_provider').value,
+        prefer_local: document.getElementById('prefer_local').checked,
+        mode: document.getElementById('mode').value,
+        signal_type: document.getElementById('signal_type').value,
+        min_score: document.getElementById('min_score').value,
+        max_market_cap: document.getElementById('max_market_cap').value,
+        max_results: document.getElementById('max_results').value,
+        workers: document.getElementById('workers').value,
+      };
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+      } catch (err) {
+        // ignore
+      }
+    }
+
+    document.getElementById('scan-form').addEventListener('submit', saveFilters);
+    const capInput = document.getElementById('max_market_cap');
+    const capDisplay = document.getElementById('cap-display');
+    const updateCap = () => {
+      const raw = capInput.value || '0';
+      capDisplay.textContent = raw;
+    };
+    capInput.addEventListener('input', updateCap);
+    updateCap();
+    document.getElementById('data_source').addEventListener('change', () => {
+      const source = document.getElementById('data_source').value;
+      const enableProvider = source !== 'cache';
+      document.getElementById('remote_provider').disabled = !enableProvider;
+      document.getElementById('prefer_local').disabled = source !== 'remote';
+    });
+    document.getElementById('mode').addEventListener('change', () => {
+      const mode = document.getElementById('mode').value;
+      const enableSignal = mode === 'ml';
+      document.getElementById('signal_type').disabled = !enableSignal;
+    });
+    loadFilters();
+    document.getElementById('data_source').dispatchEvent(new Event('change'));
+    document.getElementById('mode').dispatchEvent(new Event('change'));
+
+    async function pollStatus() {
+      try {
+        const res = await fetch('/status');
+        const data = await res.json();
+        document.getElementById('status-text').textContent = data.running ? '运行中' : '空闲';
+        document.getElementById('status-progress').textContent = data.progress + '/' + data.total;
+        document.getElementById('status-message').textContent = data.message || '';
+        document.getElementById('status-source').textContent = data.source || '未知';
+        document.getElementById('status-error').textContent = data.error || '无';
+        document.getElementById('status-last').textContent = data.last_run || '{{ meta.updated_at or "暂无" }}';
+        if (lastRunning && !data.running) {
+          window.location.reload();
+          return;
+        }
+        lastRunning = data.running;
+      } catch (err) {
+        // ignore
+      }
+    }
+    setInterval(pollStatus, 2000);
+  </script>
+</body>
+</html>

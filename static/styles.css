@@ -1,0 +1,256 @@
+:root {
+  --bg: #0e1116;
+  --panel: #171b22;
+  --panel-light: #1e242d;
+  --accent: #f2b134;
+  --accent-2: #2fc4b2;
+  --text: #f4f5f7;
+  --muted: #a5b0c2;
+  --danger: #f06c6c;
+  --border: rgba(255, 255, 255, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Alegreya Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+.bg {
+  position: fixed;
+  inset: 0;
+  background:
+    radial-gradient(circle at 10% 10%, rgba(242, 177, 52, 0.2), transparent 40%),
+    radial-gradient(circle at 90% 20%, rgba(47, 196, 178, 0.2), transparent 45%),
+    linear-gradient(120deg, rgba(9, 12, 18, 0.9), rgba(17, 22, 30, 0.9));
+  z-index: -1;
+}
+
+.container {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 32px 20px 60px;
+}
+
+.hero {
+  display: flex;
+  gap: 24px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 12px;
+  color: var(--accent-2);
+}
+
+h1 {
+  font-size: 40px;
+  margin: 6px 0 8px;
+}
+
+.subtitle {
+  color: var(--muted);
+  max-width: 540px;
+}
+
+.status-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px 20px;
+  min-width: 240px;
+  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.3);
+}
+
+.status-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.status-row strong {
+  color: var(--text);
+}
+
+.panel {
+  margin-top: 24px;
+  padding: 20px;
+  background: var(--panel-light);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.2);
+}
+
+.form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+  align-items: end;
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #0f141b;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.toggle-row input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent);
+}
+
+.toggle-row span {
+  color: var(--text);
+  font-size: 14px;
+}
+
+input {
+  background: #0f141b;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+select {
+  background: #0f141b;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.primary {
+  background: linear-gradient(120deg, var(--accent), #f59f3d);
+  color: #1b1408;
+  border: none;
+  padding: 12px 16px;
+  font-weight: 700;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(242, 177, 52, 0.3);
+}
+
+.hint {
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.cap-hint {
+  margin-top: 12px;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.table-panel {
+  padding: 0;
+}
+
+.table-header {
+  display: flex;
+  justify-content: space-between;
+  padding: 18px 20px 10px;
+  align-items: center;
+}
+
+.bucket-row {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0 20px 12px;
+}
+
+.bucket-row strong {
+  color: #e2e8f0;
+  font-weight: 600;
+}
+
+.table-header h2 {
+  margin: 0;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.table-wrap table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th, td {
+  padding: 14px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+}
+
+th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.score {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.pct {
+  color: var(--accent-2);
+}
+
+.reasons {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.empty {
+  text-align: center;
+  color: var(--muted);
+  padding: 40px 0;
+}
+
+@media (max-width: 720px) {
+  h1 {
+    font-size: 32px;
+  }
+
+  .status-card {
+    width: 100%;
+  }
+}

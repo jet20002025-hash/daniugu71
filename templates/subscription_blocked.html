@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>开通服务 - 强势股筛选器</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+  <style>
+    .block-box { max-width: 480px; margin: 80px auto; padding: 32px; background: var(--panel-light); border: 1px solid var(--border); border-radius: 18px; text-align: center; }
+    .block-box h1 { font-size: 24px; margin-bottom: 16px; }
+    .block-box p { color: var(--muted); margin-bottom: 12px; }
+    .block-box .primary { margin-top: 16px; }
+  </style>
+</head>
+<body>
+  <div class="bg" aria-hidden="true"></div>
+  <main class="container">
+    <div class="block-box">
+      <h1>试用已结束</h1>
+      <p>您的免费试用（1 个月）已到期。充值后请联系管理员开通，即可继续使用筛选与评分功能。</p>
+      <p>当前账号：<strong>{{ user.username }}</strong></p>
+      <a href="{{ url_for('logout') }}" class="primary" style="display:inline-block;text-decoration:none">退出登录</a>
+    </div>
+  </main>
+</body>
+</html>

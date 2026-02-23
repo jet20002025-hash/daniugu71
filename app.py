@@ -717,7 +717,7 @@ def run_mode3_scan(
 
         scan_state["total"] = len(stock_list)
         scan_state["progress"] = 0
-        provider_label = remote_provider if data_source == "remote" else data_source
+        provider_label = remote_provider if data_source == "remote" else ("本地股票库" if data_source == "gpt" else data_source)
         cap_note = ""
         if config.max_market_cap:
             if market_caps is None:

@@ -97,19 +97,21 @@ Description=Stock App Gunicorn
 After=network.target
 
 [Service]
-User=www-data
-Group=www-data
+User=admin
+Group=admin
 WorkingDirectory=/var/www/stock-app
 Environment="PATH=/var/www/stock-app/venv/bin"
-EnvironmentFile=/var/www/stock-app/.env
-ExecStart=/var/www/stock-app/venv/bin/gunicorn -w 4 -b 127.0.0.1:8080 "wsgi:app"
+Environment="GPT_DATA_DIR=/data/gpt"
+EnvironmentFile=-/var/www/stock-app/.env
+ExecStart=/var/www/stock-app/venv/bin/gunicorn -w 2 -b 127.0.0.1:8080 "wsgi:app"
 Restart=always
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-若用当前用户运行，把 `User/Group` 改为当前用户。然后：
+说明：`User/Group` 改为你实际运行的用户（如 admin）；`EnvironmentFile=-` 中 `-` 表示 .env 不存在也不报错。然后：
 
 ```bash
 sudo systemctl daemon-reload

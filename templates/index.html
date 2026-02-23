@@ -46,29 +46,7 @@
         </div>
         <div class="status-row">
           <span>模型</span>
-          <strong id="status-model">
-            {% if meta.model == 'ml_bull' %}
-              牛股ML
-            {% elif meta.model == 'ml' %}
-              ML
-            {% elif meta.model == 'mode3' %}
-              mode3
-            {% elif meta.model == 'mode3ok' %}
-              mode3ok
-            {% elif meta.model == 'mode3_avoid' %}
-              mode3(避大阳线)
-            {% elif meta.model == 'mode3_upper' %}
-              mode3(上影优先)
-            {% elif meta.model == 'mode3_upper_strict' %}
-              mode3(上影强过滤)
-            {% elif meta.model == 'mode3_upper_near' %}
-              mode3(上影+放量+贴近MA20)
-            {% elif meta.model == 'mode4' %}
-              mode4(避连续3板后跌停)
-            {% else %}
-              规则
-            {% endif %}
-          </strong>
+          <strong id="status-model">71倍模型</strong>
         </div>
         <div class="status-row">
           <span>上次更新</span>
@@ -113,23 +91,7 @@
         <label>
           模型
           <select name="mode" id="mode">
-            <option value="rule" selected>规则版</option>
-            <option value="ml">ML 版（量化买点）</option>
-            <option value="ml_bull">ML 版（牛股·高精度）</option>
-            <option value="mode3">mode3（启动点·71倍模型）</option>
-            <option value="mode3ok">mode3ok（mode3 保存版）</option>
-            <option value="mode3_avoid">mode3（避大阳线）</option>
-            <option value="mode3_upper">mode3（放量长上影优先）</option>
-            <option value="mode3_upper_strict">mode3（放量长上影过滤）</option>
-            <option value="mode3_upper_near">mode3（上影优先+放量+贴近MA20）</option>
-            <option value="mode4">mode4（避连续3板后跌停）</option>
-          </select>
-        </label>
-        <label>
-          信号强度
-          <select name="signal_type" id="signal_type">
-            <option value="aggressive" selected>激进</option>
-            <option value="relaxed">宽松</option>
+            <option value="mode3" selected>71倍模型（启动点）</option>
           </select>
         </label>
         <label>
@@ -151,13 +113,13 @@
         <button type="submit" class="primary">开始筛选</button>
       </form>
       <div class="cap-hint">当前市值上限: <strong id="cap-display">150</strong> 亿（填 0 代表不启用）</div>
-      <p class="hint">首次运行可能需要较长时间，结果会保存在本地。牛股高精度模式会使用训练得到的高阈值，可能出现当日无结果。开始/截止日期可限定区间筛选。</p>
+      <p class="hint">首次运行可能需要较长时间，结果会保存在本地。开始/截止日期可限定区间筛选。</p>
     </section>
 
     <section class="panel table-panel">
       <div class="table-header">
         <h2>候选列表（{{ meta.count }}）</h2>
-        <span>{{ '按概率降序' if meta.model in ['ml', 'ml_bull'] else '按得分降序' }}</span>
+        <span>按得分降序</span>
       </div>
       {% if meta.score_buckets %}
       <div class="bucket-row">
@@ -219,7 +181,6 @@
         if (data.remote_provider) document.getElementById('remote_provider').value = data.remote_provider;
         if (data.prefer_local !== undefined) document.getElementById('prefer_local').checked = data.prefer_local;
         if (data.mode) document.getElementById('mode').value = data.mode;
-        if (data.signal_type) document.getElementById('signal_type').value = data.signal_type;
         if (data.min_score) document.getElementById('min_score').value = data.min_score;
         if (data.max_market_cap !== undefined) document.getElementById('max_market_cap').value = data.max_market_cap;
         if (data.max_results) document.getElementById('max_results').value = data.max_results;
@@ -237,7 +198,6 @@
         remote_provider: document.getElementById('remote_provider').value,
         prefer_local: document.getElementById('prefer_local').checked,
         mode: document.getElementById('mode').value,
-        signal_type: document.getElementById('signal_type').value,
         min_score: document.getElementById('min_score').value,
         max_market_cap: document.getElementById('max_market_cap').value,
         max_results: document.getElementById('max_results').value,
@@ -265,14 +225,8 @@
       document.getElementById('remote_provider').disabled = !enableProvider;
       document.getElementById('prefer_local').disabled = source !== 'remote';
     });
-    document.getElementById('mode').addEventListener('change', () => {
-      const mode = document.getElementById('mode').value;
-      const enableSignal = mode === 'ml';
-      document.getElementById('signal_type').disabled = !enableSignal;
-    });
     loadFilters();
     document.getElementById('data_source').dispatchEvent(new Event('change'));
-    document.getElementById('mode').dispatchEvent(new Event('change'));
 
     async function pollStatus() {
       try {

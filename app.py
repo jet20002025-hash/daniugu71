@@ -880,7 +880,9 @@ def scan():
     if scan_state["running"]:
         return redirect(url_for("index"))
 
-    mode = request.form.get("mode", "rule")
+    mode = request.form.get("mode", "mode3")
+    if mode not in ("mode3", "mode3ok", "mode3_avoid", "mode3_upper", "mode3_upper_strict", "mode3_upper_near", "mode4"):
+        mode = "mode3"
     cutoff_date = request.form.get("cutoff_date") or None
     start_date = request.form.get("start_date") or None
     data_source = request.form.get("data_source", "gpt")
@@ -906,69 +908,30 @@ def scan():
         workers=workers,
         max_market_cap=cap_limit,
     )
-    if mode in ("ml", "ml_bull"):
-        ml_config = MLConfig(
-            workers=workers,
-            max_results=max_results,
-            count=200,
-            min_score=min_score,
-            signal_type=signal_type,
-            max_market_cap=cap_limit,
-        )
-        if mode == "ml":
-            ml_config.entry_mode = "pullback"
-        ml_config.count = max(ml_config.count, ml_config.year_lookback + 5)
-        thread = threading.Thread(
-            target=run_ml_scan,
-            args=(
-                ml_config,
-                cutoff_date,
-                start_date,
-                data_source,
-                remote_provider,
-                prefer_local,
-                mode,
-            ),
-            daemon=True,
-        )
-    elif mode in (
-        "mode3",
-        "mode3ok",
-        "mode3_avoid",
-        "mode3_upper",
-        "mode3_upper_strict",
-        "mode3_upper_near",
-        "mode4",
-    ):
-        use_startup_data = mode in ("mode3", "mode3ok", "mode3_avoid", "mode3_upper", "mode3_upper_strict", "mode3_upper_near", "mode4")
-        use_71x_standard = mode == "mode3"
-        thread = threading.Thread(
-            target=run_mode3_scan,
-            args=(
-                config,
-                cutoff_date,
-                start_date,
-                data_source,
-                remote_provider,
-                prefer_local,
-                mode == "mode3_avoid",
-                mode in ("mode3_upper", "mode3_upper_near"),
-                mode == "mode3_upper_strict",
-                mode == "mode3_upper_near",
-                mode == "mode3_upper_near",
-                mode == "mode4",
-                "mode3ok" if mode == "mode3ok" else None,
-                use_startup_data,
-                use_71x_standard,
-            ),
-            daemon=True,
-        )
-    else:
-        thread = threading.Thread(
-            target=run_scan,
-            args=(config, cutoff_date, start_date, data_source, remote_provider, prefer_local),
-            daemon=True,
-        )
+    # 仅保留 71 倍模型（mode3）
+    use_startup_data = True
+    use_71x_standard = mode == "mode3"
+    thread = threading.Thread(
+        target=run_mode3_scan,
+        args=(
+            config,
+            cutoff_date,
+            start_date,
+            data_source,
+            remote_provider,
+            prefer_local,
+            mode == "mode3_avoid",
+            mode in ("mode3_upper", "mode3_upper_near"),
+            mode == "mode3_upper_strict",
+            mode == "mode3_upper_near",
+            mode == "mode3_upper_near",
+            mode == "mode4",
+            "mode3ok" if mode == "mode3ok" else None,
+            use_startup_data,
+            use_71x_standard,
+        ),
+        daemon=True,
+    )
     thread.start()
     time.sleep(0.2)
     return redirect(url_for("index"))

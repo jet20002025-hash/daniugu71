@@ -23,6 +23,7 @@ from app.database import (
     set_activated_until,
     downgrade_expired_subscriptions,
     list_users,
+    count_registrations_by_ip,
 )
 from app.eastmoney import (
     KlineRow,
@@ -833,17 +834,26 @@ def register():
         elif len(password) < 6:
             error = "密码至少 6 位"
         else:
+            # 限制同一 IP 注册数量，防止反复注册刷试用
             try:
-                user = create_user(username, password)
-                if user:
-                    session["user_id"] = user.id
-                    session.permanent = True
-                    return redirect(url_for("index"))
-                error = "用户名已被注册"
-            except Exception as e:
-                import traceback
-                traceback.print_exc()
-                error = "注册失败，请稍后重试或联系管理员"
+                max_per_ip = int(os.environ.get("MAX_ACCOUNTS_PER_IP", "1"))
+            except ValueError:
+                max_per_ip = 1
+            remote_ip = request.remote_addr or ""
+            if count_registrations_by_ip(remote_ip) >= max_per_ip:
+                error = "同一 IP 注册账号数量已达上限，请勿重复注册。如有需要请联系管理员。"
+            else:
+                try:
+                    user = create_user(username, password, register_ip=remote_ip)
+                    if user:
+                        session["user_id"] = user.id
+                        session.permanent = True
+                        return redirect(url_for("index"))
+                    error = "用户名已被注册"
+                except Exception as e:
+                    import traceback
+                    traceback.print_exc()
+                    error = "注册失败，请稍后重试或联系管理员"
     return render_template("register.html", error=error)
 
 

@@ -44,6 +44,7 @@
             <tr>
               <th>ID</th>
               <th>用户名</th>
+              <th>注册IP</th>
               <th>注册时间</th>
               <th>试用截止</th>
               <th>状态</th>
@@ -56,6 +57,7 @@
             <tr>
               <td>{{ u.id }}</td>
               <td>{{ u.username }}{% if u.is_admin %} <span class="badge badge-trial">管理员</span>{% endif %}{% if u.is_super_admin %} <span class="badge badge-super">超级管理员</span>{% endif %}</td>
+              <td>{{ u.register_ip or '—' }}</td>
               <td>{{ u.created_at }}</td>
               <td>{{ u.trial_ends_at }}</td>
               <td>

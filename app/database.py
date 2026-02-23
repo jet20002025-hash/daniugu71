@@ -24,6 +24,8 @@ def _ensure_columns(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE users ADD COLUMN activated_until TEXT")
     if "is_super_admin" not in names:
         conn.execute("ALTER TABLE users ADD COLUMN is_super_admin INTEGER NOT NULL DEFAULT 0")
+    if "register_ip" not in names:
+        conn.execute("ALTER TABLE users ADD COLUMN register_ip TEXT")
     # 将 superzwj 设为超级管理员并确保有管理员权限
     conn.execute(
         "UPDATE users SET is_super_admin = 1, is_admin = 1 WHERE username = ?",
@@ -47,7 +49,8 @@ def init_db() -> None:
                 is_activated INTEGER NOT NULL DEFAULT 0,
                 is_admin INTEGER NOT NULL DEFAULT 0,
                 activated_until TEXT,
-                is_super_admin INTEGER NOT NULL DEFAULT 0
+                is_super_admin INTEGER NOT NULL DEFAULT 0,
+                register_ip TEXT
             )
         """)
         conn.commit()
@@ -69,6 +72,7 @@ class User:
         is_admin: int,
         activated_until: Optional[str] = None,
         is_super_admin: int = 0,
+        register_ip: Optional[str] = None,
     ):
         self.id = id
         self.username = username
@@ -80,6 +84,7 @@ class User:
         self.is_admin = bool(is_admin)
         self.activated_until = (activated_until or "").strip() or None
         self.is_super_admin = bool(is_super_admin)
+        self.register_ip = (register_ip or "").strip() or None
 
     @property
     def trial_ended(self) -> bool:
@@ -111,9 +116,10 @@ class User:
 
 
 def _row_to_user(row: Tuple) -> User:
-    # 兼容 8 列（旧库）与 10 列
+    # 兼容 8 列（旧库）、10 列、11 列（含 register_ip）
     activated_until = row[8] if len(row) > 8 else None
     is_super_admin = int(row[9]) if len(row) > 9 else (1 if (row[1] == "superzwj") else 0)
+    register_ip = row[10] if len(row) > 10 else None
     return User(
         id=row[0],
         username=row[1],
@@ -125,11 +131,12 @@ def _row_to_user(row: Tuple) -> User:
         is_admin=row[7],
         activated_until=activated_until,
         is_super_admin=is_super_admin,
+        register_ip=register_ip,
     )
 
 
 def _user_columns() -> str:
-    return "id, username, password_hash, created_at, trial_ends_at, is_paid, is_activated, is_admin, activated_until, is_super_admin"
+    return "id, username, password_hash, created_at, trial_ends_at, is_paid, is_activated, is_admin, activated_until, is_super_admin, register_ip"
 
 
 def get_user_by_id(user_id: int) -> Optional[User]:
@@ -158,8 +165,23 @@ def get_user_by_username(username: str) -> Optional[User]:
         conn.close()
 
 
-def create_user(username: str, password: str) -> Optional[User]:
-    """注册新用户，试用期 1 个月"""
+def count_registrations_by_ip(ip: Optional[str]) -> int:
+    """同一 IP 已注册账号数量（用于限制重复注册）"""
+    if not (ip or "").strip():
+        return 0
+    conn = get_connection()
+    try:
+        cur = conn.execute(
+            "SELECT COUNT(*) FROM users WHERE register_ip = ?",
+            (ip.strip(),),
+        )
+        return cur.fetchone()[0]
+    finally:
+        conn.close()
+
+
+def create_user(username: str, password: str, register_ip: Optional[str] = None) -> Optional[User]:
+    """注册新用户，试用期 1 个月。register_ip 用于限制同一 IP 重复注册。"""
     username = username.strip()
     if not username or not password:
         return None
@@ -168,13 +190,14 @@ def create_user(username: str, password: str) -> Optional[User]:
     created = now.strftime("%Y-%m-%d %H:%M:%S")
     trial_ends_at = trial_ends.strftime("%Y-%m-%d %H:%M:%S")
     password_hash = generate_password_hash(password)
+    ip_val = (register_ip or "").strip() or None
     conn = get_connection()
     try:
         is_super = 1 if username == "superzwj" else 0
         is_adm = 1 if (username == "superzwj" or is_super) else 0
         conn.execute(
-            "INSERT INTO users (username, password_hash, created_at, trial_ends_at, is_paid, is_activated, is_admin, is_super_admin) VALUES (?, ?, ?, ?, 0, 0, ?, ?)",
-            (username, password_hash, created, trial_ends_at, is_adm, is_super),
+            "INSERT INTO users (username, password_hash, created_at, trial_ends_at, is_paid, is_activated, is_admin, is_super_admin, register_ip) VALUES (?, ?, ?, ?, 0, 0, ?, ?, ?)",
+            (username, password_hash, created, trial_ends_at, is_adm, is_super, ip_val),
         )
         conn.commit()
         cur = conn.execute("SELECT last_insert_rowid()")

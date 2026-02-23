@@ -68,6 +68,9 @@ export STOCK_APP_DB=/data/users.db
 
 # 管理员账号（充值后在此开通用户），多个用逗号分隔
 export ADMIN_USERNAMES=admin
+
+# 可选：同一 IP 最多允许注册账号数，默认 1（防刷试用）
+# export MAX_ACCOUNTS_PER_IP=1
 ```
 
 首次部署前请把 K 线等数据放到 `/data/gpt`（可从本地上传，或首次在服务器跑一次全量 prefetch）。

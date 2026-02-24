@@ -146,6 +146,8 @@ server {
 }
 ```
 
+应用会优先用 `X-Real-IP` / `X-Forwarded-For` 作为注册 IP 和同一 IP 注册数量限制，上述 `proxy_set_header` 需保留。
+
 启用并重载：
 
 ```bash

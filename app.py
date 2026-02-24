@@ -62,6 +62,19 @@ os.makedirs(RESULTS_DIR, exist_ok=True)
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "change-me-in-production-" + os.path.basename(BASE_DIR))
 
+
+def get_client_ip():
+    """获取真实客户端 IP（优先 Nginx 转发的 X-Real-IP / X-Forwarded-For）。"""
+    xff = request.headers.get("X-Forwarded-For")
+    if xff:
+        # 格式多为 "客户端IP, 代理IP,..." 取第一个
+        return xff.strip().split(",")[0].strip()
+    xri = request.headers.get("X-Real-IP")
+    if xri:
+        return xri.strip()
+    return request.remote_addr or ""
+
+
 # 首次启动初始化用户表
 init_db()
 # 管理员账号（多个用逗号分隔），如 ADMIN_USERNAMES=admin
@@ -839,7 +852,7 @@ def register():
                 max_per_ip = int(os.environ.get("MAX_ACCOUNTS_PER_IP", "1"))
             except ValueError:
                 max_per_ip = 1
-            remote_ip = request.remote_addr or ""
+            remote_ip = get_client_ip()
             if count_registrations_by_ip(remote_ip) >= max_per_ip:
                 error = "同一 IP 注册账号数量已达上限，请勿重复注册。如有需要请联系管理员。"
             else:

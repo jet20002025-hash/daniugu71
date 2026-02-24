@@ -667,7 +667,7 @@ def scan_with_mode3(
 
     results.sort(key=_mode3_sort_key)
 
-    # 一段时间选股：每日取分数最高的3只，不受 max_results 限制
+    # 一段时间选股：每日取分数最高的 max_results 只（与前端「输出数量」一致）
     if start_date:
         grouped: Dict[str, List[ScanResult]] = {}
         for r in results:
@@ -678,8 +678,8 @@ def scan_with_mode3(
         for day in sorted(grouped.keys()):
             group = grouped[day]
             group.sort(key=_mode3_sort_key)
-            out.extend(group[:3])
-        return out
+            out.extend(group[: config.max_results])
+        return out[: config.max_results]
 
     return results[: config.max_results]
 

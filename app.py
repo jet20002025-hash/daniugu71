@@ -1115,6 +1115,51 @@ def score_page():
     return render_template("score.html")
 
 
+def _cache_status() -> dict:
+    """K 线缓存目录状态，用于判断在线更新是否写入了数据。"""
+    out = {"cache_dir": CACHE_DIR, "file_count": 0, "newest_mtime": None, "newest_date_in_data": None}
+    if not os.path.isdir(CACHE_DIR):
+        return out
+    try:
+        files = [f for f in os.listdir(CACHE_DIR) if f.endswith(".csv")]
+        out["file_count"] = len(files)
+        if not files:
+            return out
+        newest_ts = None
+        for f in files[:500]:  # 只检查前 500 个，避免太慢
+            path = os.path.join(CACHE_DIR, f)
+            try:
+                ts = os.path.getmtime(path)
+                if newest_ts is None or ts > newest_ts:
+                    newest_ts = ts
+            except OSError:
+                pass
+        if newest_ts is not None:
+            from datetime import datetime
+            out["newest_mtime"] = datetime.fromtimestamp(newest_ts).strftime("%Y-%m-%d %H:%M:%S")
+        # 任选一个文件看最后一行的日期，作为「数据最新到哪一天」的参考
+        try:
+            sample = os.path.join(CACHE_DIR, files[0])
+            with open(sample, "r", encoding="utf-8") as h:
+                for line in h:
+                    pass
+                last_line = line.strip().split(",")
+                if last_line:
+                    out["newest_date_in_data"] = last_line[0][:10]
+        except Exception:
+            pass
+    except Exception:
+        pass
+    return out
+
+
+@app.route("/api/cache_status")
+@subscription_required
+def api_cache_status():
+    """查看 K 线缓存是否已更新（在线更新会写入该目录）。"""
+    return jsonify(_cache_status())
+
+
 @app.route("/score/query", methods=["GET", "POST"])
 @subscription_required
 def score_query():

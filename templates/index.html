@@ -52,6 +52,10 @@
           <span>上次更新</span>
           <strong id="status-last">{{ meta.updated_at or '暂无' }}</strong>
         </div>
+        <div class="status-row">
+          <span>K线缓存</span>
+          <strong id="status-cache">—</strong>
+        </div>
       </div>
     </header>
 
@@ -246,6 +250,17 @@
       }
     }
     setInterval(pollStatus, 2000);
+
+    async function loadCacheStatus() {
+      try {
+        const res = await fetch('/api/cache_status');
+        const d = await res.json();
+        const el = document.getElementById('status-cache');
+        if (d.file_count === 0) el.textContent = '暂无';
+        else el.textContent = '共' + d.file_count + '只' + (d.newest_mtime ? '，最后更新 ' + d.newest_mtime : '') + (d.newest_date_in_data ? '，数据至' + d.newest_date_in_data : '');
+      } catch (e) { document.getElementById('status-cache').textContent = '—'; }
+    }
+    loadCacheStatus();
   </script>
 </body>
 </html>

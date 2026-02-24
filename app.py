@@ -754,8 +754,11 @@ def run_mode3_scan(
                 raise RuntimeError("gpt股票缓存为空，无法进行筛选。")
             local_only = True
         else:
+            # 远程源：用独立 session 且不走系统代理，避免 Mac 等上代理导致东财请求卡住
+            _remote_session = requests.Session()
+            _remote_session.trust_env = False
             try:
-                stock_list = fetch_stock_list()
+                stock_list = fetch_stock_list(session=_remote_session)
             except Exception:
                 stock_list = []
             if not stock_list:
@@ -795,7 +798,7 @@ def run_mode3_scan(
                     cached = read_cached_kline(path)
                     if cached and (prefer_local or em_fresh(cached, max_age_days=config.cache_days)):
                         return cached
-                    rows = fetch_kline(item.secid, count=count_k)
+                    rows = fetch_kline(item.secid, count=count_k, session=_remote_session)
                     if rows:
                         write_cached_kline(path, rows)
                     return rows

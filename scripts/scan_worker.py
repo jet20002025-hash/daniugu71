@@ -84,6 +84,7 @@ def run_one():
             use_startup_modes_data=True,
             use_71x_standard=(mode == "mode3"),
             user_id=user_id,
+            throttle_free_user=payload.get("throttle_free_user", True),
         )
     finally:
         try:

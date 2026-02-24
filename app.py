@@ -69,7 +69,8 @@ from app.scan_queue import (
     save_user_status,
     user_result_dir,
 )
-USE_SCAN_QUEUE = os.environ.get("USE_SCAN_QUEUE", "1").strip().lower() in ("1", "true", "yes")
+# 默认不排队：点击即在本进程起线程扫描，每人独立；设为 1 则走队列 + scan_worker
+USE_SCAN_QUEUE = os.environ.get("USE_SCAN_QUEUE", "0").strip().lower() in ("1", "true", "yes")
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "change-me-in-production-" + os.path.basename(BASE_DIR))
@@ -712,6 +713,7 @@ def run_mode3_scan(
     use_startup_modes_data: bool = False,
     use_71x_standard: bool = False,
     user_id: Optional[int] = None,
+    throttle_free_user: bool = False,
 ) -> None:
     _state = {} if user_id is not None else scan_state
 
@@ -796,6 +798,8 @@ def run_mode3_scan(
         _emit({"message": f"加载{mode_label}，开始筛选（{provider_label}）{cap_note}"})
 
         def _progress_cb() -> None:
+            if throttle_free_user:
+                time.sleep(0.03)  # 免费用户每只股票延时，整体约 5 倍以上变慢
             _state["progress"] = _state.get("progress", 0) + 1
             if _state["progress"] % 200 == 0 or _state["progress"] == _state["total"]:
                 _emit({"progress": _state["progress"], "message": f"筛选中 {_state['progress']}/{_state['total']}"})
@@ -970,14 +974,11 @@ def admin_set_activated_until(user_id):
 @app.route("/")
 @subscription_required
 def index():
-    uid = g.current_user.id if (USE_SCAN_QUEUE and g.current_user) else None
+    # 始终按用户展示结果与状态（队列 / 直扫 两种模式均每人独立）
+    uid = g.current_user.id if g.current_user else None
     meta = load_meta(uid)
     results = load_results(uid)
-    state = get_user_status(uid) if (USE_SCAN_QUEUE and uid) else scan_state
-    if USE_SCAN_QUEUE and uid and not state.get("running") and has_pending_job(uid):
-        state = dict(state)
-        state["message"] = "排队中，请稍候"
-        state["queued"] = True
+    state = get_user_status(uid) if uid else scan_state
     return render_template("index.html", meta=meta, results=results, state=state, user=g.current_user)
 
 
@@ -1006,6 +1007,7 @@ def scan():
         cap_limit = None if cap_billion <= 0 else cap_billion * 1e8
         max_results = int(request.form.get("max_results", 200))
         workers_count = int(request.form.get("workers", 6))
+        is_paid = g.current_user.is_activated and not getattr(g.current_user, "subscription_expired", True)
         job_config = {
             "min_score": min_score,
             "max_results": max_results,
@@ -1017,11 +1019,12 @@ def scan():
             "data_source": data_source,
             "remote_provider": remote_provider,
             "prefer_local": prefer_local,
+            "throttle_free_user": not is_paid,
         }
         push_job(user_id, job_config)
         return redirect(url_for("index"))
-    # 兼容：未启用队列时沿用原逻辑（单机单任务）
-    if scan_state["running"]:
+    # 不排队：点击即在本进程起线程扫描，每人独立，支持多用户同时扫（每人一个线程）
+    if get_user_status(user_id).get("running"):
         return redirect(url_for("index"))
     mode = request.form.get("mode", "mode3")
     if mode not in ("mode3", "mode3ok", "mode3_avoid", "mode3_upper", "mode3_upper_strict", "mode3_upper_near", "mode4"):
@@ -1051,6 +1054,7 @@ def scan():
     )
     use_startup_data = True
     use_71x_standard = mode == "mode3"
+    is_paid = g.current_user.is_activated and not getattr(g.current_user, "subscription_expired", True)
     thread = threading.Thread(
         target=run_mode3_scan,
         args=(
@@ -1069,6 +1073,8 @@ def scan():
             "mode3ok" if mode == "mode3ok" else None,
             use_startup_data,
             use_71x_standard,
+            user_id,
+            not is_paid,
         ),
         daemon=True,
     )
@@ -1081,25 +1087,12 @@ def scan():
 @subscription_required
 def status():
     try:
-        if USE_SCAN_QUEUE and g.current_user:
+        if g.current_user:
             data = get_user_status(g.current_user.id)
         else:
             data = dict(scan_state)
         if data.get("source") == "gpt":
             data["source"] = "本地"
-        # 排队中：有队列任务但尚未被 worker 接单
-        if USE_SCAN_QUEUE and g.current_user and not data.get("running"):
-            try:
-                from app.scan_queue import SCAN_QUEUE_DIR
-                uid = g.current_user.id
-                if os.path.isdir(SCAN_QUEUE_DIR):
-                    for name in os.listdir(SCAN_QUEUE_DIR):
-                        if name.startswith(f"{uid}_") and name.endswith(".json") and not name.endswith(".processing"):
-                            data["message"] = "排队中，请稍候"
-                            data["queued"] = True
-                            break
-            except OSError:
-                pass
         return jsonify(data)
     except Exception:
         return jsonify({"running": False, "progress": 0, "total": 0, "message": "空闲", "error": None, "source": "", "last_run": None})

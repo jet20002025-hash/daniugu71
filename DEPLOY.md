@@ -72,7 +72,8 @@ export ADMIN_USERNAMES=admin
 # 可选：同一 IP 最多允许注册账号数，默认 1（防刷试用）
 # export MAX_ACCOUNTS_PER_IP=1
 
-# 多用户扫描队列（默认开启）：每人独立结果，支持约 100 人同时提交、排队执行
+# 扫描模式：默认 0 = 点击即开始、不排队，每人独立线程；设为 1 = 队列 + scan_worker 进程
+# export USE_SCAN_QUEUE=0
 # export USE_SCAN_QUEUE=1
 ```
 
@@ -170,11 +171,12 @@ sudo certbot --nginx -d www.daniugu.top -d daniugu.top
 
 按提示选择域名并开启重定向到 HTTPS。证书会自动续期。
 
-### 3.5 多用户扫描队列（满足约 100 人同时扫描、结果不冲突）
+### 3.5 扫描模式：不排队（默认）与队列模式
 
-启用 `USE_SCAN_QUEUE=1`（默认已开启）后，用户点击「开始筛选」会进入队列，由**独立 worker 进程**执行，每人结果存在各自目录，互不覆盖。
+- **默认（USE_SCAN_QUEUE=0）**：用户点击「开始筛选」即在本进程起线程扫描，不排队，每人结果独立；支持多用户同时扫（每人一个线程，受机器 CPU/内存限制）。
+- **队列模式（USE_SCAN_QUEUE=1）**：点击后任务进入队列，由**独立 scan_worker 进程**执行，适合需要限流或与 Web 进程分离的场景。
 
-**必须单独启动扫描 worker**，否则任务会一直处于「排队中」：
+**仅在 USE_SCAN_QUEUE=1 时需要单独启动扫描 worker**：
 
 ```bash
 cd /var/www/stock-app

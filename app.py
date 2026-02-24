@@ -64,9 +64,12 @@ os.makedirs(RESULTS_DIR, exist_ok=True)
 from app.scan_queue import (
     USER_RESULTS_DIR,
     USER_STATUS_DIR,
+    clear_cancel,
     get_user_status,
     has_pending_job,
+    is_cancelled,
     push_job,
+    request_cancel,
     save_user_status,
     user_result_dir,
 )
@@ -697,6 +700,11 @@ def run_ml_scan(
         scan_state["message"] = "完成" if scan_state["error"] is None else "失败"
 
 
+class _CancelScan(Exception):
+    """用户点击「开始筛选」中断上一轮时由 _progress_cb 抛出。"""
+    pass
+
+
 def run_mode3_scan(
     config: ScanConfig,
     cutoff_date: Optional[str] = None,
@@ -736,7 +744,10 @@ def run_mode3_scan(
         "progress": 0,
         "total": 0,
         "message": "加载中…",
+        "started_at": time.time(),
     })
+    if user_id is not None:
+        clear_cancel(user_id)
     try:
         market_caps = _load_market_caps(MARKET_CAP_PATH)
         market_caps = market_caps or None
@@ -823,6 +834,8 @@ def run_mode3_scan(
         _emit({"message": f"加载{mode_label}，开始筛选（{provider_label}）{cap_note}"})
 
         def _progress_cb() -> None:
+            if user_id is not None and is_cancelled(user_id):
+                raise _CancelScan()
             if throttle_free_user:
                 time.sleep(0.03)  # 免费用户每只股票延时，整体约 5 倍以上变慢
             _state["progress"] = _state.get("progress", 0) + 1
@@ -862,16 +875,17 @@ def run_mode3_scan(
             model_tag = "mode3_avoid" if avoid_big_candle else "mode3"
         save_results(results, model=model_tag, user_id=user_id)
         _emit({"last_run": datetime.now().strftime("%Y-%m-%d %H:%M:%S")})
+    except _CancelScan:
+        _state["_cancelled"] = True
+        _emit({"running": False, "message": "已取消"})
     except Exception as exc:
         msg = str(exc).strip()
         if not msg:
             msg = type(exc).__name__
         _emit({"error": f"{msg}\n{traceback.format_exc()}"})
     finally:
-        _emit({
-            "running": False,
-            "message": "完成" if _state.get("error") is None else "失败",
-        })
+        msg = "已取消" if _state.get("_cancelled") else ("完成" if _state.get("error") is None else "失败")
+        _emit({"running": False, "message": msg})
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -1012,9 +1026,8 @@ def index():
 def scan():
     user_id = g.current_user.id
     if USE_SCAN_QUEUE:
-        # 加入队列，由独立 worker 进程执行，每人结果独立
-        if get_user_status(user_id).get("running"):
-            return redirect(url_for("index"))
+        # 加入队列，由独立 worker 执行；先发取消让上一轮尽快退出，再入队新任务
+        request_cancel(user_id)
         mode = request.form.get("mode", "mode3")
         if mode not in ("mode3", "mode3ok", "mode3_avoid", "mode3_upper", "mode3_upper_strict", "mode3_upper_near", "mode4"):
             mode = "mode3"
@@ -1053,9 +1066,8 @@ def scan():
         }
         push_job(user_id, job_config)
         return redirect(url_for("index"))
-    # 不排队：点击即在本进程起线程扫描，每人独立，支持多用户同时扫（每人一个线程）
-    if get_user_status(user_id).get("running"):
-        return redirect(url_for("index"))
+    # 不排队：点击即在本进程起线程扫描；先发取消标记中断上一轮，再启动新任务
+    request_cancel(user_id)
     mode = request.form.get("mode", "mode3")
     if mode not in ("mode3", "mode3ok", "mode3_avoid", "mode3_upper", "mode3_upper_strict", "mode3_upper_near", "mode4"):
         mode = "mode3"

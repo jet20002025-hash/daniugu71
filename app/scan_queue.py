@@ -27,8 +27,12 @@ def push_job(user_id: int, config: Dict[str, Any]) -> str:
     return job_id
 
 
+# 进度为 0 超过此秒数视为卡住，允许用户重新开始（避免远程任务一直占着）
+STALE_RUN_SECONDS = 300
+
+
 def get_user_status(user_id: int) -> Dict[str, Any]:
-    """读取该用户当前扫描状态（用于 /status）。只读不写，避免无写权限时崩溃。"""
+    """读取该用户当前扫描状态（用于 /status）。若 running 且 progress 长时间为 0 则视为卡住，返回 running=False。"""
     path = os.path.join(USER_STATUS_DIR, f"{user_id}.json")
     if not os.path.exists(path):
         return {"running": False, "progress": 0, "total": 0, "message": "空闲", "error": None, "source": "", "last_run": None}
@@ -39,6 +43,17 @@ def get_user_status(user_id: int) -> Dict[str, Any]:
             data["source"] = "本地"
         data.setdefault("progress", 0)
         data.setdefault("total", 0)
+        # 卡住判定：running 且 progress 一直为 0 超过 N 分钟，视为可重新开始
+        if data.get("running") and data.get("progress", 0) == 0:
+            started = data.get("started_at") or 0
+            try:
+                started = float(started)
+            except (TypeError, ValueError):
+                started = 0
+            if started > 0 and (time.time() - started) > STALE_RUN_SECONDS:
+                data = dict(data)
+                data["running"] = False
+                data["message"] = "空闲（上次任务已超时，可重新开始）"
         return data
     except Exception:
         return {"running": False, "progress": 0, "total": 0, "message": "空闲", "error": None, "source": "", "last_run": None}
@@ -78,3 +93,31 @@ def has_pending_job(user_id: int) -> bool:
         if name.startswith(prefix) and name.endswith(".json") and not name.endswith(".processing"):
             return True
     return False
+
+
+def _cancel_file_path(user_id: int) -> str:
+    return os.path.join(USER_STATUS_DIR, f"{user_id}.cancel")
+
+
+def request_cancel(user_id: int) -> None:
+    """写入取消标记，让该用户当前正在跑的扫描任务尽快退出（点击开始筛选时调用）。"""
+    _ensure_dirs()
+    path = _cancel_file_path(user_id)
+    try:
+        with open(path, "w") as f:
+            f.write("1")
+    except OSError:
+        pass
+
+
+def clear_cancel(user_id: int) -> None:
+    """清除取消标记（新任务启动时调用，避免把自己取消）。"""
+    try:
+        os.remove(_cancel_file_path(user_id))
+    except OSError:
+        pass
+
+
+def is_cancelled(user_id: int) -> bool:
+    """该用户是否被请求取消（扫描循环里每次 progress 时检查）。"""
+    return os.path.isfile(_cancel_file_path(user_id))

@@ -71,6 +71,9 @@ export ADMIN_USERNAMES=admin
 
 # 可选：同一 IP 最多允许注册账号数，默认 1（防刷试用）
 # export MAX_ACCOUNTS_PER_IP=1
+
+# 多用户扫描队列（默认开启）：每人独立结果，支持约 100 人同时提交、排队执行
+# export USE_SCAN_QUEUE=1
 ```
 
 首次部署前请把 K 线等数据放到 `/data/gpt`（可从本地上传，或首次在服务器跑一次全量 prefetch）。
@@ -166,6 +169,55 @@ sudo certbot --nginx -d www.daniugu.top -d daniugu.top
 ```
 
 按提示选择域名并开启重定向到 HTTPS。证书会自动续期。
+
+### 3.5 多用户扫描队列（满足约 100 人同时扫描、结果不冲突）
+
+启用 `USE_SCAN_QUEUE=1`（默认已开启）后，用户点击「开始筛选」会进入队列，由**独立 worker 进程**执行，每人结果存在各自目录，互不覆盖。
+
+**必须单独启动扫描 worker**，否则任务会一直处于「排队中」：
+
+```bash
+cd /var/www/stock-app
+source venv/bin/activate
+# 前台运行（4 个并发任务）
+python scripts/scan_worker.py --workers 4
+
+# 或使用 systemd 常驻（推荐）
+```
+
+创建 `/etc/systemd/system/stock-scan-worker.service`：
+
+```ini
+[Unit]
+Description=Stock App Scan Queue Worker
+After=network.target
+
+[Service]
+User=admin
+Group=admin
+WorkingDirectory=/var/www/stock-app
+Environment="PATH=/var/www/stock-app/venv/bin"
+Environment="GPT_DATA_DIR=/data/gpt"
+EnvironmentFile=-/var/www/stock-app/.env
+ExecStart=/var/www/stock-app/venv/bin/python scripts/scan_worker.py --workers 4 --interval 1
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+然后：
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable stock-scan-worker
+sudo systemctl start stock-scan-worker
+```
+
+- 队列目录：`data/results/scan_queue/`
+- 每人结果：`data/results/by_user/<user_id>/latest.json` 与 `latest_meta.json`
+- 可多机部署多个 worker 或单机增大 `--workers` 提高吞吐（建议 4–8，视 CPU 而定）
 
 ---
 

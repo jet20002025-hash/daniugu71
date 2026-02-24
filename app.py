@@ -59,6 +59,18 @@ GPT_INDEX_PATH = os.path.join(GPT_DATA_DIR, "index_sh000001.csv")
 os.makedirs(CACHE_DIR, exist_ok=True)
 os.makedirs(RESULTS_DIR, exist_ok=True)
 
+# 多用户扫描队列与按用户结果目录（满足 100 人同时提交、结果不冲突）
+from app.scan_queue import (
+    USER_RESULTS_DIR,
+    USER_STATUS_DIR,
+    get_user_status,
+    has_pending_job,
+    push_job,
+    save_user_status,
+    user_result_dir,
+)
+USE_SCAN_QUEUE = os.environ.get("USE_SCAN_QUEUE", "1").strip().lower() in ("1", "true", "yes")
+
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "change-me-in-production-" + os.path.basename(BASE_DIR))
 
@@ -435,11 +447,19 @@ def _score_buckets(results: List[ScanResult], model: str) -> Dict[str, int]:
     return buckets
 
 
-def save_results(results: List[ScanResult], model: str = "rule") -> None:
+def save_results(results: List[ScanResult], model: str = "rule", user_id: Optional[int] = None) -> None:
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    json_path = os.path.join(RESULTS_DIR, "latest.json")
-    csv_path = os.path.join(RESULTS_DIR, "latest.csv")
-    meta_path = os.path.join(RESULTS_DIR, "latest_meta.json")
+    if user_id is not None:
+        out_dir = user_result_dir(user_id)
+        json_path = os.path.join(out_dir, "latest.json")
+        csv_path = os.path.join(out_dir, "latest.csv")
+        meta_path = os.path.join(out_dir, "latest_meta.json")
+    else:
+        json_path = os.path.join(RESULTS_DIR, "latest.json")
+        csv_path = os.path.join(RESULTS_DIR, "latest.csv")
+        meta_path = os.path.join(RESULTS_DIR, "latest_meta.json")
+    if user_id is not None:
+        os.makedirs(os.path.dirname(json_path), exist_ok=True)
 
     with open(json_path, "w", encoding="utf-8") as handle:
         json.dump(serialize_results(results), handle, ensure_ascii=False, indent=2)
@@ -459,16 +479,22 @@ def save_results(results: List[ScanResult], model: str = "rule") -> None:
         json.dump(meta_payload, handle, ensure_ascii=False, indent=2)
 
 
-def load_results() -> List[Dict[str, object]]:
-    json_path = os.path.join(RESULTS_DIR, "latest.json")
+def load_results(user_id: Optional[int] = None) -> List[Dict[str, object]]:
+    if user_id is not None:
+        json_path = os.path.join(USER_RESULTS_DIR, str(user_id), "latest.json")
+    else:
+        json_path = os.path.join(RESULTS_DIR, "latest.json")
     if not os.path.exists(json_path):
         return []
     with open(json_path, "r", encoding="utf-8") as handle:
         return json.load(handle)
 
 
-def load_meta() -> Dict[str, object]:
-    meta_path = os.path.join(RESULTS_DIR, "latest_meta.json")
+def load_meta(user_id: Optional[int] = None) -> Dict[str, object]:
+    if user_id is not None:
+        meta_path = os.path.join(USER_RESULTS_DIR, str(user_id), "latest_meta.json")
+    else:
+        meta_path = os.path.join(RESULTS_DIR, "latest_meta.json")
     if not os.path.exists(meta_path):
         return {"updated_at": None, "count": 0, "model": "rule"}
     with open(meta_path, "r", encoding="utf-8") as handle:
@@ -685,13 +711,23 @@ def run_mode3_scan(
     model_tag_override: Optional[str] = None,
     use_startup_modes_data: bool = False,
     use_71x_standard: bool = False,
+    user_id: Optional[int] = None,
 ) -> None:
-    scan_state["running"] = True
-    scan_state["error"] = None
-    scan_state["source"] = (
-        f"remote/{remote_provider}" if data_source == "remote"
-        else ("本地" if data_source == "gpt" else data_source)
-    )
+    _state = {} if user_id is not None else scan_state
+
+    def _emit(updates: dict) -> None:
+        _state.update(updates)
+        if user_id is not None:
+            save_user_status(user_id, dict(_state))
+
+    _emit({
+        "running": True,
+        "error": None,
+        "source": (
+            f"remote/{remote_provider}" if data_source == "remote"
+            else ("本地" if data_source == "gpt" else data_source)
+        ),
+    })
     try:
         market_caps = _load_market_caps(MARKET_CAP_PATH)
         market_caps = market_caps or None
@@ -748,8 +784,7 @@ def run_mode3_scan(
                 kline_loader = None
             local_only = False
 
-        scan_state["total"] = len(stock_list)
-        scan_state["progress"] = 0
+        _emit({"total": len(stock_list), "progress": 0})
         provider_label = remote_provider if data_source == "remote" else ("本地股票库" if data_source == "gpt" else data_source)
         cap_note = ""
         if config.max_market_cap:
@@ -758,12 +793,12 @@ def run_mode3_scan(
             else:
                 cap_note = f"，市值≤{config.max_market_cap / 1e8:.0f}亿"
         mode_label = "mode4" if mode4_filters else ("mode3ok" if model_tag_override == "mode3ok" else "mode3")
-        scan_state["message"] = f"加载{mode_label}，开始筛选（{provider_label}）{cap_note}"
+        _emit({"message": f"加载{mode_label}，开始筛选（{provider_label}）{cap_note}"})
 
         def _progress_cb() -> None:
-            scan_state["progress"] += 1
-            if scan_state["progress"] % 200 == 0 or scan_state["progress"] == scan_state["total"]:
-                scan_state["message"] = f"筛选中 {scan_state['progress']}/{scan_state['total']}"
+            _state["progress"] = _state.get("progress", 0) + 1
+            if _state["progress"] % 200 == 0 or _state["progress"] == _state["total"]:
+                _emit({"progress": _state["progress"], "message": f"筛选中 {_state['progress']}/{_state['total']}"})
 
         results = scan_with_mode3(
             stock_list=stock_list,
@@ -796,16 +831,18 @@ def run_mode3_scan(
             model_tag = "mode3_upper"
         else:
             model_tag = "mode3_avoid" if avoid_big_candle else "mode3"
-        save_results(results, model=model_tag)
-        scan_state["last_run"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        save_results(results, model=model_tag, user_id=user_id)
+        _emit({"last_run": datetime.now().strftime("%Y-%m-%d %H:%M:%S")})
     except Exception as exc:
         msg = str(exc).strip()
         if not msg:
             msg = type(exc).__name__
-        scan_state["error"] = f"{msg}\n{traceback.format_exc()}"
+        _emit({"error": f"{msg}\n{traceback.format_exc()}"})
     finally:
-        scan_state["running"] = False
-        scan_state["message"] = "完成" if scan_state["error"] is None else "失败"
+        _emit({
+            "running": False,
+            "message": "完成" if _state.get("error") is None else "失败",
+        })
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -933,17 +970,59 @@ def admin_set_activated_until(user_id):
 @app.route("/")
 @subscription_required
 def index():
-    meta = load_meta()
-    results = load_results()
-    return render_template("index.html", meta=meta, results=results, state=scan_state, user=g.current_user)
+    uid = g.current_user.id if (USE_SCAN_QUEUE and g.current_user) else None
+    meta = load_meta(uid)
+    results = load_results(uid)
+    state = get_user_status(uid) if (USE_SCAN_QUEUE and uid) else scan_state
+    if USE_SCAN_QUEUE and uid and not state.get("running") and has_pending_job(uid):
+        state = dict(state)
+        state["message"] = "排队中，请稍候"
+        state["queued"] = True
+    return render_template("index.html", meta=meta, results=results, state=state, user=g.current_user)
 
 
 @app.route("/scan", methods=["POST"])
 @subscription_required
 def scan():
+    user_id = g.current_user.id
+    if USE_SCAN_QUEUE:
+        # 加入队列，由独立 worker 进程执行，每人结果独立
+        if get_user_status(user_id).get("running"):
+            return redirect(url_for("index"))
+        mode = request.form.get("mode", "mode3")
+        if mode not in ("mode3", "mode3ok", "mode3_avoid", "mode3_upper", "mode3_upper_strict", "mode3_upper_near", "mode4"):
+            mode = "mode3"
+        cutoff_date = request.form.get("cutoff_date") or None
+        start_date = request.form.get("start_date") or None
+        data_source = request.form.get("data_source", "gpt")
+        remote_provider = request.form.get("remote_provider", "eastmoney")
+        prefer_local = request.form.get("prefer_local") == "on"
+        min_score = int(request.form.get("min_score", 70))
+        raw_cap = str(request.form.get("max_market_cap", "")).strip()
+        try:
+            cap_billion = float(raw_cap) if raw_cap else 150.0
+        except Exception:
+            cap_billion = 150.0
+        cap_limit = None if cap_billion <= 0 else cap_billion * 1e8
+        max_results = int(request.form.get("max_results", 200))
+        workers_count = int(request.form.get("workers", 6))
+        job_config = {
+            "min_score": min_score,
+            "max_results": max_results,
+            "workers": workers_count,
+            "max_market_cap": cap_limit,
+            "mode": mode,
+            "cutoff_date": cutoff_date,
+            "start_date": start_date,
+            "data_source": data_source,
+            "remote_provider": remote_provider,
+            "prefer_local": prefer_local,
+        }
+        push_job(user_id, job_config)
+        return redirect(url_for("index"))
+    # 兼容：未启用队列时沿用原逻辑（单机单任务）
     if scan_state["running"]:
         return redirect(url_for("index"))
-
     mode = request.form.get("mode", "mode3")
     if mode not in ("mode3", "mode3ok", "mode3_avoid", "mode3_upper", "mode3_upper_strict", "mode3_upper_near", "mode4"):
         mode = "mode3"
@@ -952,7 +1031,6 @@ def scan():
     data_source = request.form.get("data_source", "gpt")
     remote_provider = request.form.get("remote_provider", "eastmoney")
     prefer_local = request.form.get("prefer_local") == "on"
-    signal_type = request.form.get("signal_type", "aggressive")
     min_score = int(request.form.get("min_score", 70))
     raw_cap = str(request.form.get("max_market_cap", "")).strip()
     if raw_cap == "":
@@ -964,15 +1042,13 @@ def scan():
             cap_billion = 150.0
     cap_limit = None if cap_billion <= 0 else cap_billion * 1e8
     max_results = int(request.form.get("max_results", 200))
-    workers = int(request.form.get("workers", 6))
-
+    workers_count = int(request.form.get("workers", 6))
     config = ScanConfig(
         min_score=min_score,
         max_results=max_results,
-        workers=workers,
+        workers=workers_count,
         max_market_cap=cap_limit,
     )
-    # 仅保留 71 倍模型（mode3）
     use_startup_data = True
     use_71x_standard = mode == "mode3"
     thread = threading.Thread(
@@ -1004,9 +1080,22 @@ def scan():
 @app.route("/status")
 @subscription_required
 def status():
-    data = dict(scan_state)
+    if USE_SCAN_QUEUE and g.current_user:
+        data = get_user_status(g.current_user.id)
+    else:
+        data = dict(scan_state)
     if data.get("source") == "gpt":
         data["source"] = "本地"
+    # 排队中：有队列任务但尚未被 worker 接单
+    if USE_SCAN_QUEUE and g.current_user and not data.get("running"):
+        from app.scan_queue import SCAN_QUEUE_DIR
+        uid = g.current_user.id
+        if os.path.isdir(SCAN_QUEUE_DIR):
+            for name in os.listdir(SCAN_QUEUE_DIR):
+                if name.startswith(f"{uid}_") and name.endswith(".json") and not name.endswith(".processing"):
+                    data["message"] = "排队中，请稍候"
+                    data["queued"] = True
+                    break
     return jsonify(data)
 
 

@@ -729,6 +729,9 @@ def run_mode3_scan(
             f"remote/{remote_provider}" if data_source == "remote"
             else ("本地" if data_source == "gpt" else data_source)
         ),
+        "progress": 0,
+        "total": 0,
+        "message": "加载中…",
     })
     try:
         market_caps = _load_market_caps(MARKET_CAP_PATH)

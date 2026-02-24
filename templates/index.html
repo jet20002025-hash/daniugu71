@@ -30,7 +30,7 @@
         </div>
         <div class="status-row">
           <span>进度</span>
-          <strong id="status-progress">{{ state.progress }}/{{ state.total }}</strong>
+          <strong id="status-progress">{{ state.progress|default(0) }}/{{ state.total|default(0) }}</strong>
         </div>
         <div class="status-row">
           <span>消息</span>
@@ -231,7 +231,7 @@
         const res = await fetch('/status');
         const data = await res.json();
         document.getElementById('status-text').textContent = data.running ? '运行中' : '空闲';
-        document.getElementById('status-progress').textContent = data.progress + '/' + data.total;
+        document.getElementById('status-progress').textContent = (data.progress ?? 0) + '/' + (data.total ?? 0);
         document.getElementById('status-message').textContent = data.message || '';
         document.getElementById('status-source').textContent = data.source || '未知';
         document.getElementById('status-error').textContent = data.error || '无';

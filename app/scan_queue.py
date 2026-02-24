@@ -37,6 +37,8 @@ def get_user_status(user_id: int) -> Dict[str, Any]:
             data = json.load(f)
         if data.get("source") == "gpt":
             data["source"] = "本地"
+        data.setdefault("progress", 0)
+        data.setdefault("total", 0)
         return data
     except Exception:
         return {"running": False, "progress": 0, "total": 0, "message": "空闲", "error": None, "source": "", "last_run": None}

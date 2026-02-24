@@ -723,6 +723,9 @@ def run_mode3_scan(
         if user_id is not None:
             save_user_status(user_id, dict(_state))
 
+    # 仅当明确为 "remote" 时才用远程；其余一律视为本地，避免表单传空/错误时误走东财
+    if data_source != "remote":
+        data_source = "gpt" if data_source != "cache" else "cache"
     _emit({
         "running": True,
         "error": None,
@@ -1017,7 +1020,8 @@ def scan():
             mode = "mode3"
         cutoff_date = request.form.get("cutoff_date") or None
         start_date = request.form.get("start_date") or None
-        data_source = request.form.get("data_source", "gpt")
+        raw_ds = (request.form.get("data_source") or "gpt").strip() or "gpt"
+        data_source = "remote" if raw_ds == "remote" else "gpt"
         remote_provider = request.form.get("remote_provider", "eastmoney")
         prefer_local = request.form.get("prefer_local") == "on"
         min_score = int(request.form.get("min_score", 70))
@@ -1057,7 +1061,8 @@ def scan():
         mode = "mode3"
     cutoff_date = request.form.get("cutoff_date") or None
     start_date = request.form.get("start_date") or None
-    data_source = request.form.get("data_source", "gpt")
+    raw_ds = (request.form.get("data_source") or "gpt").strip() or "gpt"
+    data_source = "remote" if raw_ds == "remote" else "gpt"
     remote_provider = request.form.get("remote_provider", "eastmoney")
     prefer_local = request.form.get("prefer_local") == "on"
     min_score = int(request.form.get("min_score", 70))

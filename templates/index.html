@@ -72,9 +72,10 @@
         <label>
           数据源
           <select name="data_source" id="data_source">
-            <option value="gpt" selected>本地股票库</option>
-            <option value="remote">在线更新</option>
+            <option value="gpt" selected>本地股票库（推荐，用服务器缓存）</option>
+            <option value="remote">在线更新（会请求东财/腾讯，海外服务器易卡）</option>
           </select>
+          <span id="data_source_hint" class="hint-inline">使用服务器缓存，不请求外网</span>
         </label>
         <label>
           来源
@@ -221,14 +222,27 @@
     };
     capInput.addEventListener('input', updateCap);
     updateCap();
+    function updateDataSourceHint() {
+      const source = document.getElementById('data_source').value;
+      const hint = document.getElementById('data_source_hint');
+      if (source === 'gpt') {
+        hint.textContent = '使用服务器缓存，不请求外网';
+        hint.style.color = '';
+      } else {
+        hint.textContent = '将请求外网，服务器在海外可能很慢或卡在 0，建议改用本地股票库';
+        hint.style.color = 'var(--warn, #e67e22)';
+      }
+    }
     document.getElementById('data_source').addEventListener('change', () => {
       const source = document.getElementById('data_source').value;
       const enableProvider = source !== 'cache';
       document.getElementById('remote_provider').disabled = !enableProvider;
       document.getElementById('prefer_local').disabled = source !== 'remote';
+      updateDataSourceHint();
     });
     loadFilters();
     document.getElementById('data_source').dispatchEvent(new Event('change'));
+    updateDataSourceHint();
 
     async function pollStatus() {
       try {

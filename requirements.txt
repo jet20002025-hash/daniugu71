@@ -6,3 +6,6 @@ pandas>=2.0.0
 openpyxl>=3.1.0
 gunicorn>=21.0.0
 werkzeug>=3.0.0
+
+# 可选：本地/批量更新 K 线时多一个数据源（scripts/update_kline_cache.py --source akshare）
+# pip install akshare

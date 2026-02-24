@@ -79,6 +79,29 @@ export ADMIN_USERNAMES=admin
 
 首次部署前请把 K 线等数据放到 `/data/gpt`（可从本地上传，或首次在服务器跑一次全量 prefetch）。
 
+### 2.5 每日更新 K 线（网络版融合今日数据）
+
+在服务器上执行以下命令，可将**今日** K 线从多源拉取并**融合**进现有缓存（已有历史不动，只追加今日/最近几根）：
+
+```bash
+cd /var/www/stock-app
+source venv/bin/activate
+export GPT_DATA_DIR=/data/gpt
+# 若 .env 已配置 GPT_DATA_DIR，可改为：set -a && source .env && set +a
+python scripts/update_kline_cache.py
+```
+
+- 默认会轮流尝试：新浪 → 网易 → 东财 → 腾讯（若已装 akshare 还会试 AKShare），任一成功即写入统一 `code.csv`。
+- 已有完整历史的股票只拉最近约 10 根并合并，不重拉全量；新股票或缓存不足时拉 300 根。
+- 建议**收盘后**执行（如 15:30 后），或配置 cron 每日自动跑一次，例如：
+
+```bash
+# 每日 16:00 更新 K 线（需替换为实际用户与路径）
+0 16 * * 1-5 cd /var/www/stock-app && /var/www/stock-app/venv/bin/python scripts/update_kline_cache.py >> /var/log/stock-app-kline-update.log 2>&1
+```
+
+cron 需能读到 `GPT_DATA_DIR`，可在 crontab 里加一行 `GPT_DATA_DIR=/data/gpt` 或改用封装脚本在脚本内 export。
+
 ---
 
 ## 三、Gunicorn + Nginx

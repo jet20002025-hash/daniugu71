@@ -5,6 +5,7 @@
 用法：python scripts/scan_worker.py [--workers 4]
 """
 import argparse
+import importlib.util
 import json
 import os
 import sys
@@ -17,7 +18,13 @@ if ROOT not in sys.path:
 
 from app.scan_queue import list_pending_jobs, SCAN_QUEUE_DIR
 from app.scanner import ScanConfig
-from app import run_mode3_scan
+
+# run_mode3_scan 在项目根目录的 app.py 中，而 import app 会加载 app 包，故按文件加载
+_app_py = os.path.join(ROOT, "app.py")
+_spec = importlib.util.spec_from_file_location("app_main", _app_py)
+_app_main = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_app_main)
+run_mode3_scan = _app_main.run_mode3_scan
 
 
 def _claim_job():

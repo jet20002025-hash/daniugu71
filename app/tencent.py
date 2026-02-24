@@ -48,7 +48,8 @@ def fetch_kline(
     session = session or requests.Session()
     session.trust_env = False
     symbol = f"{_prefix(code)}{code}"
-    params = {"param": f"{symbol},day,2020-01-01,2050-01-01,{count},"}
+    end_date = dt.date.today().strftime("%Y-%m-%d")
+    params = {"param": f"{symbol},day,2020-01-01,{end_date},{count},"}
     resp = session.get(KLINE_URL, params=params, timeout=20)
     resp.raise_for_status()
     payload = resp.json()

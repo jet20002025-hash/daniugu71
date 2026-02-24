@@ -222,12 +222,13 @@ def fetch_kline(
     session: Optional[requests.Session] = None,
 ) -> List[KlineRow]:
     session = session or requests.Session()
+    end_date = int(dt.date.today().strftime("%Y%m%d"))
     params = {
         "secid": secid,
         "klt": 101,
         "fqt": 1,
         "beg": 0,
-        "end": 20500101,
+        "end": end_date,
         "lmt": count,
         "fields1": "f1,f2,f3,f4,f5,f6",
         "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61",

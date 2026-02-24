@@ -784,6 +784,20 @@ def run_mode3_scan(
                 )
             elif remote_provider == "netease":
                 raise RuntimeError("网易数据源尚未接入，请先选择腾讯或新浪。")
+            elif remote_provider == "eastmoney":
+                cache_dir = CACHE_DIR
+                from app.eastmoney import fetch_kline, write_cached_kline, read_cached_kline, kline_is_fresh as em_fresh
+                count_k = max(260, config.year_lookback + 5)
+                def _eastmoney_loader(item):
+                    path = os.path.join(cache_dir, f"{item.code}.csv")
+                    cached = read_cached_kline(path)
+                    if cached and (prefer_local or em_fresh(cached, max_age_days=config.cache_days)):
+                        return cached
+                    rows = fetch_kline(item.secid, count=count_k)
+                    if rows:
+                        write_cached_kline(path, rows)
+                    return rows
+                kline_loader = _eastmoney_loader
             else:
                 cache_dir = CACHE_DIR
                 kline_loader = None

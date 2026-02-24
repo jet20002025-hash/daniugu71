@@ -109,6 +109,31 @@ python scripts/update_kline_cache.py
 
 cron 需能读到 `GPT_DATA_DIR`，可在 crontab 里加一行 `GPT_DATA_DIR=/data/gpt` 或改用封装脚本在脚本内 export。
 
+### 2.6 本地上传 K 线缓存到服务器（使网络版与本地结果一致）
+
+当本地与服务器 K 线数据不一致时，可把本地缓存打包上传并覆盖服务器缓存：
+
+**本机执行（在项目根目录）：**
+
+```bash
+# 若 K 线在项目默认目录 data/gpt，直接执行；否则先 export GPT_DATA_DIR=/你的gpt目录
+chmod +x scripts/sync_kline_to_server.sh
+./scripts/sync_kline_to_server.sh admin@服务器公网IP
+```
+
+脚本会：打包 `data/gpt/kline_cache_tencent` 为 `kline_cache_tencent.tar.gz`，并 scp 到服务器 `/tmp/`，然后提示你在服务器上执行的命令。
+
+**服务器上执行（按脚本提示）：**
+
+```bash
+sudo mkdir -p /data/gpt
+sudo chown -R $(whoami) /data/gpt
+cd /data/gpt && rm -rf kline_cache_tencent && tar -xzf /tmp/kline_cache_tencent.tar.gz && chown -R $(whoami) kline_cache_tencent
+rm /tmp/kline_cache_tencent.tar.gz
+```
+
+完成后网络版使用的即为本地同一套 K 线，同一信号日筛选结果会与本地一致。
+
 ---
 
 ## 三、Gunicorn + Nginx

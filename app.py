@@ -1128,9 +1128,15 @@ def status():
             data = dict(scan_state)
         if data.get("source") == "gpt":
             data["source"] = "本地"
-        return jsonify(data)
+        resp = jsonify(data)
+        # 禁止缓存，避免 Mac/Safari 等缓存 /status 导致进度条不更新
+        resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        resp.headers["Pragma"] = "no-cache"
+        return resp
     except Exception:
-        return jsonify({"running": False, "progress": 0, "total": 0, "message": "空闲", "error": None, "source": "", "last_run": None})
+        out = jsonify({"running": False, "progress": 0, "total": 0, "message": "空闲", "error": None, "source": "", "last_run": None})
+        out.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        return out
 
 
 @app.route("/score")

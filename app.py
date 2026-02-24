@@ -1080,23 +1080,29 @@ def scan():
 @app.route("/status")
 @subscription_required
 def status():
-    if USE_SCAN_QUEUE and g.current_user:
-        data = get_user_status(g.current_user.id)
-    else:
-        data = dict(scan_state)
-    if data.get("source") == "gpt":
-        data["source"] = "本地"
-    # 排队中：有队列任务但尚未被 worker 接单
-    if USE_SCAN_QUEUE and g.current_user and not data.get("running"):
-        from app.scan_queue import SCAN_QUEUE_DIR
-        uid = g.current_user.id
-        if os.path.isdir(SCAN_QUEUE_DIR):
-            for name in os.listdir(SCAN_QUEUE_DIR):
-                if name.startswith(f"{uid}_") and name.endswith(".json") and not name.endswith(".processing"):
-                    data["message"] = "排队中，请稍候"
-                    data["queued"] = True
-                    break
-    return jsonify(data)
+    try:
+        if USE_SCAN_QUEUE and g.current_user:
+            data = get_user_status(g.current_user.id)
+        else:
+            data = dict(scan_state)
+        if data.get("source") == "gpt":
+            data["source"] = "本地"
+        # 排队中：有队列任务但尚未被 worker 接单
+        if USE_SCAN_QUEUE and g.current_user and not data.get("running"):
+            try:
+                from app.scan_queue import SCAN_QUEUE_DIR
+                uid = g.current_user.id
+                if os.path.isdir(SCAN_QUEUE_DIR):
+                    for name in os.listdir(SCAN_QUEUE_DIR):
+                        if name.startswith(f"{uid}_") and name.endswith(".json") and not name.endswith(".processing"):
+                            data["message"] = "排队中，请稍候"
+                            data["queued"] = True
+                            break
+            except OSError:
+                pass
+        return jsonify(data)
+    except Exception:
+        return jsonify({"running": False, "progress": 0, "total": 0, "message": "空闲", "error": None, "source": "", "last_run": None})
 
 
 @app.route("/score")

@@ -28,8 +28,7 @@ def push_job(user_id: int, config: Dict[str, Any]) -> str:
 
 
 def get_user_status(user_id: int) -> Dict[str, Any]:
-    """读取该用户当前扫描状态（用于 /status）。"""
-    _ensure_dirs()
+    """读取该用户当前扫描状态（用于 /status）。只读不写，避免无写权限时崩溃。"""
     path = os.path.join(USER_STATUS_DIR, f"{user_id}.json")
     if not os.path.exists(path):
         return {"running": False, "progress": 0, "total": 0, "message": "空闲", "error": None, "source": "", "last_run": None}

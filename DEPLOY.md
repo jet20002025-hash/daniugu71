@@ -134,6 +134,32 @@ rm /tmp/kline_cache_tencent.tar.gz
 
 完成后网络版使用的即为本地同一套 K 线，同一信号日筛选结果会与本地一致。
 
+**用 GitHub Release 做中转（无需 SSH/SCP）：**
+
+1. **本机打包**（不传服务器参数）：
+   ```bash
+   ./scripts/sync_kline_to_server.sh
+   ```
+   得到 `kline_cache_tencent.tar.gz`（若超过 100MB 需用 Git LFS 或只传 Release，不提交到仓库）。
+
+2. **上传到 Release**：  
+   - 打开仓库：https://github.com/jet20002025-hash/daniugu71/releases  
+   - 点「Draft a new release」→ 填 Tag（如 `kline-cache-20260224`）和标题 → 把本机 `kline_cache_tencent.tar.gz` 拖进「Attach binaries」→ 发布。
+
+3. **复制下载链接**：  
+   在刚发布的 Release 页面里，点 `kline_cache_tencent.tar.gz` 的下载链接，或使用：  
+   `https://github.com/jet20002025-hash/daniugu71/releases/download/<Tag名>/kline_cache_tencent.tar.gz`
+
+4. **服务器上下载并解压**：
+   ```bash
+   cd /tmp
+   wget -O kline_cache_tencent.tar.gz "https://github.com/jet20002025-hash/daniugu71/releases/download/<Tag名>/kline_cache_tencent.tar.gz"
+   sudo mkdir -p /data/gpt && sudo chown -R $(whoami) /data/gpt
+   cd /data/gpt && rm -rf kline_cache_tencent && tar -xzf /tmp/kline_cache_tencent.tar.gz && chown -R $(whoami) kline_cache_tencent
+   rm /tmp/kline_cache_tencent.tar.gz
+   ```
+   把 `<Tag名>` 换成你创建的 Tag（如 `kline-cache-20260224`）。单文件超过 100MB 时 GitHub 网页可能提示，Release 附件支持到约 2GB。
+
 ---
 
 ## 三、Gunicorn + Nginx

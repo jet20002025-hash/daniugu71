@@ -21,6 +21,8 @@ if [ ! -d "$CACHE" ]; then
 fi
 
 echo "打包: $CACHE -> $ARCHIVE"
+# 在 Mac 上禁用扩展属性，避免在 Linux 解压时出现 LIBARCHIVE.xattr.com.apple.provenance 警告
+export COPYFILE_DISABLE=1 2>/dev/null || true
 tar -czf "$ARCHIVE" -C "$GPT" kline_cache_tencent
 echo "已生成: $ARCHIVE ($(du -h "$ARCHIVE" | cut -f1))"
 
@@ -36,6 +38,7 @@ if [ -n "$1" ]; then
   echo "  rm /tmp/kline_cache_tencent.tar.gz"
 else
   echo "未传服务器参数，仅打包完成。"
+  echo "可选：用 GitHub Release 做中转 → 见 DEPLOY.md 2.6「用 GitHub Release 做中转」"
   echo "上传示例: scp $ARCHIVE 管理员用户@服务器IP:/tmp/"
   echo "服务器上解压: cd /data/gpt && rm -rf kline_cache_tencent && tar -xzf /tmp/kline_cache_tencent.tar.gz && chown -R 运行用户 kline_cache_tencent"
 fi

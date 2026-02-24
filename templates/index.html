@@ -124,7 +124,8 @@
     <section class="panel table-panel">
       <div class="table-header">
         <h2>候选列表（{{ meta.count }}）</h2>
-        <span>按得分降序</span>
+        <span>按信号打分降序</span>
+        <span class="hint-inline">（T+1 信号日不可交易，当天涨跌幅仅供参考）</span>
       </div>
       {% if meta.score_buckets %}
       <div class="bucket-row">
@@ -143,7 +144,7 @@
               <th>名称</th>
               <th>得分</th>
               <th>当天收盘价</th>
-              <th>涨跌幅%</th>
+              <th title="信号日涨跌幅，T+1 不可当日交易仅供参考">涨跌幅%</th>
             </tr>
           </thead>
           <tbody>

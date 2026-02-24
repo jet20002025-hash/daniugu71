@@ -81,6 +81,13 @@ export ADMIN_USERNAMES=admin
 
 ### 2.5 每日更新 K 线（网络版融合今日数据）
 
+**确保缓存目录对运行脚本的用户可写**（否则会报 `PermissionError`）：
+
+```bash
+# 将 /data/gpt 及其子目录属主改为运行脚本的用户（如 admin）
+sudo chown -R admin:admin /data/gpt
+```
+
 在服务器上执行以下命令，可将**今日** K 线从多源拉取并**融合**进现有缓存（已有历史不动，只追加今日/最近几根）：
 
 ```bash

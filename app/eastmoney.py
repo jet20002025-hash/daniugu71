@@ -178,6 +178,39 @@ def list_cached_stocks_flat(cache_dir: str, name_map: Optional[dict] = None) -> 
     return items
 
 
+_SCAN_LIST_CACHE_PATH = ".scan_list_flat.json"
+
+
+def list_cached_stocks_flat_cached(
+    cache_dir: str,
+    name_map: Optional[dict] = None,
+    max_age_sec: int = 600,
+) -> List[StockItem]:
+    """与 list_cached_stocks_flat 相同，但用文件缓存结果，避免每次 listdir 数千文件导致启动慢。"""
+    import json
+    cache_path = os.path.join(cache_dir, _SCAN_LIST_CACHE_PATH)
+    try:
+        if os.path.exists(cache_path):
+            age = time.time() - os.path.getmtime(cache_path)
+            if age <= max_age_sec:
+                with open(cache_path, "r", encoding="utf-8") as f:
+                    raw = json.load(f)
+                return [StockItem(code=x["code"], name=x.get("name", x["code"]), market=int(x["market"])) for x in raw]
+    except Exception:
+        pass
+    items = list_cached_stocks_flat(cache_dir, name_map)
+    try:
+        with open(cache_path, "w", encoding="utf-8") as f:
+            json.dump(
+                [{"code": i.code, "name": i.name, "market": i.market} for i in items],
+                f,
+                ensure_ascii=False,
+            )
+    except Exception:
+        pass
+    return items
+
+
 def list_cached_stocks_secid(cache_dir: str, name_map: Optional[dict] = None) -> List[StockItem]:
     if not os.path.exists(cache_dir):
         return []

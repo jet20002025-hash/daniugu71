@@ -32,6 +32,7 @@ from app.eastmoney import (
     get_kline_cached,
     list_cached_stocks,
     list_cached_stocks_flat,
+    list_cached_stocks_flat_cached,
     list_cached_stocks_secid,
     load_stock_list_csv,
     read_cached_kline_by_code,
@@ -736,6 +737,7 @@ def run_mode3_scan(
     try:
         market_caps = _load_market_caps(MARKET_CAP_PATH)
         market_caps = market_caps or None
+        _emit({"message": "正在加载股票列表…"})
         if data_source == "cache":
             stock_list = list_cached_stocks(CACHE_DIR)
             if not stock_list:
@@ -746,7 +748,7 @@ def run_mode3_scan(
         elif data_source == "gpt":
             name_map = load_stock_list_csv(GPT_STOCK_LIST)
             cache_dir = GPT_CACHE_DIR
-            stock_list = stock_items_from_list_csv(GPT_STOCK_LIST) if use_startup_modes_data else list_cached_stocks_flat(cache_dir, name_map=name_map)
+            stock_list = stock_items_from_list_csv(GPT_STOCK_LIST) if use_startup_modes_data else list_cached_stocks_flat_cached(cache_dir, name_map=name_map, max_age_sec=600)
             kline_loader = lambda item: read_cached_kline_by_code(cache_dir, item.code)
             if not stock_list:
                 raise RuntimeError("gpt股票缓存为空，无法进行筛选。")

@@ -112,8 +112,12 @@ def main() -> None:
 
     os.makedirs(os.path.dirname(args.output) or ".", exist_ok=True)
     df = pd.DataFrame(rows)
-    if not df.empty and "收益率%" in df.columns:
-        df = df.sort_values("收益率%", ascending=False).reset_index(drop=True)
+    if not df.empty:
+        if "得分" in df.columns and "代码" in df.columns:
+            df["代码"] = df["代码"].astype(str).str.zfill(6)
+            df = df.sort_values(["得分", "代码"], ascending=[False, True]).reset_index(drop=True)
+        elif "收益率%" in df.columns:
+            df = df.sort_values("收益率%", ascending=False).reset_index(drop=True)
     df.to_excel(args.output, index=False)
     print(f"信号日 {signal_date} 得分>={args.min_score} 不限市值: {len(rows)} 只")
     print(f"已保存: {args.output}")

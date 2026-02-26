@@ -10,12 +10,21 @@
     .score-form { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
     .score-form input { flex: 1; padding: 0.5rem; }
     .score-form button { padding: 0.5rem 1rem; }
-    .score-result { margin-top: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 8px; }
-    .score-result h3 { margin: 0 0 0.5rem 0; }
-    .score-result .meta { color: #666; font-size: 0.9rem; }
-    .score-result .breakdown { margin-top: 0.5rem; font-size: 0.9rem; }
-    .score-result .error { color: #c00; }
-    .nav-link { display: inline-block; margin-bottom: 1rem; color: #0066cc; }
+    /* 结果卡片：强制浅底深字，不被全局深色主题覆盖 */
+    .score-result {
+      margin-top: 1rem; padding: 1rem;
+      background: #ffffff !important;
+      border-radius: 8px;
+      color: #111 !important;
+      border: 1px solid rgba(0,0,0,0.1);
+    }
+    .score-result h3 { margin: 0 0 0.5rem 0; color: #111 !important; font-size: 1.1rem; }
+    .score-result p { color: #222 !important; }
+    .score-result .score-num { font-size: 1.25rem; font-weight: 700; color: #059669 !important; }
+    .score-result .meta { color: #444 !important; font-size: 0.9rem; }
+    .score-result .breakdown { margin-top: 0.5rem; font-size: 0.9rem; color: #333 !important; }
+    .score-result .error { color: #c00 !important; }
+    .nav-link { display: inline-block; margin-bottom: 1rem; color: var(--accent-2, #2fc4b2); }
   </style>
 </head>
 <body>
@@ -47,7 +56,7 @@
         }
         let html = '<h3>' + d.code + ' ' + (d.name || '') + '</h3>';
         if (d.score != null) {
-          html += '<p><strong>评分: ' + d.score + '</strong></p>';
+          html += '<p><strong>评分: </strong><span class="score-num">' + d.score + '</span></p>';
           if (d.has_signal) {
             html += '<p class="meta">信号日: ' + d.signal_date + ' &nbsp; 买入日: ' + d.buy_date + '</p>';
             html += '<p class="meta">放量: ' + (d.vol_ratio || '-') + 'x &nbsp; MA10-20: ' + (d.ma20_gap_pct != null ? d.ma20_gap_pct + '%' : '-') + ' &nbsp; MA20-60: ' + (d.ma60_gap_pct != null ? d.ma60_gap_pct + '%' : '-') + '</p>';
@@ -59,7 +68,7 @@
           }
           if (d.breakdown && Object.keys(d.breakdown).length) {
             html += '<div class="breakdown"><strong>评分明细:</strong> ';
-            html += Object.entries(d.breakdown).map(([k,v]) => k + ':+' + v).join(' &nbsp; ');
+            html += Object.entries(d.breakdown).map(([k,v]) => k + ':' + (v >= 0 ? '+' : '') + v).join(' &nbsp; ');
             html += '</div>';
           }
         } else {

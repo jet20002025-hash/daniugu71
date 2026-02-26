@@ -614,6 +614,9 @@ def _score_mode9(
                         break
                 if recent_down:
                     base -= 2
+        # 当日收盘价低于 MA5 扣分（如 301030、301085 信号日收盘在 MA5 下方，不能给满分）
+        if ma5 is not None and not np.isnan(ma5[idx]) and close < ma5[idx]:
+            base -= 5  # 扣足以保证无法满分
     if ma60_now > 0:
         ma20_60_gap = (ma20[idx] - ma60_now) / ma60_now
         if ma20_60_gap >= 0.03:
@@ -637,6 +640,28 @@ def _score_mode9(
     if idx >= 5 and volume[idx - 5] > 0:
         if volume[idx] / volume[idx - 5] > 2.8:
             base -= 2  # 5日内量能放大超过2.8倍，放大过快
+    # 买点前3日内爆量（如哈尔斯 2月12日量是2月11日的4倍以上）：前3日内任一天量>=前一日3倍则扣分；除非该日在近2个月最低价附近（底部放量可豁免）。按比例加重扣分。
+    if idx >= 4:
+        low_arr = np.array([r.low for r in rows], dtype=float)
+        for i in range(idx - 3, idx):
+            if i < 1 or volume[i - 1] <= 0:
+                continue
+            vol_ratio = volume[i] / volume[i - 1]
+            if vol_ratio < 3.0:
+                continue
+            # 爆量日 i，是否在近2个月最低价附近（约40日）
+            start = max(0, i - 39)
+            min_low_40 = np.nanmin(low_arr[start : i + 1])
+            if np.isnan(min_low_40) or min_low_40 <= 0:
+                deduct = min(10, 4 + int((vol_ratio - 3) * 2))  # 3倍起扣4分，每多1倍多扣2分，上限10
+                base -= deduct
+                break
+            # 该日最低或收盘在最低价 5% 以内视为「最低价附近」
+            near_bottom = (low_arr[i] <= min_low_40 * 1.05) or (close_arr[i] <= min_low_40 * 1.05)
+            if not near_bottom:
+                deduct = min(10, 4 + int((vol_ratio - 3) * 2))  # 3倍扣4分，4倍扣6分，4.67倍扣7分，上限10
+                base -= deduct
+                break
     # 当日量/前一日量：小于2倍不扣（满分），>=2倍按比例扣分，比例越大扣越多
     if idx >= 1 and volume[idx - 1] > 0:
         vol_ratio_prev = volume[idx] / volume[idx - 1]

@@ -83,6 +83,47 @@ def _calc_shares(cash: float, price: float, min_lot: int) -> int:
     return max(0, (raw // min_lot) * min_lot)
 
 
+def _reason_stop_loss(stop_loss: float) -> str:
+    if stop_loss and abs(stop_loss - 0.05) < 1e-6:
+        return "stop_loss_5pct"
+    return "stop_loss_10pct"
+
+
+def _find_exit_take_profit_only(
+    rows,
+    buy_idx: int,
+    buy_price: float,
+    end_date: Optional[str],
+    take_profit_pct: float = 0.03,
+) -> Tuple[int, float, str]:
+    """仅盈利止盈：达到 take_profit_pct（如 3%）即卖，不盈利则持有至 end_date；仅用当日及历史数据。"""
+    target = buy_price * (1 + take_profit_pct)
+    exit_idx = buy_idx
+    exit_price = rows[buy_idx].close
+    reason = "end"
+    for i in range(buy_idx + 1, len(rows)):
+        if end_date and rows[i].date > end_date:
+            break
+        high = rows[i].high
+        close = rows[i].close
+        if high >= target:
+            exit_idx = i
+            exit_price = target
+            reason = "take_profit_3pct"
+            break
+        exit_idx = i
+        exit_price = close
+        reason = "end"
+    if end_date and rows[exit_idx].date > end_date:
+        for j in range(exit_idx - 1, buy_idx - 1, -1):
+            if rows[j].date <= end_date:
+                exit_idx = j
+                exit_price = rows[j].close
+                reason = "end_date"
+                break
+    return exit_idx, exit_price, reason
+
+
 def _find_exit(
     rows,
     buy_idx: int,
@@ -90,7 +131,9 @@ def _find_exit(
     ma: np.ndarray,
     end_date: Optional[str],
     ma_period: int = 20,
+    reason_stop_loss: str = "stop_loss_10pct",
 ) -> Tuple[int, float, str]:
+    """卖出判断仅用当日及历史数据：逐日检查当日 low/close 与 MA，禁止使用未来数据。"""
     reason_suffix = f"ma{ma_period}_break"
     exit_idx = buy_idx
     exit_price = rows[buy_idx].close
@@ -102,7 +145,7 @@ def _find_exit(
         if low <= stop_loss_price:
             exit_idx = i
             exit_price = stop_loss_price
-            reason = "stop_loss_10pct"
+            reason = reason_stop_loss
             break
         if not np.isnan(ma[i]) and ma[i] > 0 and close < ma[i]:
             exit_idx = i
@@ -131,6 +174,8 @@ def run_backtest(
     stop_loss: float = 0.10,
     ma_exit: int = 10,
     buy_at_close: bool = False,
+    use_stop_loss: bool = True,
+    take_profit_only: Optional[float] = None,
 ) -> Tuple[List[Dict], float]:
     """执行单年回测，返回 (交易列表, 期末资金)。"""
     if "date" not in picks.columns and "signal_date" in picks.columns:
@@ -140,7 +185,13 @@ def run_backtest(
     picks["date"] = picks["date"].astype(str)
     picks["buy_date"] = picks["buy_date"].astype(str)
     picks["code"] = picks["code"].astype(str).str.zfill(6)
-    picks = picks.sort_values(["date", "score"], ascending=[True, False])
+    sort_cols = ["date", "score"]
+    ascending = [True, False]
+    if "buy_point_score" in picks.columns:
+        picks["buy_point_score"] = picks["buy_point_score"].fillna(0).astype(int)
+        sort_cols.append("buy_point_score")
+        ascending.append(False)
+    picks = picks.sort_values(sort_cols, ascending=ascending)
     daily_candidates = picks.groupby("date").apply(
         lambda g: g.head(5).to_dict("records"), include_groups=False
     ).to_dict()
@@ -218,12 +269,18 @@ def run_backtest(
             if buy_idx_pos is None:
                 position = None
                 continue
-            close = np.array([r.close for r in pos_rows], dtype=float)
-            ma = _moving_mean(close, ma_exit)
-            stop_price = position["buy_price"] * (1 - stop_loss)
-            exit_idx, exit_price, reason = _find_exit(
-                pos_rows, buy_idx_pos, stop_price, ma, end_date, ma_exit
-            )
+            if take_profit_only is not None:
+                exit_idx, exit_price, reason = _find_exit_take_profit_only(
+                    pos_rows, buy_idx_pos, position["buy_price"], end_date, take_profit_only
+                )
+            else:
+                close = np.array([r.close for r in pos_rows], dtype=float)
+                ma = _moving_mean(close, ma_exit)
+                stop_price = position["buy_price"] * (1 - stop_loss) if use_stop_loss else 0.0
+                exit_idx, exit_price, reason = _find_exit(
+                    pos_rows, buy_idx_pos, stop_price, ma, end_date, ma_exit,
+                    reason_stop_loss=_reason_stop_loss(stop_loss),
+                )
             exit_date = pos_rows[exit_idx].date
             if exit_date > buy_date:
                 continue
@@ -275,11 +332,18 @@ def run_backtest(
         if shares < min_lot:
             continue
         cash -= shares * entry_price
-        close = np.array([r.close for r in kline], dtype=float)
-        ma = _moving_mean(close, ma_exit)
-        exit_idx, exit_price, reason = _find_exit(
-            kline, buy_idx, entry_price * (1 - stop_loss), ma, end_date, ma_exit
-        )
+        if take_profit_only is not None:
+            exit_idx, exit_price, reason = _find_exit_take_profit_only(
+                kline, buy_idx, entry_price, end_date, take_profit_only
+            )
+        else:
+            close = np.array([r.close for r in kline], dtype=float)
+            ma = _moving_mean(close, ma_exit)
+            sl_price = entry_price * (1 - stop_loss) if use_stop_loss else 0.0
+            exit_idx, exit_price, reason = _find_exit(
+                kline, buy_idx, sl_price, ma, end_date, ma_exit,
+                reason_stop_loss=_reason_stop_loss(stop_loss),
+            )
         exit_date = kline[exit_idx].date
         position = {
             "code": str(code).zfill(6),
@@ -407,8 +471,11 @@ TRADE_CN = {
 
 REASON_CN = {
     "stop_loss_10pct": "10%止损",
+    "stop_loss_5pct": "5%止损",
+    "take_profit_3pct": "盈利3%止盈",
     "ma20_break": "破20日均线",
     "ma10_break": "破10日均线",
+    "ma5_break": "破5日均线",
     "end": "持仓结束",
     "end_date": "回测截止",
 }
@@ -446,6 +513,7 @@ def main() -> None:
     )
     parser.add_argument("--initial-cash", type=float, default=100000)
     parser.add_argument("--stop-loss", type=float, default=0.10)
+    parser.add_argument("--no-stop-loss", action="store_true", help="关闭10%%止损，仅破MA卖或期末平仓（用于对比收益差异）")
     parser.add_argument("--ma-exit", type=int, default=10, help="破N日均线卖出，默认10（与最新模型一致）")
     parser.add_argument(
         "--market-cap",
@@ -498,6 +566,7 @@ def main() -> None:
                 initial_cash=args.initial_cash,
                 stop_loss=args.stop_loss,
                 ma_exit=args.ma_exit,
+                use_stop_loss=not args.no_stop_loss,
             )
             stats = _compute_stats(
                 trades, args.initial_cash, final_cash, year

@@ -1057,9 +1057,11 @@ def scan_with_mode3(
         close_gap = float(metrics.get("close_gap", 0.0))
         ret20_val = float(metrics.get("ret20", 0.0))
         upper_score = float(metrics.get("upper_score", 0.0))
+        buy_point_score = int(metrics.get("buy_point_score", 0))
         if prefer_upper_shadow:
             return (
                 -r.score,
+                -buy_point_score,
                 -upper_score,
                 close_gap,
                 -vol_ratio,
@@ -1067,7 +1069,7 @@ def scan_with_mode3(
                 ret20_val,
                 r.code,
             )
-        return (-r.score, close_gap, -vol_ratio, -(ma20_gap + ma60_gap), ret20_val, r.code)
+        return (-r.score, -buy_point_score, close_gap, -vol_ratio, -(ma20_gap + ma60_gap), ret20_val, r.code)
 
     results.sort(key=_mode3_sort_key)
 

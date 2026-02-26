@@ -38,6 +38,7 @@ class ScanConfig:
     weight_strength: float = 1.0
     weight_risk: float = 1.0
     max_market_cap: Optional[float] = 15_000_000_000.0
+    mode8_n_bars: int = 60  # mode8 起算 K 线根数（70/80/90 等），仅 use_mode8 时生效
 
 
 def _normalize_code(code: str) -> str:
@@ -272,6 +273,11 @@ def _mode3_signals(
     start_date: Optional[str],
     end_date: Optional[str],
 ) -> List[int]:
+    """
+    找出所有满足 mode3 启动点的信号日下标。
+    测算起点：从信号日当天往前至少 60 根 K 线参与计算（MA60、vol20 等），
+    即从买点前约 60 个交易日开始数据就参与测算；第一个可能出信号的日期是第 61 根 K 线（下标 60）。
+    """
     signals: List[int] = []
     if len(rows) < 60:
         return signals
@@ -310,6 +316,78 @@ def _mode3_signals(
             if ret20 > 25:
                 continue
 
+        ma10_slope = ma10[i] - ma10[i - 3]
+        ma20_slope = ma20[i] - ma20[i - 3]
+        ma60_slope = ma60[i] - ma60[i - 3]
+        if not (
+            ma10[i] > ma20[i] > ma60[i]
+            and ma10_slope > 0
+            and ma20_slope > 0
+            and ma60_slope > 0
+        ):
+            continue
+        if close[i] < ma20[i]:
+            continue
+        if volume[i] < vol20[i] * 1.2:
+            continue
+        signals.append(i)
+    return signals
+
+
+def _mode9_signals(
+    rows: List[KlineRow],
+    start_date: Optional[str],
+    end_date: Optional[str],
+) -> List[int]:
+    """mode9：与 mode3（71倍）完全一致的信号逻辑，复制一份便于独立调参或扩展。"""
+    return _mode3_signals(rows, start_date, end_date)
+
+
+def _mode8_signals(
+    rows: List[KlineRow],
+    start_date: Optional[str],
+    end_date: Optional[str],
+    n_bars: int = 60,
+) -> List[int]:
+    """
+    mode8 信号：与 mode3（71倍）一致，便于与 mode3 同口径对比；仅评分侧做大牛股偏好（ret60 适中加分）。
+    """
+    signals: List[int] = []
+    if len(rows) < n_bars:
+        return signals
+    close = np.array([r.close for r in rows], dtype=float)
+    volume = np.array([r.volume for r in rows], dtype=float)
+    ma10 = _moving_mean(close, 10)
+    ma20 = _moving_mean(close, 20)
+    ma60 = _moving_mean(close, 60)
+    vol20 = _moving_mean(volume, 20)
+    start_dt = _parse_date(start_date)
+    end_dt = _parse_date(end_date)
+    for i in range(n_bars, len(rows)):
+        if start_dt or end_dt:
+            try:
+                row_dt = datetime.strptime(rows[i].date, "%Y-%m-%d").date()
+            except Exception:
+                continue
+            if start_dt and row_dt < start_dt:
+                continue
+            if end_dt and row_dt > end_dt:
+                continue
+        if (
+            np.isnan(ma10[i])
+            or np.isnan(ma20[i])
+            or np.isnan(ma60[i])
+            or np.isnan(vol20[i])
+        ):
+            continue
+        if i - 20 >= 0 and close[i - 20] > 0:
+            ret20 = (close[i] - close[i - 20]) / close[i - 20] * 100
+            if ret20 > 50:
+                continue
+        if i >= 60 and close[i - 60] > 0:
+            ret60 = (close[i] - close[i - 60]) / close[i - 60] * 100
+            if ret60 < -15 or ret60 > 50:
+                continue
         ma10_slope = ma10[i] - ma10[i - 3]
         ma20_slope = ma20[i] - ma20[i - 3]
         ma60_slope = ma60[i] - ma60[i - 3]
@@ -451,6 +529,293 @@ def _score_mode3(
     return int(max(0, round(score)))
 
 
+def _score_mode9(
+    rows: List[KlineRow],
+    idx: int,
+    ma10: np.ndarray,
+    ma20: np.ndarray,
+    ma60: np.ndarray,
+    vol20: np.ndarray,
+) -> int:
+    """
+    mode9 评分：在 mode3 基础上微调，使选股更准。
+    基于「满分100 表现最好5只 vs 最差5只」买点前特征对比：
+    - 收盘距MA20 过远(>8%)略降分，偏好温和突破；
+    - MA20-MA60 开口大(趋势强)额外加分；
+    - 当日实体占比大(阳线实在)加分；
+    - 60日涨幅适中(15%～40%)略加分；
+    - MA5 斜率过于陡峭(5日内MA5涨幅>15%)降分，避免短期冲得过猛（如金时科技 17.44%）。
+    - 量能放大太快（多看3～5日）：近3日均量/再前3日>2 或 当日量/5日前量>2.8 降分，可能快到顶。
+    - 均线整齐度（参考明阳电路 vs 神开股份）：当日 MA5>MA10>MA20 加分；近5日内均线交叉次数多则降分。
+    """
+    base = _score_mode3(rows, idx, ma10, ma20, ma60, vol20)
+    close_arr = np.array([r.close for r in rows], dtype=float)
+    volume = np.array([r.volume for r in rows], dtype=float)
+    close = rows[idx].close
+    ma20_now = ma20[idx]
+    ma60_now = ma60[idx]
+    if ma20_now <= 0:
+        return base
+    close_gap = (close - ma20_now) / ma20_now
+    # 收盘距MA20 过远降分（最好组 10.34% vs 最差 12.53%，温和突破更优）
+    if close_gap > 0.08:
+        base -= 2
+    # MA5 斜率过于陡峭降分（最好5只 MA5斜率 7～14%，最差中金时科技 17.44%、亚康 16.32%）
+    ma5 = None
+    if idx >= 5:
+        ma5 = _moving_mean(close_arr, 5)
+        if not (np.isnan(ma5[idx]) or np.isnan(ma5[idx - 5]) or ma5[idx - 5] <= 0):
+            ma5_slope_pct = (ma5[idx] - ma5[idx - 5]) / ma5[idx - 5] * 100
+            if ma5_slope_pct > 15:
+                base -= 2
+        # 均线整齐度：当日 MA5>MA10>MA20 加分（明阳电路式完美多头）
+        if ma5 is not None and not (np.isnan(ma5[idx]) or np.isnan(ma10[idx]) or np.isnan(ma20[idx])):
+            if ma5[idx] > ma10[idx] > ma20[idx]:
+                base += 2
+        # 近5日内均线交叉次数多则降分（神开股份式乱序）
+        if idx >= 6 and ma5 is not None:
+            crosses = 0
+            for i in range(idx - 4, idx + 1):
+                if i <= 0:
+                    continue
+                if not (np.isnan(ma5[i]) or np.isnan(ma5[i - 1]) or np.isnan(ma10[i]) or np.isnan(ma10[i - 1])):
+                    if (ma5[i] - ma10[i]) * (ma5[i - 1] - ma10[i - 1]) < 0:
+                        crosses += 1
+                if not (np.isnan(ma10[i]) or np.isnan(ma10[i - 1]) or np.isnan(ma20[i]) or np.isnan(ma20[i - 1])):
+                    if (ma10[i] - ma20[i]) * (ma10[i - 1] - ma20[i - 1]) < 0:
+                        crosses += 1
+            if crosses >= 2:
+                base -= 2
+        # MA5 与 MA10 粘连降分（如美利云 2月9日两线几乎贴在一起，趋势不清晰）
+        if ma5 is not None and ma10[idx] > 0:
+            # 当日粘连：|MA5-MA10|/MA10 < 1%
+            gap_pct = abs(ma5[idx] - ma10[idx]) / ma10[idx]
+            if gap_pct < 0.01:
+                base -= 2
+            # 近5日内曾粘连（含当日）
+            elif idx >= 5:
+                for i in range(idx - 4, idx + 1):
+                    if i < 0 or np.isnan(ma5[i]) or np.isnan(ma10[i]) or ma10[i] <= 0:
+                        continue
+                    if abs(ma5[i] - ma10[i]) / ma10[i] < 0.01:
+                        base -= 2
+                        break
+        # MA5 近期拐头向下、当日强行拐回降分（如兴民智通 2月12日 MA5 向下，2月13日拐回，形态不稳）
+        if ma5 is not None and idx >= 3:
+            today_up = not (np.isnan(ma5[idx]) or np.isnan(ma5[idx - 1])) and ma5[idx] > ma5[idx - 1]
+            if today_up:
+                # 昨日或前日 MA5 曾向下
+                recent_down = False
+                for i in range(1, 3):
+                    if idx - i < 1:
+                        break
+                    if not (np.isnan(ma5[idx - i]) or np.isnan(ma5[idx - i - 1])) and ma5[idx - i] < ma5[idx - i - 1]:
+                        recent_down = True
+                        break
+                if recent_down:
+                    base -= 2
+    if ma60_now > 0:
+        ma20_60_gap = (ma20[idx] - ma60_now) / ma60_now
+        if ma20_60_gap >= 0.03:
+            base += 2  # 均线多头开口大，趋势更强
+    # 当日 K 线实体占比大加分（最好组 74.9% vs 最差 50%）
+    rng = rows[idx].high - rows[idx].low
+    if rng > 0:
+        body = abs(close - rows[idx].open)
+        if body / rng >= 0.6:
+            base += 2
+    if idx >= 60 and close_arr[idx - 60] > 0:
+        ret60 = (close - close_arr[idx - 60]) / close_arr[idx - 60] * 100
+        if 15 <= ret60 <= 40:
+            base += 1
+    # 量能放大太快（多看3～5日）：最好组 近3日/再前3日 1.27、最差组 2.13；当日/5日前 最好2.71、最差3.06
+    if idx >= 6:
+        vol_3d_recent = (volume[idx] + volume[idx - 1] + volume[idx - 2]) / 3.0
+        vol_3d_older = (volume[idx - 3] + volume[idx - 4] + volume[idx - 5]) / 3.0
+        if vol_3d_older > 0 and vol_3d_recent / vol_3d_older > 2.0:
+            base -= 2  # 近3日量能相对再前3日陡升，可能快到顶
+    if idx >= 5 and volume[idx - 5] > 0:
+        if volume[idx] / volume[idx - 5] > 2.8:
+            base -= 2  # 5日内量能放大超过2.8倍，放大过快
+    # 当日量/前一日量：小于2倍不扣（满分），>=2倍按比例扣分，比例越大扣越多
+    if idx >= 1 and volume[idx - 1] > 0:
+        vol_ratio_prev = volume[idx] / volume[idx - 1]
+        if vol_ratio_prev > 2.0:
+            deduct = min(10, max(2, int((vol_ratio_prev - 2) * 4)))
+            base -= deduct
+    return int(max(0, min(100, base)))
+
+
+def _score_mode8(
+    rows: List[KlineRow],
+    idx: int,
+    ma10: np.ndarray,
+    ma20: np.ndarray,
+    ma60: np.ndarray,
+    vol20: np.ndarray,
+) -> int:
+    """
+    mode8 评分：在 mode3 基础上增加买点前60日涨幅适中区间加分（大牛股样本 ret60 多落在 0～35%）。
+    """
+    close_arr = np.array([r.close for r in rows], dtype=float)
+    close = rows[idx].close
+    volume = rows[idx].volume
+    score = 60.0
+
+    ma20_now = ma20[idx]
+    ma60_now = ma60[idx]
+    ma10_now = ma10[idx]
+    vol20_now = vol20[idx]
+
+    if ma20_now > 0:
+        gap = (ma10_now - ma20_now) / ma20_now
+        if gap >= 0.02:
+            score += 10
+        elif gap >= 0.01:
+            score += 6
+        elif gap >= 0.005:
+            score += 3
+
+    if ma60_now > 0:
+        gap = (ma20_now - ma60_now) / ma60_now
+        if gap >= 0.02:
+            score += 10
+        elif gap >= 0.01:
+            score += 6
+        elif gap >= 0.005:
+            score += 3
+
+    if vol20_now > 0:
+        vol_ratio = volume / vol20_now
+        if vol_ratio >= 1.6:
+            score += 15
+        elif vol_ratio >= 1.4:
+            score += 10
+        elif vol_ratio >= 1.2:
+            score += 6
+
+    if ma20_now > 0:
+        close_gap = (close - ma20_now) / ma20_now
+        if close_gap >= 0.03:
+            score += 5
+        elif close_gap >= 0.01:
+            score += 3
+
+    if idx >= 3:
+        base_close = rows[idx - 3].close
+        if base_close > 0:
+            ret3 = (close - base_close) / base_close * 100
+            if ret3 > 20:
+                score -= 10
+            elif ret3 > 15:
+                score -= 5
+
+    if idx >= 5:
+        ma5 = _moving_mean(close_arr, 5)
+        if not (np.isnan(ma5[idx]) or np.isnan(ma5[idx - 1])) and ma5[idx] < ma5[idx - 1]:
+            score -= 5
+
+    if idx >= 60 and close_arr[idx - 60] > 0:
+        ret60 = (close - close_arr[idx - 60]) / close_arr[idx - 60] * 100
+        if 0 <= ret60 <= 35:
+            score += 5
+        elif -10 <= ret60 < 0:
+            score += 2
+
+    # 仅用历史：买点前 60 日回撤/波动/筹码成本代理，大牛买点常为洗盘震仓后的适度回撤与成本区附近
+    if idx >= 60:
+        high_arr = np.array([r.high for r in rows], dtype=float)
+        vol_arr = np.array([r.volume for r in rows], dtype=float)
+        pct_arr = np.array([r.pct_chg for r in rows], dtype=float)
+        start = max(0, idx - 59)
+        window_high = np.nanmax(high_arr[start : idx + 1])
+        if window_high > 0:
+            drawdown_60 = (window_high - close) / window_high * 100
+            if 5 <= drawdown_60 <= 25:
+                score += 2
+            elif 0 <= drawdown_60 < 5:
+                score += 1
+        pct_slice = pct_arr[start : idx + 1]
+        pct_valid = pct_slice[~np.isnan(pct_slice)]
+        if len(pct_valid) >= 10:
+            vol_60 = float(np.std(pct_valid))
+            if 1.0 <= vol_60 <= 3.0:
+                score += 1
+        s_vol = np.sum(vol_arr[start : idx + 1])
+        if s_vol > 0:
+            vwap60 = np.sum(close_arr[start : idx + 1] * vol_arr[start : idx + 1]) / s_vol
+            if vwap60 > 0:
+                vwap_ratio = close / vwap60
+                if 1.0 <= vwap_ratio <= 1.06:
+                    score += 2
+                elif 0.98 <= vwap_ratio < 1.0:
+                    score += 1
+
+    return int(max(0, round(score)))
+
+
+def _buy_point_score(
+    rows: List[KlineRow],
+    idx: int,
+    ma10: np.ndarray,
+    ma20: np.ndarray,
+    ma60: np.ndarray,
+    vol20: np.ndarray,
+) -> int:
+    """买点分值 0～100：衡量当日作为买入点的质量（放量、距MA20适中、均线多头、非追高等）。"""
+    close = rows[idx].close
+    volume = rows[idx].volume
+    score = 50.0
+    ma20_now = ma20[idx]
+    ma60_now = ma60[idx]
+    ma10_now = ma10[idx]
+    vol20_now = vol20[idx]
+
+    # 放量：量比越大买点越可靠
+    if vol20_now > 0:
+        vol_ratio = volume / vol20_now
+        if vol_ratio >= 1.6:
+            score += 15
+        elif vol_ratio >= 1.4:
+            score += 12
+        elif vol_ratio >= 1.2:
+            score += 8
+
+    # 收盘相对 MA20：适中突破给高分，追高扣分
+    if ma20_now > 0:
+        close_gap = (close - ma20_now) / ma20_now
+        if 0 <= close_gap <= 0.01:
+            score += 15
+        elif close_gap <= 0.03:
+            score += 12
+        elif close_gap <= 0.05:
+            score += 5
+        elif close_gap > 0.05:
+            score -= 5
+
+    # 均线多头排列
+    if ma20_now > 0 and ma60_now > 0 and ma10_now > ma20_now and ma20_now > ma60_now:
+        score += 10
+
+    # 上影线适中（有试探但不过长）
+    rng = rows[idx].high - rows[idx].low
+    if rng > 0:
+        upper = rows[idx].high - max(rows[idx].open, rows[idx].close)
+        upper_ratio = upper / rng
+        if 0.2 <= upper_ratio <= 0.5:
+            score += 5
+
+    # 近 3 日涨幅过大则扣分（追高）
+    if idx >= 3 and rows[idx - 3].close > 0:
+        ret3 = (close - rows[idx - 3].close) / rows[idx - 3].close * 100
+        if ret3 > 20:
+            score -= 15
+        elif ret3 > 15:
+            score -= 8
+
+    return int(max(0, min(100, round(score))))
+
+
 def scan_with_mode3(
     stock_list: List[StockItem],
     config: ScanConfig,
@@ -475,8 +840,19 @@ def scan_with_mode3(
     close_gap_max: float = 0.02,
     mode4_filters: bool = False,
     use_71x_standard: bool = False,
+    use_mode8: bool = False,
+    use_mode9: bool = False,
 ) -> List[ScanResult]:
+    """use_mode8=True 时使用 mode8 信号与评分；use_mode9=True 时使用 mode9（与 mode3 一致）。"""
     results: List[ScanResult] = []
+    mode8_n_bars = getattr(config, "mode8_n_bars", 60)
+    signal_fn = (
+        (lambda r, s, e: _mode8_signals(r, s, e, n_bars=mode8_n_bars))
+        if use_mode8
+        else (_mode9_signals if use_mode9 else _mode3_signals)
+    )
+    score_fn = _score_mode8 if use_mode8 else (_score_mode9 if use_mode9 else _score_mode3)
+    mode_label = "mode8" if use_mode8 else ("mode9" if use_mode9 else ("mode4" if mode4_filters else "mode3"))
     end_date = cutoff_date
 
     for item in stock_list:
@@ -506,7 +882,8 @@ def scan_with_mode3(
                 )
         except Exception:
             rows = None
-        if not rows or len(rows) < 80:
+        min_rows = max(80, mode8_n_bars) if use_mode8 else 80
+        if not rows or len(rows) < min_rows:
             continue
 
         if end_date:
@@ -533,7 +910,7 @@ def scan_with_mode3(
             if min_low > 0 and max_high / min_low >= config.year_high_low_ratio_limit:
                 continue
 
-        signals = _mode3_signals(rows, start_date, end_date)
+        signals = signal_fn(rows, start_date, end_date)
         if cutoff_date and not start_date:
             signals = [s for s in signals if rows[s].date == cutoff_date]
         if not start_date and not cutoff_date and signals:
@@ -579,10 +956,11 @@ def scan_with_mode3(
                 if _has_limit_up_then_down(rows, idx, item.code, item.name, lookback=5, min_consec_limit_up=3):
                     continue
 
-            score = _score_mode3(rows, idx, ma10, ma20, ma60, vol20)
+            score = score_fn(rows, idx, ma10, ma20, ma60, vol20)
             if score < config.min_score:
                 continue
 
+            buy_point_score = _buy_point_score(rows, idx, ma10, ma20, ma60, vol20)
             buy_idx = min(idx + 1, len(rows) - 1)
             signal_date = rows[idx].date
             buy_date = rows[buy_idx].date
@@ -611,7 +989,7 @@ def scan_with_mode3(
             if require_close_gap and close_gap > close_gap_max:
                 continue
             reasons = [
-                "启动点 mode4" if mode4_filters else "启动点 mode3",
+                f"启动点 {mode_label}",
                 f"信号日 {signal_date}",
                 f"买入日 {buy_date} (T+1 开盘)",
                 f"放量 {vol_ratio:.2f}x",
@@ -641,6 +1019,7 @@ def scan_with_mode3(
                         "upper_ratio": float(upper_ratio),
                         "upper_score": float(upper_score),
                         "market_cap": float(cap_value) if cap_value is not None else None,
+                        "buy_point_score": int(buy_point_score),
                     },
                 )
             )
@@ -689,6 +1068,7 @@ def serialize_results(results: List[ScanResult]) -> List[Dict[str, object]]:
         {
             **asdict(r),
             "reasons": ", ".join(r.reasons),
+            "buy_point_score": (r.metrics or {}).get("buy_point_score"),
         }
         for r in results
     ]

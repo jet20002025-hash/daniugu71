@@ -1,4 +1,4 @@
-"""个股评分：输入代码，输出 mode3 评分"""
+"""个股评分：输入代码，输出 mode9 评分（当前主模型，由 71 倍/mode3 升级）"""
 import csv
 import os
 from typing import Dict, Optional
@@ -11,7 +11,7 @@ from .eastmoney import (
     read_cached_kline_by_market_code,
 )
 from .paths import GPT_DATA_DIR
-from .scanner import _mode3_signals, _moving_mean, _score_mode3
+from .scanner import _mode3_signals, _moving_mean, _score_mode9
 
 
 def _load_kline(code: str, cache_dir: str, use_secid: bool) -> tuple:
@@ -89,7 +89,7 @@ def score_stock(
 
     if not signals:
         idx = len(rows) - 1
-        raw_score = _score_mode3(rows, idx, ma10, ma20, ma60, vol20)
+        raw_score = _score_mode9(rows, idx, ma10, ma20, ma60, vol20)
         breakdown = _breakdown(rows, idx, ma10, ma20, ma60, vol20)
         reasons = []
         if np.isnan(ma10[idx]) or np.isnan(ma20[idx]) or np.isnan(ma60[idx]):
@@ -119,13 +119,13 @@ def score_stock(
             return {
                 "code": code,
                 "name": name,
-                "score": _score_mode3(rows, idx, ma10, ma20, ma60, vol20),
+                "score": _score_mode9(rows, idx, ma10, ma20, ma60, vol20),
                 "has_signal": False,
                 "reason": f"近一年最高/最低倍数{max_high/min_low:.2f}x超4倍，已排除",
                 "breakdown": _breakdown(rows, idx, ma10, ma20, ma60, vol20),
                 "latest_date": rows[idx].date,
             }
-    score = _score_mode3(rows, idx, ma10, ma20, ma60, vol20)
+    score = _score_mode9(rows, idx, ma10, ma20, ma60, vol20)
     signal_date = rows[idx].date
     buy_idx = min(idx + 1, len(rows) - 1)
     buy_date = rows[buy_idx].date
@@ -141,7 +141,7 @@ def score_stock(
         "has_signal": True,
         "signal_date": signal_date,
         "buy_date": buy_date,
-        "reason": "符合mode3启动点",
+        "reason": "符合mode9启动点",
         "breakdown": _breakdown(rows, idx, ma10, ma20, ma60, vol20),
         "vol_ratio": round(vol_ratio, 2),
         "ma20_gap_pct": round(ma20_gap * 100, 2),

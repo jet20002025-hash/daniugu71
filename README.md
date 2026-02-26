@@ -13,8 +13,13 @@ python app.py
 
 浏览器打开：`http://127.0.0.1:5000`
 
+## 数据与回测规范（必读）
+
+**禁止使用未来数据。** 所有训练、选股、回测、测试只能使用当日及历史数据；用未来数据得到的回测结果无参考价值。详见 [DATA_RULES.md](DATA_RULES.md)。
+
 ## 说明
 
+- **主规则模型**：当前默认使用 **mode9**（由 71 倍/mode3 升级，含均线整齐度、量比按比例扣分等），详见 [docs/mode9模型说明.md](docs/mode9模型说明.md)；71 倍原版保留为 mode3 可选。
 - 首次运行会缓存 K 线到 `data/kline_cache/`，后续会增量更新。
 - 结果会写入 `data/results/latest.json` 与 `data/results/latest.csv`。
 - 仅做强势筛选，不提供买点或荐股建议。

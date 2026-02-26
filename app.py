@@ -1,6 +1,7 @@
 import csv
 import json
 import os
+import sqlite3
 import threading
 import time
 import traceback
@@ -471,9 +472,10 @@ def save_results(results: List[ScanResult], model: str = "rule", user_id: Option
 
     with open(csv_path, "w", encoding="utf-8", newline="") as handle:
         writer = csv.writer(handle)
-        writer.writerow(["code", "name", "score", "close", "pct_chg", "reasons"])
+        writer.writerow(["code", "name", "score", "buy_point_score", "close", "pct_chg", "reasons"])
         for r in results:
-            writer.writerow([r.code, r.name, r.score, r.latest_close, r.change_pct, " ".join(r.reasons)])
+            bp = (r.metrics or {}).get("buy_point_score", "")
+            writer.writerow([r.code, r.name, r.score, bp, r.latest_close, r.change_pct, " ".join(r.reasons)])
 
     meta_payload = {"updated_at": timestamp, "count": len(results), "model": model}
     score_buckets = _score_buckets(results, model)
@@ -721,6 +723,8 @@ def run_mode3_scan(
     model_tag_override: Optional[str] = None,
     use_startup_modes_data: bool = False,
     use_71x_standard: bool = False,
+    use_mode8: bool = False,
+    use_mode9: bool = False,
     user_id: Optional[int] = None,
     throttle_free_user: bool = False,
 ) -> None:
@@ -830,7 +834,7 @@ def run_mode3_scan(
                 cap_note = "，市值过滤未启用(缺缓存)"
             else:
                 cap_note = f"，市值≤{config.max_market_cap / 1e8:.0f}亿"
-        mode_label = "mode4" if mode4_filters else ("mode3ok" if model_tag_override == "mode3ok" else "mode3")
+        mode_label = "mode8" if use_mode8 else ("mode9" if use_mode9 else ("mode4" if mode4_filters else ("mode3ok" if model_tag_override == "mode3ok" else "mode3")))
         _emit({"message": f"加载{mode_label}，开始筛选（{provider_label}）{cap_note}"})
 
         def _progress_cb() -> None:
@@ -860,9 +864,15 @@ def run_mode3_scan(
             require_close_gap=require_close_gap,
             mode4_filters=mode4_filters,
             use_71x_standard=use_71x_standard,
+            use_mode8=use_mode8,
+            use_mode9=use_mode9,
         )
         if model_tag_override:
             model_tag = model_tag_override
+        elif use_mode8:
+            model_tag = "mode8"
+        elif use_mode9:
+            model_tag = "mode9"
         elif mode4_filters:
             model_tag = "mode4"
         elif require_upper_shadow:
@@ -943,10 +953,15 @@ def register():
                         session.permanent = True
                         return redirect(url_for("index"))
                     error = "用户名已被注册"
+                except sqlite3.IntegrityError:
+                    error = "用户名已被注册"
                 except Exception as e:
-                    import traceback
                     traceback.print_exc()
-                    error = "注册失败，请稍后重试或联系管理员"
+                    # 本地或调试时显示具体错误，便于排查
+                    if os.environ.get("FLASK_DEBUG") or os.environ.get("SHOW_REGISTER_ERROR"):
+                        error = f"注册失败：{e}"
+                    else:
+                        error = "注册失败，请稍后重试或联系管理员"
     return render_template("register.html", error=error)
 
 
@@ -1028,9 +1043,9 @@ def scan():
     if USE_SCAN_QUEUE:
         # 加入队列，由独立 worker 执行；先发取消让上一轮尽快退出，再入队新任务
         request_cancel(user_id)
-        mode = request.form.get("mode", "mode3")
-        if mode not in ("mode3", "mode3ok", "mode3_avoid", "mode3_upper", "mode3_upper_strict", "mode3_upper_near", "mode4"):
-            mode = "mode3"
+        mode = request.form.get("mode", "mode9")
+        if mode not in ("mode3", "mode3ok", "mode3_avoid", "mode3_upper", "mode3_upper_strict", "mode3_upper_near", "mode4", "mode8", "mode9"):
+            mode = "mode9"
         cutoff_date = request.form.get("cutoff_date") or None
         start_date = request.form.get("start_date") or None
         raw_ds = (request.form.get("data_source") or "gpt").strip() or "gpt"
@@ -1068,9 +1083,9 @@ def scan():
         return redirect(url_for("index"))
     # 不排队：点击即在本进程起线程扫描；先发取消标记中断上一轮，再启动新任务
     request_cancel(user_id)
-    mode = request.form.get("mode", "mode3")
-    if mode not in ("mode3", "mode3ok", "mode3_avoid", "mode3_upper", "mode3_upper_strict", "mode3_upper_near", "mode4"):
-        mode = "mode3"
+    mode = request.form.get("mode", "mode9")
+    if mode not in ("mode3", "mode3ok", "mode3_avoid", "mode3_upper", "mode3_upper_strict", "mode3_upper_near", "mode4", "mode8", "mode9"):
+        mode = "mode9"
     cutoff_date = request.form.get("cutoff_date") or None
     start_date = request.form.get("start_date") or None
     raw_ds = (request.form.get("data_source") or "gpt").strip() or "gpt"
@@ -1096,7 +1111,7 @@ def scan():
         max_market_cap=cap_limit,
     )
     use_startup_data = True
-    use_71x_standard = mode == "mode3"
+    use_71x_standard = mode in ("mode3", "mode9")
     is_paid = (
         g.current_user.is_activated and not getattr(g.current_user, "subscription_expired", True)
         or getattr(g.current_user, "is_super_admin", False)
@@ -1120,6 +1135,8 @@ def scan():
             "mode3ok" if mode == "mode3ok" else None,
             use_startup_data,
             use_71x_standard,
+            mode == "mode8",
+            mode == "mode9",
             user_id,
             not is_paid,
         ),

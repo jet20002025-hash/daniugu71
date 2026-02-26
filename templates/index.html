@@ -46,7 +46,7 @@
         </div>
         <div class="status-row">
           <span>模型</span>
-          <strong id="status-model">71倍模型</strong>
+          <strong id="status-model">mode9</strong>
         </div>
         <div class="status-row">
           <span>上次更新</span>
@@ -93,10 +93,12 @@
             <span>已有缓存则不联网</span>
           </div>
         </label>
-        <label>
+          <label>
           模型
           <select name="mode" id="mode">
-            <option value="mode3" selected>71倍模型（启动点）</option>
+            <option value="mode9" selected>mode9（当前主模型，原71倍升级）</option>
+            <option value="mode3">71倍原版(mode3)</option>
+            <option value="mode8">mode8（60根K线起算）</option>
           </select>
         </label>
         <label>
@@ -143,6 +145,7 @@
               <th>代码</th>
               <th>名称</th>
               <th>得分</th>
+              <th title="衡量当日作为买入点的质量，0～100">买点分值</th>
               <th>当天收盘价</th>
               <th title="信号日涨跌幅，T+1 不可当日交易仅供参考">涨跌幅%</th>
             </tr>
@@ -153,12 +156,13 @@
               <td>{{ row.code }}</td>
               <td>{{ row.name }}</td>
               <td class="score">{{ row.score }}</td>
+              <td class="score">{{ row.get("buy_point_score", "—") }}</td>
               <td>{{ "%.2f" % row.latest_close }}</td>
               <td class="pct">{{ "%.2f" % row.change_pct }}</td>
             </tr>
             {% else %}
             <tr>
-              <td colspan="5" class="empty">暂无结果，点击上方按钮开始筛选。</td>
+              <td colspan="6" class="empty">暂无结果，点击上方按钮开始筛选。</td>
             </tr>
             {% endfor %}
           </tbody>

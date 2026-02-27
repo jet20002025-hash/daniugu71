@@ -82,7 +82,7 @@ def run_one():
             mode4_filters=(mode == "mode4"),
             model_tag_override="mode3ok" if mode == "mode3ok" else None,
             use_startup_modes_data=True,
-            use_71x_standard=(mode in ("mode3", "mode9")),
+            use_71x_standard=(mode in ("mode3", "mode8", "mode9")),
             use_mode8=(mode == "mode8"),
             use_mode9=(mode == "mode9"),
             user_id=user_id,

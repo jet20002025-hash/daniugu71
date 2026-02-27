@@ -1111,7 +1111,7 @@ def scan():
         max_market_cap=cap_limit,
     )
     use_startup_data = True
-    use_71x_standard = mode in ("mode3", "mode9")
+    use_71x_standard = mode in ("mode3", "mode8", "mode9")
     is_paid = (
         g.current_user.is_activated and not getattr(g.current_user, "subscription_expired", True)
         or getattr(g.current_user, "is_super_admin", False)

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-基于 mode9 对 2月13日、2月24日 筛选满分100的个股，按分数降序排列，输出 Excel。
+基于最新 mode9、本地 K 线缓存，筛选 2026-02-26 得分>=98 的个股，按分数降序输出 Excel。
 """
 import os
 import sys
@@ -14,16 +14,33 @@ if ROOT not in sys.path:
 
 from app.eastmoney import list_cached_stocks_flat, load_stock_list_csv
 from app.paths import GPT_DATA_DIR
-from app.scanner import _moving_mean, _score_mode9
+from app.scanner import _moving_mean, _score_mode9, _limit_rate
 from scripts.backtest_startup_modes import _load_rows, _signals_mode3
 
 CACHE_DIR = os.path.join(GPT_DATA_DIR, "kline_cache_tencent")
 STOCK_LIST_CSV = os.path.join(GPT_DATA_DIR, "stock_list.csv")
-OUTPUT_XLSX = os.path.join(ROOT, "data", "results", "score100_mode9_0213_0224.xlsx")
-DATES = ["2026-02-13", "2026-02-24"]
+TARGET_DATE = "2026-02-26"
+MIN_SCORE = 98
+OUTPUT_XLSX = os.path.join(ROOT, "data", "results", "mode9_20260226_score98_plus.xlsx")
 
 
-def get_results_mode9_for_date(target_date: str, stock_list: list, cache_dir: str, min_score: int = 100):
+def _has_limit_up_6d(rows, idx: int, code: str, name: str, lookback: int = 6) -> bool:
+    """
+    最近 lookback 个交易日内是否有涨停（仅判定有/无，不要求缩量）。
+    涨停阈值与项目内一致：按 ST / 创业板 / 科创板 / 主板 的涨停幅度判定。
+    """
+    if idx < 1:
+        return False
+    rate = _limit_rate(code, name)
+    limit_up = (rate * 100) - 0.5
+    start = max(1, idx - lookback)
+    for i in range(start, idx):
+        if rows[i].pct_chg >= limit_up:
+            return True
+    return False
+
+
+def get_results_mode9_for_date(target_date: str, stock_list: list, cache_dir: str, min_score: int):
     """指定日期用 mode9 筛选，返回 score>=min_score，按分数降序。"""
     cache_format = "code"
     results = []
@@ -31,7 +48,7 @@ def get_results_mode9_for_date(target_date: str, stock_list: list, cache_dir: st
         rows = _load_rows(cache_dir, cache_format, item.market, item.code)
         if not rows or len(rows) < 80:
             continue
-        dates = [r.date[:10] if hasattr(r.date, '__getitem__') else str(r.date)[:10] for r in rows]
+        dates = [r.date[:10] if hasattr(r.date, "__getitem__") else str(r.date)[:10] for r in rows]
         close = np.array([r.close for r in rows], dtype=float)
         open_ = np.array([r.open for r in rows], dtype=float)
         high = np.array([r.high for r in rows], dtype=float)
@@ -57,12 +74,15 @@ def get_results_mode9_for_date(target_date: str, stock_list: list, cache_dir: st
             if score < min_score:
                 continue
             code = item.code.zfill(6) if len(item.code) < 6 else item.code
+            has_limit_up_6d = _has_limit_up_6d(rows, idx, item.code, item.name, lookback=6)
             results.append({
                 "信号日": target_date,
                 "代码": code,
                 "名称": item.name or code,
                 "得分": score,
                 "当天收盘价": round(float(close[idx]), 2),
+                "最早出现日期": target_date,
+                "最近6个交易日有涨停": "是" if has_limit_up_6d else "否",
             })
     results.sort(key=lambda x: (-x["得分"], x["代码"]))
     return results
@@ -72,17 +92,16 @@ def main():
     name_map = load_stock_list_csv(STOCK_LIST_CSV) if os.path.exists(STOCK_LIST_CSV) else {}
     stock_list = list_cached_stocks_flat(CACHE_DIR, name_map=name_map)
     if not stock_list:
-        print("股票列表为空")
+        print("股票列表为空，请确认本地缓存目录:", CACHE_DIR)
         sys.exit(1)
     os.makedirs(os.path.dirname(OUTPUT_XLSX) or ".", exist_ok=True)
-    with pd.ExcelWriter(OUTPUT_XLSX, engine="openpyxl") as writer:
-        for day in DATES:
-            rows = get_results_mode9_for_date(day, stock_list, CACHE_DIR, min_score=100)
-            df = pd.DataFrame(rows)
-            sheet_name = day.replace("-", "")[:8]
-            df.to_excel(writer, sheet_name=sheet_name, index=False)
-            print(f"{day} mode9 满分100: {len(df)} 只")
+    rows = get_results_mode9_for_date(TARGET_DATE, stock_list, CACHE_DIR, MIN_SCORE)
+    df = pd.DataFrame(rows)
+    df.to_excel(OUTPUT_XLSX, index=False)
+    print(f"{TARGET_DATE} mode9 得分>={MIN_SCORE}: {len(df)} 只")
     print(f"已保存: {OUTPUT_XLSX}")
+    if not df.empty:
+        print(df.to_string(index=False))
 
 
 if __name__ == "__main__":

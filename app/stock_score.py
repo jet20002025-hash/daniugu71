@@ -89,7 +89,7 @@ def score_stock(
 
     if not signals:
         idx = len(rows) - 1
-        raw_score = _score_mode9(rows, idx, ma10, ma20, ma60, vol20)
+        raw_score = _score_mode9(rows, idx, ma10, ma20, ma60, vol20, code, name)
         breakdown = _breakdown(rows, idx, ma10, ma20, ma60, vol20)
         reasons = []
         if np.isnan(ma10[idx]) or np.isnan(ma20[idx]) or np.isnan(ma60[idx]):
@@ -119,13 +119,13 @@ def score_stock(
             return {
                 "code": code,
                 "name": name,
-                "score": _score_mode9(rows, idx, ma10, ma20, ma60, vol20),
+                "score": _score_mode9(rows, idx, ma10, ma20, ma60, vol20, code, name),
                 "has_signal": False,
                 "reason": f"近一年最高/最低倍数{max_high/min_low:.2f}x超4倍，已排除",
                 "breakdown": _breakdown(rows, idx, ma10, ma20, ma60, vol20),
                 "latest_date": rows[idx].date,
             }
-    score = _score_mode9(rows, idx, ma10, ma20, ma60, vol20)
+    score = _score_mode9(rows, idx, ma10, ma20, ma60, vol20, code, name)
     signal_date = rows[idx].date
     buy_idx = min(idx + 1, len(rows) - 1)
     buy_date = rows[buy_idx].date

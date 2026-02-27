@@ -148,6 +148,8 @@
               <th title="衡量当日作为买入点的质量，0～100">买点分值</th>
               <th>当天收盘价</th>
               <th title="信号日涨跌幅，T+1 不可当日交易仅供参考">涨跌幅%</th>
+              <th title="本次筛选区间内，该股票最早出现的信号日期">最早出现日期</th>
+              <th title="信号日前最近6个交易日内是否出现过涨停（仅看有/无）">最近6日有涨停</th>
             </tr>
           </thead>
           <tbody>
@@ -159,10 +161,18 @@
               <td class="score">{{ row.get("buy_point_score", "—") }}</td>
               <td>{{ "%.2f" % row.latest_close }}</td>
               <td class="pct">{{ "%.2f" % row.change_pct }}</td>
+              <td>{{ row.get("first_signal_date", row.get("signal_date", "—")) }}</td>
+              <td>
+                {% if row.get("has_limit_up_6d") %}
+                  是
+                {% else %}
+                  否
+                {% endif %}
+              </td>
             </tr>
             {% else %}
             <tr>
-              <td colspan="6" class="empty">暂无结果，点击上方按钮开始筛选。</td>
+              <td colspan="8" class="empty">暂无结果，点击上方按钮开始筛选。</td>
             </tr>
             {% endfor %}
           </tbody>

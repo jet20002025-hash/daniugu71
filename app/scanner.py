@@ -447,6 +447,57 @@ def _has_limit_up_then_down(
     return False
 
 
+def _has_limit_up_6d(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    lookback: int = 6,
+) -> bool:
+    """
+    买点日前 lookback 个交易日内是否出现过涨停（仅判定有/无，不要求缩量）。
+    涨停阈值与 _limit_rate 一致：按 ST / 创业板 / 科创板 / 主板 的涨停幅度计算。
+    """
+    if idx < 1:
+        return False
+    rate = _limit_rate(code, name)
+    limit_up = (rate * 100) - 0.5
+    start = max(1, idx - lookback)
+    for i in range(start, idx):
+        if rows[i].pct_chg >= limit_up:
+            return True
+    return False
+
+
+def _has_limit_up_then_shrink_volume(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    lookback: int = 6,
+    next_vol_max_mult: float = 1.8,
+) -> bool:
+    """
+    买点前 lookback 个交易日内出现涨停，且涨停后1个交易日成交量 < 涨停日成交量 * next_vol_max_mult → True(加分特征)。
+    仅用当日及历史数据；涨停阈值按代码板块与 ST 规则计算。
+    """
+    if idx < 2:
+        return False
+    rate = _limit_rate(code, name)
+    limit_up = (rate * 100) - 0.5
+    start = max(1, idx - lookback)
+    for i in range(start, idx):
+        if rows[i].pct_chg < limit_up:
+            continue
+        if i + 1 >= len(rows):
+            continue
+        v0 = rows[i].volume
+        v1 = rows[i + 1].volume
+        if v0 > 0 and v1 < v0 * next_vol_max_mult:
+            return True
+    return False
+
+
 def _close_below_ma20_today(
     close: np.ndarray,
     ma20: np.ndarray,
@@ -536,6 +587,8 @@ def _score_mode9(
     ma20: np.ndarray,
     ma60: np.ndarray,
     vol20: np.ndarray,
+    code: str = "",
+    name: str = "",
 ) -> int:
     """
     mode9 评分：在 mode3 基础上微调，使选股更准。
@@ -560,6 +613,9 @@ def _score_mode9(
     # 收盘距MA20 过远降分（最好组 10.34% vs 最差 12.53%，温和突破更优）
     if close_gap > 0.08:
         base -= 2
+    # 涨停后缩量：买点前6日内有涨停，且涨停次日量 < 涨停日量 * 1.8，加分（缩量不松、承接好）
+    if code and _has_limit_up_then_shrink_volume(rows, idx, code, name, lookback=6, next_vol_max_mult=1.8):
+        base += 2
     # MA5 斜率过于陡峭降分（最好5只 MA5斜率 7～14%，最差中金时科技 17.44%、亚康 16.32%）
     ma5 = None
     if idx >= 5:
@@ -981,7 +1037,10 @@ def scan_with_mode3(
                 if _has_limit_up_then_down(rows, idx, item.code, item.name, lookback=5, min_consec_limit_up=3):
                     continue
 
-            score = score_fn(rows, idx, ma10, ma20, ma60, vol20)
+            if use_mode9 and score_fn is _score_mode9:
+                score = _score_mode9(rows, idx, ma10, ma20, ma60, vol20, item.code, item.name)
+            else:
+                score = score_fn(rows, idx, ma10, ma20, ma60, vol20)
             if score < config.min_score:
                 continue
 
@@ -1045,6 +1104,12 @@ def scan_with_mode3(
                         "upper_score": float(upper_score),
                         "market_cap": float(cap_value) if cap_value is not None else None,
                         "buy_point_score": int(buy_point_score),
+                        "limitup_shrink_vol": int(
+                            _has_limit_up_then_shrink_volume(rows, idx, item.code, item.name, lookback=6, next_vol_max_mult=1.8)
+                        ),
+                        "has_limit_up_6d": int(
+                            _has_limit_up_6d(rows, idx, item.code, item.name, lookback=6)
+                        ),
                     },
                 )
             )
@@ -1058,9 +1123,13 @@ def scan_with_mode3(
         ret20_val = float(metrics.get("ret20", 0.0))
         upper_score = float(metrics.get("upper_score", 0.0))
         buy_point_score = int(metrics.get("buy_point_score", 0))
+        limitup_shrink_vol = int(metrics.get("limitup_shrink_vol", 0))
+        has_limit_up_6d = int(metrics.get("has_limit_up_6d", 0))
         if prefer_upper_shadow:
             return (
                 -r.score,
+                -limitup_shrink_vol,
+                -has_limit_up_6d,
                 -buy_point_score,
                 -upper_score,
                 close_gap,
@@ -1069,9 +1138,39 @@ def scan_with_mode3(
                 ret20_val,
                 r.code,
             )
-        return (-r.score, -buy_point_score, close_gap, -vol_ratio, -(ma20_gap + ma60_gap), ret20_val, r.code)
+        return (
+            -r.score,
+            -limitup_shrink_vol,
+            -has_limit_up_6d,
+            -buy_point_score,
+            close_gap,
+            -vol_ratio,
+            -(ma20_gap + ma60_gap),
+            ret20_val,
+            r.code,
+        )
 
+    # 先按评分与买点/涨停特征排序
     results.sort(key=_mode3_sort_key)
+
+    # 计算每个代码在本次扫描区间内的最早信号日，用于前端展示「最早出现日期」
+    first_dates: Dict[str, str] = {}
+    for r in results:
+        metrics = r.metrics or {}
+        sig = str(metrics.get("signal_date") or "").strip()
+        if not sig:
+            continue
+        code = r.code
+        if code not in first_dates or sig < first_dates[code]:
+            first_dates[code] = sig
+    for r in results:
+        if not first_dates:
+            break
+        metrics = r.metrics or {}
+        code = r.code
+        if code in first_dates:
+            metrics["first_signal_date"] = first_dates[code]
+            r.metrics = metrics
 
     # 一段时间选股：每日取分数最高的 max_results 只（与前端「输出数量」一致）
     if start_date:
@@ -1096,6 +1195,8 @@ def serialize_results(results: List[ScanResult]) -> List[Dict[str, object]]:
             **asdict(r),
             "reasons": ", ".join(r.reasons),
             "buy_point_score": (r.metrics or {}).get("buy_point_score"),
+            "first_signal_date": (r.metrics or {}).get("first_signal_date"),
+            "has_limit_up_6d": (r.metrics or {}).get("has_limit_up_6d"),
         }
         for r in results
     ]

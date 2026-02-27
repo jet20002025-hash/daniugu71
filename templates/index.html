@@ -37,10 +37,6 @@
           <strong id="status-message">{{ state.message }}</strong>
         </div>
         <div class="status-row">
-          <span>来源</span>
-          <strong id="status-source">{{ '本地' if state.source == 'gpt' else (state.source or '未知') }}</strong>
-        </div>
-        <div class="status-row">
           <span>错误</span>
           <strong id="status-error">{{ state.error or '无' }}</strong>
         </div>
@@ -70,30 +66,6 @@
           <input type="date" name="cutoff_date" id="cutoff_date" />
         </label>
         <label>
-          数据源
-          <select name="data_source" id="data_source">
-            <option value="gpt" selected>本地股票库（推荐，用服务器缓存）</option>
-            <option value="remote">在线更新（会请求东财/腾讯，海外服务器易卡）</option>
-          </select>
-          <span id="data_source_hint" class="hint-inline">使用服务器缓存，不请求外网</span>
-        </label>
-        <label>
-          来源
-          <select name="remote_provider" id="remote_provider" title="腾讯日K接口目前只到约 2026-02-13，欲获取今日数据请选东财。">
-            <option value="eastmoney" selected>东财</option>
-            <option value="tencent">腾讯</option>
-            <option value="sina">新浪</option>
-            <option value="netease">网易（待接入）</option>
-          </select>
-        </label>
-        <label>
-          优先本地
-          <div class="toggle-row">
-            <input type="checkbox" name="prefer_local" id="prefer_local" />
-            <span>已有缓存则不联网</span>
-          </div>
-        </label>
-          <label>
           模型
           <select name="mode" id="mode">
             <option value="mode9" selected>mode9（当前主模型，原71倍升级）</option>
@@ -113,14 +85,12 @@
           输出数量
           <input type="number" name="max_results" id="max_results" value="200" min="10" max="2000" />
         </label>
-        <label>
-          并发线程
-          <input type="number" name="workers" id="workers" value="6" min="1" max="12" />
-        </label>
         <button type="submit" class="primary">开始筛选</button>
       </form>
       <div class="cap-hint">当前市值上限: <strong id="cap-display">150</strong> 亿（填 0 代表不启用）</div>
-      <p class="hint">首次运行可能需要较长时间，结果会保存在本地。开始/截止日期可限定区间筛选。</p>
+      <p class="hint">
+        使用方法：选择开始日期和截止日期（同一天视为单日信号），选择模型（推荐 mode9）、设置最低分数和市值上限、输出数量，然后点击“开始筛选”，系统会基于服务器本地股票数据库和最新 K 线缓存完成计算。
+      </p>
     </section>
 
     <section class="panel table-panel">
@@ -192,17 +162,10 @@
         const data = JSON.parse(raw);
         if (data.cutoff_date !== undefined) document.getElementById('cutoff_date').value = data.cutoff_date;
         if (data.start_date !== undefined) document.getElementById('start_date').value = data.start_date;
-        if (data.data_source) {
-          const source = data.data_source === 'cache' ? 'gpt' : data.data_source;
-          document.getElementById('data_source').value = source;
-        }
-        if (data.remote_provider) document.getElementById('remote_provider').value = data.remote_provider;
-        if (data.prefer_local !== undefined) document.getElementById('prefer_local').checked = data.prefer_local;
         if (data.mode) document.getElementById('mode').value = data.mode;
         if (data.min_score) document.getElementById('min_score').value = data.min_score;
         if (data.max_market_cap !== undefined) document.getElementById('max_market_cap').value = data.max_market_cap;
         if (data.max_results) document.getElementById('max_results').value = data.max_results;
-        if (data.workers) document.getElementById('workers').value = data.workers;
       } catch (err) {
         // ignore
       }
@@ -212,14 +175,10 @@
       const payload = {
         cutoff_date: document.getElementById('cutoff_date').value,
         start_date: document.getElementById('start_date').value,
-        data_source: document.getElementById('data_source').value,
-        remote_provider: document.getElementById('remote_provider').value,
-        prefer_local: document.getElementById('prefer_local').checked,
         mode: document.getElementById('mode').value,
         min_score: document.getElementById('min_score').value,
         max_market_cap: document.getElementById('max_market_cap').value,
-        max_results: document.getElementById('max_results').value,
-        workers: document.getElementById('workers').value,
+        max_results: document.getElementById('max_results').value
       };
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
@@ -237,27 +196,7 @@
     };
     capInput.addEventListener('input', updateCap);
     updateCap();
-    function updateDataSourceHint() {
-      const source = document.getElementById('data_source').value;
-      const hint = document.getElementById('data_source_hint');
-      if (source === 'gpt') {
-        hint.textContent = '使用服务器缓存，不请求外网';
-        hint.style.color = '';
-      } else {
-        hint.textContent = '将请求外网，服务器在海外可能很慢或卡在 0，建议改用本地股票库';
-        hint.style.color = 'var(--warn, #e67e22)';
-      }
-    }
-    document.getElementById('data_source').addEventListener('change', () => {
-      const source = document.getElementById('data_source').value;
-      const enableProvider = source !== 'cache';
-      document.getElementById('remote_provider').disabled = !enableProvider;
-      document.getElementById('prefer_local').disabled = source !== 'remote';
-      updateDataSourceHint();
-    });
     loadFilters();
-    document.getElementById('data_source').dispatchEvent(new Event('change'));
-    updateDataSourceHint();
 
     async function pollStatus() {
       try {
@@ -266,7 +205,6 @@
         document.getElementById('status-text').textContent = data.running ? '运行中' : '空闲';
         document.getElementById('status-progress').textContent = (data.progress ?? 0) + '/' + (data.total ?? 0);
         document.getElementById('status-message').textContent = data.message || '';
-        document.getElementById('status-source').textContent = data.source || '未知';
         document.getElementById('status-error').textContent = data.error || '无';
         document.getElementById('status-last').textContent = data.last_run || '{{ meta.updated_at or "暂无" }}';
         if (lastRunning && !data.running) {

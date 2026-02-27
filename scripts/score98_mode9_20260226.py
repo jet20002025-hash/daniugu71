@@ -1,7 +1,13 @@
 #!/usr/bin/env python3
 """
-基于最新 mode9、本地 K 线缓存，筛选 2026-02-26 得分>=98 的个股，按分数降序输出 Excel。
+基于最新 mode9、本地 K 线缓存，筛选指定日期得分>=给定阈值的个股，按分数降序输出 Excel。
+
+默认：
+- 目标日期 = 今天
+- 最低得分 = 98
 """
+import argparse
+import datetime as dt
 import os
 import sys
 
@@ -19,9 +25,6 @@ from scripts.backtest_startup_modes import _load_rows, _signals_mode3
 
 CACHE_DIR = os.path.join(GPT_DATA_DIR, "kline_cache_tencent")
 STOCK_LIST_CSV = os.path.join(GPT_DATA_DIR, "stock_list.csv")
-TARGET_DATE = "2026-02-26"
-MIN_SCORE = 98
-OUTPUT_XLSX = os.path.join(ROOT, "data", "results", "mode9_20260226_score98_plus.xlsx")
 
 
 def _has_limit_up_6d(rows, idx: int, code: str, name: str, lookback: int = 6) -> bool:
@@ -89,17 +92,42 @@ def get_results_mode9_for_date(target_date: str, stock_list: list, cache_dir: st
 
 
 def main():
+    parser = argparse.ArgumentParser(description="基于 mode9、本地缓存筛选指定日期高分个股")
+    today_str = dt.date.today().strftime("%Y-%m-%d")
+    parser.add_argument(
+        "--date",
+        dest="target_date",
+        default=today_str,
+        help="目标交易日期，格式 YYYY-MM-DD，默认今天",
+    )
+    parser.add_argument(
+        "--min-score",
+        dest="min_score",
+        type=int,
+        default=98,
+        help="最低得分阈值，默认 98",
+    )
+    args = parser.parse_args()
+    target_date = args.target_date
+    min_score = args.min_score
+
     name_map = load_stock_list_csv(STOCK_LIST_CSV) if os.path.exists(STOCK_LIST_CSV) else {}
     stock_list = list_cached_stocks_flat(CACHE_DIR, name_map=name_map)
     if not stock_list:
         print("股票列表为空，请确认本地缓存目录:", CACHE_DIR)
         sys.exit(1)
-    os.makedirs(os.path.dirname(OUTPUT_XLSX) or ".", exist_ok=True)
-    rows = get_results_mode9_for_date(TARGET_DATE, stock_list, CACHE_DIR, MIN_SCORE)
+    output_xlsx = os.path.join(
+        ROOT,
+        "data",
+        "results",
+        f"mode9_{target_date.replace('-', '')}_score{min_score}_plus.xlsx",
+    )
+    os.makedirs(os.path.dirname(output_xlsx) or ".", exist_ok=True)
+    rows = get_results_mode9_for_date(target_date, stock_list, CACHE_DIR, min_score)
     df = pd.DataFrame(rows)
-    df.to_excel(OUTPUT_XLSX, index=False)
-    print(f"{TARGET_DATE} mode9 得分>={MIN_SCORE}: {len(df)} 只")
-    print(f"已保存: {OUTPUT_XLSX}")
+    df.to_excel(output_xlsx, index=False)
+    print(f"{target_date} mode9 得分>={min_score}: {len(df)} 只")
+    print(f"已保存: {output_xlsx}")
     if not df.empty:
         print(df.to_string(index=False))
 

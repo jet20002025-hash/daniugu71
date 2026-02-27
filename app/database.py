@@ -189,7 +189,8 @@ def create_user(username: str, password: str, register_ip: Optional[str] = None)
     trial_ends = now + timedelta(days=30)
     created = now.strftime("%Y-%m-%d %H:%M:%S")
     trial_ends_at = trial_ends.strftime("%Y-%m-%d %H:%M:%S")
-    password_hash = generate_password_hash(password)
+    # 使用 pbkdf2 避免部分环境缺少 hashlib.scrypt（如 macOS 自带 Python）
+    password_hash = generate_password_hash(password, method="pbkdf2:sha256")
     ip_val = (register_ip or "").strip() or None
     conn = get_connection()
     try:

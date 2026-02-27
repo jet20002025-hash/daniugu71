@@ -422,6 +422,7 @@ def _build_features(
     stop_idx: int,
     market: int,
 ) -> Optional[List[float]]:
+    """特征仅用 rows[0..signal_idx]（当日及历史），禁止使用 signal_idx 之后的数据。"""
     if signal_idx < 60:
         return None
 
@@ -640,6 +641,7 @@ def build_dataset(
     kline_loader: Optional[Callable[[StockItem], Optional[List[KlineRow]]]] = None,
     index_rows: Optional[List[KlineRow]] = None,
 ) -> Tuple[np.ndarray, np.ndarray]:
+    """构建训练集：特征仅用信号日及历史；标签为持有期收益/超额（事后），不得用未来数据做特征或样本筛选。"""
     if index_rows is None:
         index_rows = fetch_index_kline()
     index_rows = _filter_rows_by_date(index_rows, config.start_date, config.end_date)

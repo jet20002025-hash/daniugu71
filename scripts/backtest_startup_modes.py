@@ -1,3 +1,10 @@
+"""
+启动模式对比：mode1/mode2/mode3 等信号与命中统计。
+
+【禁止作弊】选股/回测/测试绝不允许使用未来数据：
+- --rank-by multiple 会按「买入后 N 日内的最高价/买入价」排序每日 top1，该指标依赖未来数据，仅可用于事后分析，禁止用于生成回测用选股。
+- 生成供回测使用的每日选股时，必须使用 --rank-by score（仅用当日及历史信息排序）。
+"""
 import argparse
 import csv
 import os
@@ -693,8 +700,8 @@ def main() -> None:
     parser.add_argument(
         "--rank-by",
         choices=["multiple", "score"],
-        default="multiple",
-        help="Daily ranking key.",
+        default="score",
+        help="每日 top 排序依据。仅 score 可用于回测选股；multiple 使用未来数据，禁止用于回测/训练。",
     )
     parser.add_argument(
         "--index-path",
@@ -757,6 +764,11 @@ def main() -> None:
         help="Output Excel path (optional)",
     )
     args = parser.parse_args()
+    if args.rank_by == "multiple":
+        print(
+            "警告：--rank-by multiple 使用未来数据（买入后 N 日最高价），禁止用于回测或训练选股。"
+            " 仅限事后分析。生成回测用选股请使用 --rank-by score。"
+        )
     global DISABLE_PROXIES
     DISABLE_PROXIES = not args.keep_proxy
     global FORCE_IPV4

@@ -244,6 +244,9 @@ def main():
         print(f"完成：共 {total} 只，全部已是最新，跳过 {skipped} 只，缓存目录 {cache_dir}")
         return 0
 
+    failed_list = []  # [(code, name), ...]
+    failed_lock = threading.Lock() if args.workers > 1 else None
+
     if args.workers <= 1:
         # 单线程：按原逻辑逐只请求并 sleep
         for i, (item, path, cached, count) in enumerate(to_update):
@@ -255,6 +258,7 @@ def main():
                 updated += 1
             else:
                 failed += 1
+                failed_list.append((item.code, getattr(item, "name", item.code)))
                 if failed <= 3:
                     print(f"  {item.code} 多源均无数据或失败")
             if (i + 1) % 200 == 0:
@@ -284,6 +288,8 @@ def main():
                     nonlocal failed
                     failed += 1
                     current_failed = failed
+                with failed_lock:
+                    failed_list.append((item.code, getattr(item, "name", item.code)))
                 if current_failed <= 5:
                     print(f"  {item.code} 多源均无数据或失败")
                 return "fail"
@@ -296,6 +302,17 @@ def main():
                 if done % 200 == 0 or done == num_to_update:
                     print(f"进度 {done}/{num_to_update}，已更新 {updated} 只，失败 {failed} 只")
     print(f"完成：共 {total} 只，更新 {updated} 只，跳过 {skipped} 只，失败 {failed} 只，缓存目录 {cache_dir}")
+    # 写入失败清单
+    if failed_list:
+        from datetime import date
+        out_dir = os.path.join(ROOT, "data", "results")
+        os.makedirs(out_dir, exist_ok=True)
+        out_file = os.path.join(out_dir, f"kline_update_failed_{date.today().isoformat()}.txt")
+        with open(out_file, "w", encoding="utf-8") as f:
+            f.write("code\tname\n")
+            for code, name in failed_list:
+                f.write(f"{code}\t{name}\n")
+        print(f"失败清单（{len(failed_list)} 只）已写入: {out_file}")
     return 0
 
 

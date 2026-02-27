@@ -1,3 +1,7 @@
+"""
+ML 模型训练（激进/宽松买点）。特征仅用信号日当日及历史，禁止使用未来数据。
+标签为持有期收益/相对指数超额（事后计算），仅作监督目标；不得用未来数据做特征或样本筛选。
+"""
 import argparse
 import os
 from datetime import datetime, timedelta

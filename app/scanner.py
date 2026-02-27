@@ -860,7 +860,7 @@ def scan_with_mode3(
     results: List[ScanResult] = []
     mode8_n_bars = getattr(config, "mode8_n_bars", 60)
     signal_fn = (
-        (lambda r, s, e: _mode8_signals(r, s, e, n_bars=mode8_n_bars))
+        _mode8_signals
         if use_mode8
         else (_mode9_signals if use_mode9 else _mode3_signals)
     )

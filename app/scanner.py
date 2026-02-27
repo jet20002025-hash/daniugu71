@@ -559,6 +559,22 @@ def _score_mode9(
     ma60_now = ma60[idx]
     if ma20_now <= 0:
         return base
+    # 前一日收盘价跌破 MA10 且前一日最低价跌破 MA20：均线支撑弱，扣分（如中国电影 2月13日信号前一日）
+    if idx >= 1:
+        prev_close = rows[idx - 1].close
+        prev_low = rows[idx - 1].low
+        ma10_prev = ma10[idx - 1]
+        ma20_prev = ma20[idx - 1]
+        if (
+            not (np.isnan(ma10_prev) or np.isnan(ma20_prev))
+            and ma10_prev > 0
+            and ma20_prev > 0
+            and prev_close < ma10_prev
+            and prev_low < ma20_prev
+        ):
+            base -= 4
+            if breakdown is not None:
+                breakdown.append(("前一日收盘破MA10且最低破MA20", -4))
     close_gap = (close - ma20_now) / ma20_now
     # 收盘距MA20 过远降分（最好组 10.34% vs 最差 12.53%，温和突破更优）
     if close_gap > 0.08:

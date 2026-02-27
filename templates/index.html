@@ -87,9 +87,8 @@
         </label>
         <button type="submit" class="primary">开始筛选</button>
       </form>
-      <div class="cap-hint">当前市值上限: <strong id="cap-display">150</strong> 亿（填 0 代表不启用）</div>
       <p class="hint">
-        选股原则：分数越高越好，买点分值越高越好，最近6日有涨停更优先；买点为信号日的第二天尾盘或分时附近买入；卖点为破10日均线止盈，亏损5个点止损，需严格执行。
+        选股原则：分数越高越好，买点分值越高越好，最近6日有涨停更优先；买点为信号日的第二天尾盘或分时附近买入；卖点为破10日均线止盈，亏损5个点止损，需严格执行。最低分数建议设置为 75 分。
       </p>
     </section>
 
@@ -190,12 +189,14 @@
     document.getElementById('scan-form').addEventListener('submit', saveFilters);
     const capInput = document.getElementById('max_market_cap');
     const capDisplay = document.getElementById('cap-display');
-    const updateCap = () => {
-      const raw = capInput.value || '0';
-      capDisplay.textContent = raw;
-    };
-    capInput.addEventListener('input', updateCap);
-    updateCap();
+    if (capInput && capDisplay) {
+      const updateCap = () => {
+        const raw = capInput.value || '0';
+        capDisplay.textContent = raw;
+      };
+      capInput.addEventListener('input', updateCap);
+      updateCap();
+    }
     loadFilters();
 
     async function pollStatus() {

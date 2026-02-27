@@ -66,6 +66,7 @@ from app.scan_queue import (
     USER_RESULTS_DIR,
     USER_STATUS_DIR,
     clear_cancel,
+    clear_pending_jobs,
     get_user_status,
     has_pending_job,
     is_cancelled,
@@ -1041,8 +1042,9 @@ def index():
 def scan():
     user_id = g.current_user.id
     if USE_SCAN_QUEUE:
-        # 加入队列，由独立 worker 执行；先发取消让上一轮尽快退出，再入队新任务
+        # 加入队列，由独立 worker 执行；同一时刻一个任务：先取消上一轮并清空旧任务，再入队新任务
         request_cancel(user_id)
+        clear_pending_jobs(user_id)
         mode = request.form.get("mode", "mode9")
         if mode not in ("mode3", "mode3ok", "mode3_avoid", "mode3_upper", "mode3_upper_strict", "mode3_upper_near", "mode4", "mode8", "mode9"):
             mode = "mode9"

@@ -95,6 +95,26 @@ def has_pending_job(user_id: int) -> bool:
     return False
 
 
+def clear_pending_jobs(user_id: int) -> None:
+    """
+    删除该用户尚未处理的队列任务文件。
+    用于「同一时刻一个任务、后者覆盖前者」的语义：点击开始筛选时，先清空旧任务，再写入新任务。
+    """
+    if not os.path.isdir(SCAN_QUEUE_DIR):
+        return
+    prefix = f"{user_id}_"
+    for name in os.listdir(SCAN_QUEUE_DIR):
+        if not name.startswith(prefix):
+            continue
+        if not name.endswith(".json"):
+            continue
+        path = os.path.join(SCAN_QUEUE_DIR, name)
+        try:
+            os.remove(path)
+        except OSError:
+            continue
+
+
 def _cancel_file_path(user_id: int) -> str:
     return os.path.join(USER_STATUS_DIR, f"{user_id}.cancel")
 

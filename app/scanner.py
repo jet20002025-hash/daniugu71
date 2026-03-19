@@ -67,6 +67,12 @@ class ScanConfig:
     mode88_D_pull: float = 3.0
     mode88_K_vol: float = 1.0
 
+    # mode90：日线 MACD 三项归一化加分参数
+    macd_norm_factor: float = 1.0  # DIF/DEA 归一化因子：dif/dea 除以 (close * factor)
+    mode90_macd_weight: float = 1.0  # 贴轴加分再乘此系数
+    mode90_macd_max_bonus: float = 12.0  # s=0 时 MACD 最高加分
+    mode90_macd_s_scale: float = 0.12  # s=DIF_norm+DEA_norm+HIST_norm 达到此值时 MACD 加分为 0
+
 
 def _normalize_code(code: str) -> str:
     value = str(code or "").strip()
@@ -149,6 +155,45 @@ def _weekly_macd_dif_dea(close: np.ndarray, fast: int = 12, slow: int = 26, sign
                 dif_norm[i] = dif[i] / close[i]
             if not np.isnan(dea[i]):
                 dea_norm[i] = dea[i] / close[i]
+    return dif_norm, dea_norm
+
+
+def _daily_macd_dif_dea(
+    close: np.ndarray,
+    fast: int = 12,
+    slow: int = 26,
+    signal: int = 9,
+    norm_factor: float = 1.0,
+) -> tuple:
+    """日线 MACD：DIF = EMA(close,fast)-EMA(close,slow)，DEA = EMA(DIF,signal)。
+    返回 (dif_norm, dea_norm)：归一化值 = 原值 / (close * norm_factor)，便于跨价位比较。"""
+    ema_fast = _ema_series(close, fast)
+    ema_slow = _ema_series(close, slow)
+    dif = np.full_like(close, np.nan, dtype=float)
+    for i in range(len(close)):
+        if not (np.isnan(ema_fast[i]) or np.isnan(ema_slow[i])):
+            dif[i] = ema_fast[i] - ema_slow[i]
+
+    # DEA = EMA(DIF, signal)
+    dea = np.full_like(close, np.nan, dtype=float)
+    alpha_sig = 2.0 / (signal + 1)
+    start = max(slow - 1, 0)
+    if start < len(close) and not np.isnan(dif[start]):
+        dea[start] = dif[start]
+        for i in range(start + 1, len(close)):
+            if np.isnan(dif[i]) or np.isnan(dea[i - 1]):
+                continue
+            dea[i] = alpha_sig * dif[i] + (1.0 - alpha_sig) * dea[i - 1]
+
+    dif_norm = np.full_like(close, np.nan, dtype=float)
+    dea_norm = np.full_like(close, np.nan, dtype=float)
+    for i in range(len(close)):
+        denom = close[i] * (norm_factor if norm_factor and norm_factor > 0 else 1.0)
+        if denom > 0:
+            if not np.isnan(dif[i]):
+                dif_norm[i] = dif[i] / denom
+            if not np.isnan(dea[i]):
+                dea_norm[i] = dea[i] / denom
     return dif_norm, dea_norm
 
 
@@ -1414,6 +1459,84 @@ def _score_mode9(
     return int(max(0, base))  # 不封顶，允许超过 100
 
 
+def _score_mode90(
+    rows: List[KlineRow],
+    idx: int,
+    ma10: np.ndarray,
+    ma20: np.ndarray,
+    ma60: np.ndarray,
+    vol20: np.ndarray,
+    code: str = "",
+    name: str = "",
+    breakdown: Optional[List[tuple]] = None,
+    macd_norm_factor: float = 1.0,
+    mode90_macd_weight: float = 1.0,
+    mode90_macd_max_bonus: float = 12.0,
+    mode90_macd_s_scale: float = 0.12,
+) -> int:
+    """
+    mode90 = mode9 评分 + 日线 MACD「贴 0 轴」加分。
+
+    MACD 加分条件（同时满足才加分，否则 MACD 加分为 0）：
+    - DIF_norm >= 0、DEA_norm >= 0、HIST_norm >= 0
+      （HIST_norm = 2*(DIF-DEA)/denom，与常见 MACD 柱一致；HIST_norm>=0 等价于 DIF>=DEA）
+    - 且信号日 DIF_norm、DEA_norm 相对前一日均上升（不允许回落或持平）。
+
+    加分：s = DIF_norm + DEA_norm + HIST_norm；
+    贴轴分 = max_bonus * max(0, 1 - s/s_scale) * weight；
+    s=0 时满分，s>=s_scale 时 MACD 加分为 0。
+    """
+    base = _score_mode9(
+        rows,
+        idx,
+        ma10,
+        ma20,
+        ma60,
+        vol20,
+        code,
+        name,
+        breakdown=breakdown,
+    )
+
+    close_arr = np.array([r.close for r in rows], dtype=float)
+    dif_norm, dea_norm = _daily_macd_dif_dea(
+        close_arr, 12, 26, 9, norm_factor=macd_norm_factor
+    )
+
+    if idx < 0 or idx >= len(close_arr):
+        return base
+    if np.isnan(dif_norm[idx]) or np.isnan(dea_norm[idx]):
+        return base
+
+    dn = float(dif_norm[idx])
+    en = float(dea_norm[idx])
+    hn = 2.0 * (dn - en)  # 柱归一化
+
+    eps = 1e-12
+    if dn < -eps or en < -eps or hn < -eps or dn < en - eps:
+        return int(max(0, round(base)))
+
+    # 上升趋势约束：当前 DIF/DEA 必须高于前一日（允许极小噪音）
+    if idx == 0 or np.isnan(dif_norm[idx - 1]) or np.isnan(dea_norm[idx - 1]):
+        return int(max(0, round(base)))
+    dn_prev = float(dif_norm[idx - 1])
+    en_prev = float(dea_norm[idx - 1])
+    if not (dn > dn_prev + eps and en > en_prev + eps):
+        return int(max(0, round(base)))
+
+    s = dn + en + hn
+    s_scale = float(mode90_macd_s_scale)
+    if s_scale <= 0:
+        prox = 0.0
+    else:
+        prox = max(0.0, min(1.0, 1.0 - s / s_scale))
+    macd_points = float(mode90_macd_max_bonus) * prox * float(mode90_macd_weight)
+    if breakdown is not None and macd_points > 0:
+        breakdown.append(("MACD贴轴加分", round(macd_points, 2)))
+
+    return int(max(0, round(base + macd_points)))
+
+
 def _score_mode8(
     rows: List[KlineRow],
     idx: int,
@@ -1625,13 +1748,14 @@ def scan_with_mode3(
     use_71x_standard: bool = False,
     use_mode8: bool = False,
     use_mode9: bool = False,
+    use_mode90: bool = False,
     use_mode10: bool = False,
     use_mode11: bool = False,
     use_mode12: bool = False,
     use_mode18: bool = False,
     use_mode88: bool = False,
 ) -> List[ScanResult]:
-    """use_mode8/9/10/11/12/18/88；mode18 为周线 MACD 金叉；mode88 为吸筹→洗盘→震仓→拉升。"""
+    """use_mode8/9/90/10/11/12/18/88；mode18 为周线 MACD 金叉；mode88 为吸筹→洗盘→震仓→拉升。"""
     results: List[ScanResult] = []
     mode8_n_bars = getattr(config, "mode8_n_bars", 60)
     mode10_conv_max = getattr(config, "mode10_conv_max", 1.0)
@@ -1696,6 +1820,38 @@ def scan_with_mode3(
         )
         score_fn = _score_mode88
         mode_label = "mode88"
+    elif use_mode90:
+        signal_fn = _mode9_signals
+        macd_norm_factor = getattr(config, "macd_norm_factor", 1.0)
+        mode90_macd_weight = getattr(config, "mode90_macd_weight", 1.0)
+        mode90_macd_max_bonus = getattr(config, "mode90_macd_max_bonus", 12.0)
+        mode90_macd_s_scale = getattr(config, "mode90_macd_s_scale", 0.12)
+        score_fn = (
+            lambda rows,
+            idx,
+            ma10,
+            ma20,
+            ma60,
+            vol20,
+            code="",
+            name="",
+            breakdown=None: _score_mode90(
+                rows,
+                idx,
+                ma10,
+                ma20,
+                ma60,
+                vol20,
+                code=code,
+                name=name,
+                breakdown=breakdown,
+                macd_norm_factor=macd_norm_factor,
+                mode90_macd_weight=mode90_macd_weight,
+                mode90_macd_max_bonus=mode90_macd_max_bonus,
+                mode90_macd_s_scale=mode90_macd_s_scale,
+            )
+        )
+        mode_label = "mode90"
     else:
         # mode3 / mode8 / mode9 为三套独立模型：信号上 mode8 与 mode3/mode9 不同，评分上三者均不同。见 docs/mode3_mode8_mode9_三者区别.md
         signal_fn = (
@@ -1810,7 +1966,7 @@ def scan_with_mode3(
                 if _has_limit_up_then_down(rows, idx, item.code, item.name, lookback=5, min_consec_limit_up=3):
                     continue
 
-            if (use_mode9 and score_fn is _score_mode9) or (use_mode8 and score_fn is _score_mode8) or (use_mode10 and score_fn is _score_mode10) or (use_mode11 and score_fn is _score_mode11) or (use_mode12 and score_fn is _score_mode12) or (use_mode18 and score_fn is _score_mode18) or (use_mode88 and score_fn is _score_mode88):
+            if (use_mode9 and score_fn is _score_mode9) or (use_mode8 and score_fn is _score_mode8) or (use_mode10 and score_fn is _score_mode10) or (use_mode11 and score_fn is _score_mode11) or (use_mode12 and score_fn is _score_mode12) or (use_mode18 and score_fn is _score_mode18) or (use_mode88 and score_fn is _score_mode88) or use_mode90:
                 score = score_fn(rows, idx, ma10, ma20, ma60, vol20, item.code, item.name)
             else:
                 score = score_fn(rows, idx, ma10, ma20, ma60, vol20)

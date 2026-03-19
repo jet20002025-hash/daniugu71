@@ -82,10 +82,11 @@ def run_one():
             mode4_filters=(mode == "mode4"),
             model_tag_override="mode3ok" if mode == "mode3ok" else None,
             use_startup_modes_data=True,
-            use_71x_standard=(mode in ("mode3", "mode8", "mode9", "mode10", "mode11", "mode12")),
+            use_71x_standard=(mode in ("mode3", "mode8", "mode9", "mode10", "mode11", "mode12", "mode90")),
             use_mode8=False,  # 网络版 mode8 用 mode88 替代
             use_mode88=(mode == "mode8"),
             use_mode9=(mode == "mode9"),
+            use_mode90=(mode == "mode90"),
             use_mode10=(mode == "mode10"),
             use_mode11=(mode == "mode11"),
             use_mode12=(mode == "mode12"),

@@ -34,6 +34,17 @@ def _ensure_columns(conn: sqlite3.Connection) -> None:
     conn.commit()
 
 
+def _ensure_page_views_table(conn: sqlite3.Connection) -> None:
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS page_views (
+            day TEXT NOT NULL,
+            path TEXT NOT NULL,
+            hits INTEGER NOT NULL DEFAULT 0,
+            PRIMARY KEY (day, path)
+        )
+    """)
+
+
 def init_db() -> None:
     """创建用户表并执行迁移"""
     conn = get_connection()
@@ -55,6 +66,79 @@ def init_db() -> None:
         """)
         conn.commit()
         _ensure_columns(conn)
+        _ensure_page_views_table(conn)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def record_page_view(path: str) -> None:
+    """记录一次页面访问量（按自然日、路径聚合）。"""
+    day = datetime.now().strftime("%Y-%m-%d")
+    path = (path or "/")[:200]
+    conn = get_connection()
+    try:
+        try:
+            conn.execute(
+                "INSERT INTO page_views (day, path, hits) VALUES (?, ?, 1) "
+                "ON CONFLICT(day, path) DO UPDATE SET hits = page_views.hits + 1",
+                (day, path),
+            )
+        except sqlite3.OperationalError:
+            cur = conn.execute(
+                "SELECT hits FROM page_views WHERE day = ? AND path = ?",
+                (day, path),
+            )
+            row = cur.fetchone()
+            if row:
+                conn.execute(
+                    "UPDATE page_views SET hits = ? WHERE day = ? AND path = ?",
+                    (row[0] + 1, day, path),
+                )
+            else:
+                conn.execute(
+                    "INSERT INTO page_views (day, path, hits) VALUES (?, ?, 1)",
+                    (day, path),
+                )
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def get_visit_statistics() -> dict:
+    """
+    管理后台用：今日 PV、近 7 日每日 PV、今日各路径 TOP、历史累计 PV。
+    """
+    conn = get_connection()
+    try:
+        today = datetime.now().strftime("%Y-%m-%d")
+        cur = conn.execute(
+            "SELECT COALESCE(SUM(hits), 0) FROM page_views WHERE day = ?",
+            (today,),
+        )
+        today_hits = int(cur.fetchone()[0])
+        last_7_days = []
+        for i in range(6, -1, -1):
+            d = (datetime.now().date() - timedelta(days=i)).isoformat()
+            cur = conn.execute(
+                "SELECT COALESCE(SUM(hits), 0) FROM page_views WHERE day = ?",
+                (d,),
+            )
+            last_7_days.append({"day": d, "hits": int(cur.fetchone()[0])})
+        cur = conn.execute(
+            "SELECT path, hits FROM page_views WHERE day = ? ORDER BY hits DESC LIMIT 24",
+            (today,),
+        )
+        today_by_path = [{"path": r[0], "hits": int(r[1])} for r in cur.fetchall()]
+        cur = conn.execute("SELECT COALESCE(SUM(hits), 0) FROM page_views")
+        all_time_hits = int(cur.fetchone()[0])
+        return {
+            "today": today,
+            "today_hits": today_hits,
+            "last_7_days": last_7_days,
+            "today_by_path": today_by_path,
+            "all_time_hits": all_time_hits,
+        }
     finally:
         conn.close()
 
@@ -212,6 +296,24 @@ def create_user(username: str, password: str, register_ip: Optional[str] = None)
 
 def verify_password(user: User, password: str) -> bool:
     return check_password_hash(user.password_hash, password)
+
+
+def set_user_password(username: str, new_password: str) -> bool:
+    """重置指定用户名的登录密码（服务器/本地运维用，不经网页）。"""
+    username = (username or "").strip()
+    if not username or not new_password:
+        return False
+    password_hash = generate_password_hash(new_password, method="pbkdf2:sha256")
+    conn = get_connection()
+    try:
+        cur = conn.execute(
+            "UPDATE users SET password_hash = ? WHERE username = ?",
+            (password_hash, username),
+        )
+        conn.commit()
+        return cur.rowcount > 0
+    finally:
+        conn.close()
 
 
 def set_activated(user_id: int, activated: bool, activated_until: Optional[str] = None) -> bool:

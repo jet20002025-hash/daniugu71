@@ -1,7 +1,9 @@
+import json
 import math
+import os
 from dataclasses import dataclass, asdict
 from datetime import datetime
-from typing import Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import numpy as np
 
@@ -22,7 +24,7 @@ class ScanResult:
     latest_close: float
     change_pct: float
     reasons: List[str]
-    metrics: Dict[str, float]
+    metrics: Dict[str, Any]
 
 
 @dataclass
@@ -1722,6 +1724,76 @@ def _buy_point_score(
     return int(max(0, min(100, round(score))))
 
 
+def mode3_sort_tuple(r: ScanResult, *, prefer_upper_shadow: bool = False) -> tuple:
+    """与 `scan_with_mode3` 内 `_mode3_sort_key` 一致，供区间扫描脚本按日截取 topN 时复用。"""
+    metrics = r.metrics or {}
+    vol_ratio = float(metrics.get("vol_ratio", 0.0))
+    ma20_gap = float(metrics.get("ma20_gap", 0.0))
+    ma60_gap = float(metrics.get("ma60_gap", 0.0))
+    close_gap = float(metrics.get("close_gap", 0.0))
+    ret20_val = float(metrics.get("ret20", 0.0))
+    ret5_val = float(metrics.get("ret5", 0.0))
+    upper_score = float(metrics.get("upper_score", 0.0))
+    buy_point_score = int(metrics.get("buy_point_score", 0))
+    limitup_shrink_vol = int(metrics.get("limitup_shrink_vol", 0))
+    has_limit_up_6d = int(metrics.get("has_limit_up_6d", 0))
+    ir = metrics.get("industry_ret5")
+    try:
+        irf = float(ir) if ir is not None else float("nan")
+    except (TypeError, ValueError):
+        irf = float("nan")
+    # 行业指数 5 日涨幅高者优先（同分时资金更可能集中在强势板块）
+    industry_ret5_key = -irf if not math.isnan(irf) else 0.0
+    tr5 = metrics.get("ths_flow_rank_5d")
+    try:
+        ths5_key = float(tr5) if tr5 is not None else 999.0
+        if math.isnan(ths5_key):
+            ths5_key = 999.0
+    except (TypeError, ValueError):
+        ths5_key = 999.0
+    tm = metrics.get("ths_flow_momentum")
+    try:
+        tmf = float(tm) if tm is not None else float("nan")
+        if math.isnan(tmf):
+            tmf = float("nan")
+    except (TypeError, ValueError):
+        tmf = float("nan")
+    # 同花顺 5 日行业资金排名越靠前越好；flow_momentum 越大表示相对 20 日榜更走强
+    ths_mom_key = -tmf if not math.isnan(tmf) else 0.0
+    if prefer_upper_shadow:
+        return (
+            -r.score,
+            ret20_val,
+            ret5_val,
+            -buy_point_score,
+            -limitup_shrink_vol,
+            has_limit_up_6d,
+            -upper_score,
+            close_gap,
+            -vol_ratio,
+            -(ma20_gap + ma60_gap),
+            industry_ret5_key,
+            ths5_key,
+            ths_mom_key,
+            r.code,
+        )
+    return (
+        -r.score,
+        ret20_val,
+        ret5_val,
+        -buy_point_score,
+        -limitup_shrink_vol,
+        has_limit_up_6d,
+        close_gap,
+        -vol_ratio,
+        -(ma20_gap + ma60_gap),
+        industry_ret5_key,
+        ths5_key,
+        ths_mom_key,
+        r.code,
+    )
+
+
 def scan_with_mode3(
     stock_list: List[StockItem],
     config: ScanConfig,
@@ -1754,9 +1826,42 @@ def scan_with_mode3(
     use_mode12: bool = False,
     use_mode18: bool = False,
     use_mode88: bool = False,
+    sector_ak_cache_dir: Optional[str] = None,
+    sector_trend_bonus_cap: int = 0,
+    sector_fund_flow_max_points: int = 5,
+    sector_fund_flow_yi_per_point: float = 3.0,
 ) -> List[ScanResult]:
     """use_mode8/9/90/10/11/12/18/88；mode18 为周线 MACD 金叉；mode88 为吸筹→洗盘→震仓→拉升。"""
     results: List[ScanResult] = []
+    from .paths import GPT_DATA_DIR
+    from .sector_trend import (
+        merge_ths_flow_features,
+        metrics_for_signal,
+        parse_ths_flow_net_yi,
+        sector_fund_flow_score_delta,
+        sector_score_bonus,
+    )
+
+    sector_dir = sector_ak_cache_dir
+    if sector_dir is None:
+        _cand = os.path.join(GPT_DATA_DIR, "akshare_cache")
+        _ind_dir = os.path.join(_cand, "industry")
+        if os.path.isdir(_ind_dir):
+            try:
+                if any(name.endswith(".txt") for name in os.listdir(_ind_dir)):
+                    sector_dir = _cand
+            except OSError:
+                pass
+    sector_hist_mem: Dict[str, Optional[List[Dict[str, str]]]] = {}
+    ths_features_data: Optional[Dict[str, Any]] = None
+    if sector_dir:
+        _ths_path = os.path.join(sector_dir, "sector_flow_ths_features.json")
+        if os.path.isfile(_ths_path):
+            try:
+                with open(_ths_path, "r", encoding="utf-8") as _tf:
+                    ths_features_data = json.load(_tf)
+            except (OSError, json.JSONDecodeError):
+                ths_features_data = None
     mode8_n_bars = getattr(config, "mode8_n_bars", 60)
     mode10_conv_max = getattr(config, "mode10_conv_max", 1.0)
     mode10_ma30_turn_weeks = getattr(config, "mode10_ma30_turn_weeks", 5)
@@ -1970,6 +2075,50 @@ def scan_with_mode3(
                 score = score_fn(rows, idx, ma10, ma20, ma60, vol20, item.code, item.name)
             else:
                 score = score_fn(rows, idx, ma10, ma20, ma60, vol20)
+
+            sector_sm: Dict[str, Any] = {}
+            if sector_dir:
+                sector_sm = metrics_for_signal(
+                    item.code, rows[idx].date, sector_dir, sector_hist_mem
+                )
+                merge_ths_flow_features(
+                    sector_sm, rows[idx].date, ths_features_data
+                )
+                if (
+                    sector_trend_bonus_cap > 0
+                    and use_mode9
+                    and score_fn is _score_mode9
+                ):
+                    sb = sector_score_bonus(
+                        sector_sm.get("industry_ret5"),
+                        cap=sector_trend_bonus_cap,
+                    )
+                    if sb:
+                        score = min(100, int(score) + sb)
+
+                # 同花顺行业净额：净流入加分、净流出减分（须 trade_date 与信号日对齐的 ths 特征）
+                if (
+                    sector_fund_flow_max_points > 0
+                    and sector_fund_flow_yi_per_point > 0
+                    and (
+                        use_mode90
+                        or (use_mode9 and score_fn is _score_mode9)
+                    )
+                ):
+                    net_raw = sector_sm.get("ths_flow_net_1d")
+                    if net_raw is None:
+                        net_raw = sector_sm.get("ths_flow_net_5d")
+                    net_yi = parse_ths_flow_net_yi(net_raw)
+                    fd = sector_fund_flow_score_delta(
+                        net_yi,
+                        yi_per_point=sector_fund_flow_yi_per_point,
+                        max_abs_points=sector_fund_flow_max_points,
+                    )
+                    if fd != 0 and net_yi is not None:
+                        score = min(100, int(score) + fd)
+                        sector_sm["sector_fund_flow_net_yi"] = net_yi
+                        sector_sm["sector_fund_flow_score_delta"] = fd
+
             if score < config.min_score:
                 continue
 
@@ -1986,6 +2135,10 @@ def scan_with_mode3(
             ma60_gap = (ma20_now - ma60_now) / ma60_now if ma60_now > 0 else 0.0
             close_gap = abs(close[idx] - ma20_now) / ma20_now if ma20_now > 0 else 0.0
             ret20_val = ret20[idx] if not np.isnan(ret20[idx]) else 0.0
+            if idx >= 5 and close[idx - 5] > 0:
+                ret5_val = (close[idx] - close[idx - 5]) / close[idx - 5] * 100.0
+            else:
+                ret5_val = 0.0
             o = rows[idx].open
             c = rows[idx].close
             h = rows[idx].high
@@ -2010,8 +2163,80 @@ def scan_with_mode3(
                 f"MA20-60 {ma60_gap:.2%}",
                 f"距MA20 {close_gap:.2%}",
                 f"20日涨幅 {ret20_val:.2f}%",
+                f"5日涨幅 {ret5_val:.2f}%",
                 f"上影占比 {upper_ratio:.2%}",
             ]
+            if sector_sm.get("industry"):
+                ir5v = sector_sm.get("industry_ret5")
+                ir5s = f"{float(ir5v):.1f}%" if ir5v is not None else "—"
+                reasons.append(
+                    f"行业 {sector_sm['industry']} 板块指数5日 {ir5s}"
+                )
+                ir10, ir20 = sector_sm.get("industry_ret10"), sector_sm.get("industry_ret20")
+                if ir10 is not None or ir20 is not None:
+                    t10 = f"{float(ir10):.1f}%" if ir10 is not None else "—"
+                    t20 = f"{float(ir20):.1f}%" if ir20 is not None else "—"
+                    reasons.append(f"行业指数 10日{t10} 20日{t20}")
+            rk = sector_sm.get("sector_flow_rank")
+            if rk is not None:
+                reasons.append(f"行业净流入排行 约第{rk}名（快照）")
+            if sector_sm.get("ths_flow_rank_5d") is not None:
+                t5 = sector_sm["ths_flow_rank_5d"]
+                reasons.append(f"同花顺行业资金5日榜 第{t5}名")
+            if sector_sm.get("ths_flow_rank_1d") is not None:
+                reasons.append(
+                    f"同花顺行业资金即时榜 第{sector_sm['ths_flow_rank_1d']}名"
+                )
+            if sector_sm.get("ths_flow_momentum") is not None:
+                reasons.append(
+                    f"行业资金相对走强(20日名次-5日名次差) {sector_sm['ths_flow_momentum']}"
+                )
+            if sector_sm.get("sector_fund_flow_score_delta"):
+                ny = sector_sm.get("sector_fund_flow_net_yi")
+                fd = sector_sm.get("sector_fund_flow_score_delta")
+                ny_s = f"{float(ny):+.2f}" if ny is not None else "—"
+                reasons.append(
+                    f"板块资金净额约{ny_s}亿 → 评分{int(fd):+d}（每{sector_fund_flow_yi_per_point:g}亿约1分，上限±{sector_fund_flow_max_points}）"
+                )
+
+            m_extra: Dict[str, Any] = {
+                "signal_date": signal_date,
+                "buy_date": buy_date,
+                "vol_ratio": float(vol_ratio),
+                "ma20_gap": float(ma20_gap),
+                "ma60_gap": float(ma60_gap),
+                "close_gap": float(close_gap),
+                "ret20": float(ret20_val),
+                "ret5": float(ret5_val),
+                "upper_ratio": float(upper_ratio),
+                "upper_score": float(upper_score),
+                "market_cap": float(cap_value) if cap_value is not None else None,
+                "buy_point_score": int(buy_point_score),
+                "limitup_shrink_vol": int(
+                    _has_limit_up_then_shrink_volume(rows, idx, item.code, item.name, lookback=6, next_vol_max_mult=1.8)
+                ),
+                "has_limit_up_6d": int(
+                    _has_limit_up_6d(rows, idx, item.code, item.name, lookback=6)
+                ),
+            }
+            for k in (
+                "industry",
+                "industry_ret5",
+                "industry_ret10",
+                "industry_ret20",
+                "sector_flow_rank",
+                "ths_flow_rank_1d",
+                "ths_flow_rank_5d",
+                "ths_flow_rank_10d",
+                "ths_flow_rank_20d",
+                "ths_flow_momentum",
+                "ths_flow_net_1d",
+                "ths_flow_net_5d",
+                "sector_fund_flow_net_yi",
+                "sector_fund_flow_score_delta",
+            ):
+                if k in sector_sm and sector_sm[k] is not None:
+                    m_extra[k] = sector_sm[k]
 
             results.append(
                 ScanResult(
@@ -2021,63 +2246,12 @@ def scan_with_mode3(
                     latest_close=float(rows[-1].close),
                     change_pct=float(rows[-1].pct_chg),
                     reasons=reasons,
-                    metrics={
-                        "signal_date": signal_date,
-                        "buy_date": buy_date,
-                        "vol_ratio": float(vol_ratio),
-                        "ma20_gap": float(ma20_gap),
-                        "ma60_gap": float(ma60_gap),
-                        "close_gap": float(close_gap),
-                        "ret20": float(ret20_val),
-                        "upper_ratio": float(upper_ratio),
-                        "upper_score": float(upper_score),
-                        "market_cap": float(cap_value) if cap_value is not None else None,
-                        "buy_point_score": int(buy_point_score),
-                        "limitup_shrink_vol": int(
-                            _has_limit_up_then_shrink_volume(rows, idx, item.code, item.name, lookback=6, next_vol_max_mult=1.8)
-                        ),
-                        "has_limit_up_6d": int(
-                            _has_limit_up_6d(rows, idx, item.code, item.name, lookback=6)
-                        ),
-                    },
+                    metrics=m_extra,
                 )
             )
 
     def _mode3_sort_key(r: ScanResult):
-        metrics = r.metrics or {}
-        vol_ratio = float(metrics.get("vol_ratio", 0.0))
-        ma20_gap = float(metrics.get("ma20_gap", 0.0))
-        ma60_gap = float(metrics.get("ma60_gap", 0.0))
-        close_gap = float(metrics.get("close_gap", 0.0))
-        ret20_val = float(metrics.get("ret20", 0.0))
-        upper_score = float(metrics.get("upper_score", 0.0))
-        buy_point_score = int(metrics.get("buy_point_score", 0))
-        limitup_shrink_vol = int(metrics.get("limitup_shrink_vol", 0))
-        has_limit_up_6d = int(metrics.get("has_limit_up_6d", 0))
-        if prefer_upper_shadow:
-            return (
-                -r.score,
-                -limitup_shrink_vol,
-                -has_limit_up_6d,
-                -buy_point_score,
-                -upper_score,
-                close_gap,
-                -vol_ratio,
-                -(ma20_gap + ma60_gap),
-                ret20_val,
-                r.code,
-            )
-        return (
-            -r.score,
-            -limitup_shrink_vol,
-            -has_limit_up_6d,
-            -buy_point_score,
-            close_gap,
-            -vol_ratio,
-            -(ma20_gap + ma60_gap),
-            ret20_val,
-            r.code,
-        )
+        return mode3_sort_tuple(r, prefer_upper_shadow=prefer_upper_shadow)
 
     # 先按评分与买点/涨停特征排序
     results.sort(key=_mode3_sort_key)

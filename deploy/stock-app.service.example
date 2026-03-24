@@ -1,0 +1,21 @@
+# 复制到 /etc/systemd/system/stock-app.service
+# 修改 User/Group、WorkingDirectory、路径后：
+#   sudo systemctl daemon-reload && sudo systemctl enable --now stock-app
+
+[Unit]
+Description=Stock App Gunicorn
+After=network.target
+
+[Service]
+User=admin
+Group=admin
+WorkingDirectory=/var/www/stock-app
+Environment="PATH=/var/www/stock-app/venv/bin"
+Environment="GPT_DATA_DIR=/data/gpt"
+EnvironmentFile=-/var/www/stock-app/.env
+ExecStart=/var/www/stock-app/venv/bin/gunicorn -w 2 -b 127.0.0.1:8080 --timeout 120 "wsgi:app"
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

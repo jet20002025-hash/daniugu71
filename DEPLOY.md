@@ -2,6 +2,8 @@
 
 本文说明如何将强势股筛选器部署到阿里云国际服务器，绑定域名 www.daniugu.top，K 线数据存服务器并每日更新，支持免费试用 1 个月与付费开通。
 
+**模板文件**（可复制到服务器后改路径与域名）：仓库内 `deploy/` — `stock-app.service.example`、`stock-app.nginx.example`、`.env.example`。本地自检：`./scripts/verify_deploy_ready.sh`（需在项目根且已 `pip install -r requirements.txt`）。
+
 ---
 
 ## 一、前置准备

@@ -25,6 +25,8 @@ from app.database import (
     downgrade_expired_subscriptions,
     list_users,
     count_registrations_by_ip,
+    record_page_view,
+    get_visit_statistics,
 )
 from app.eastmoney import (
     KlineRow,
@@ -127,6 +129,25 @@ def _auto_downgrade_expired():
         downgrade_expired_subscriptions()
     except Exception:
         pass
+
+
+@app.after_request
+def _record_page_visit(response):
+    """访问量统计（PV）：写入 SQLite，管理后台可查看。排除静态资源与 /status 轮询。"""
+    try:
+        if request.method not in ("GET", "POST"):
+            return response
+        path = request.path or ""
+        if (
+            path.startswith("/static/")
+            or path in ("/favicon.ico", "/status", "/robots.txt", "/api/cache_status")
+            or path.startswith("/status/")
+        ):
+            return response
+        record_page_view(path)
+    except Exception:
+        pass
+    return response
 
 
 @app.before_request
@@ -858,6 +879,23 @@ def run_mode3_scan(
             if _state["progress"] % 200 == 0 or _state["progress"] == _state["total"]:
                 _emit({"progress": _state["progress"], "message": f"筛选中 {_state['progress']}/{_state['total']}"})
 
+        _sector_bonus = 0
+        try:
+            _sector_bonus = int(os.environ.get("SECTOR_TREND_BONUS_CAP", "0"))
+        except ValueError:
+            _sector_bonus = 0
+        _sector_ak = os.environ.get("SECTOR_AK_CACHE_DIR", "").strip() or None
+        _fund_flow_max_pts = 5
+        _fund_flow_yi_per_pt = 3.0
+        try:
+            _fund_flow_max_pts = int(os.environ.get("SECTOR_FUND_FLOW_MAX_POINTS", "5"))
+        except ValueError:
+            _fund_flow_max_pts = 0
+        try:
+            _fund_flow_yi_per_pt = float(os.environ.get("SECTOR_FUND_FLOW_YI_PER_POINT", "3"))
+        except ValueError:
+            _fund_flow_yi_per_pt = 3.0
+
         results = scan_with_mode3(
             stock_list=stock_list,
             config=config,
@@ -883,6 +921,10 @@ def run_mode3_scan(
             use_mode10=use_mode10,
             use_mode11=use_mode11,
             use_mode12=use_mode12,
+            sector_ak_cache_dir=_sector_ak,
+            sector_trend_bonus_cap=_sector_bonus if use_mode9 else 0,
+            sector_fund_flow_max_points=_fund_flow_max_pts,
+            sector_fund_flow_yi_per_point=_fund_flow_yi_per_pt,
         )
         if model_tag_override:
             model_tag = model_tag_override
@@ -1013,12 +1055,23 @@ def admin():
     users = list_users()
     free_count = sum(1 for u in users if not u.is_activated)
     paid_count = sum(1 for u in users if u.is_activated)
+    try:
+        visit_stats = get_visit_statistics()
+    except Exception:
+        visit_stats = {
+            "today": "",
+            "today_hits": 0,
+            "last_7_days": [],
+            "today_by_path": [],
+            "all_time_hits": 0,
+        }
     return render_template(
         "admin.html",
         users=users,
         free_count=free_count,
         paid_count=paid_count,
         is_super_admin=getattr(g.current_user, "is_super_admin", False),
+        visit_stats=visit_stats,
     )
 
 

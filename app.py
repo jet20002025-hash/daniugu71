@@ -879,11 +879,48 @@ def run_mode3_scan(
             if _state["progress"] % 200 == 0 or _state["progress"] == _state["total"]:
                 _emit({"progress": _state["progress"], "message": f"筛选中 {_state['progress']}/{_state['total']}"})
 
-        _sector_bonus = 0
         try:
-            _sector_bonus = int(os.environ.get("SECTOR_TREND_BONUS_CAP", "0"))
+            _v = os.environ.get("MODE9_HOT_INDUSTRY_BONUS", "").strip()
+            if _v != "":
+                config.mode9_hot_industry_bonus = int(_v)
         except ValueError:
-            _sector_bonus = 0
+            pass
+        try:
+            _v = os.environ.get("MODE9_HOT_INDUSTRY_TOP_N", "").strip()
+            if _v != "":
+                config.mode9_hot_industry_top_n = int(_v)
+        except ValueError:
+            pass
+        try:
+            _v = os.environ.get("MODE9_HOT_INDUSTRY_BONUS_MAX", "").strip()
+            if _v != "":
+                config.mode9_hot_industry_bonus_max = int(_v)
+        except ValueError:
+            pass
+        try:
+            _v = os.environ.get("MODE9_INDUSTRY_LIMIT_NDAYS", "").strip()
+            if _v != "":
+                config.mode9_industry_limit_ndays = int(_v)
+        except ValueError:
+            pass
+        try:
+            _v = os.environ.get("MODE9_INDUSTRY_NDAYS_PENALTY", "").strip()
+            if _v != "":
+                config.mode9_industry_ndays_penalty = int(_v)
+        except ValueError:
+            pass
+        try:
+            _v = os.environ.get("MODE9_INDUSTRY_NDAYS_BONUS_PER_UNIT", "").strip()
+            if _v != "":
+                config.mode9_industry_ndays_bonus_per_unit = int(_v)
+        except ValueError:
+            pass
+        try:
+            _v = os.environ.get("MODE9_INDUSTRY_NDAYS_BONUS_CAP", "").strip()
+            if _v != "":
+                config.mode9_industry_ndays_bonus_cap = int(_v)
+        except ValueError:
+            pass
         _sector_ak = os.environ.get("SECTOR_AK_CACHE_DIR", "").strip() or None
         _fund_flow_max_pts = 5
         _fund_flow_yi_per_pt = 3.0
@@ -922,7 +959,6 @@ def run_mode3_scan(
             use_mode11=use_mode11,
             use_mode12=use_mode12,
             sector_ak_cache_dir=_sector_ak,
-            sector_trend_bonus_cap=_sector_bonus if use_mode9 else 0,
             sector_fund_flow_max_points=_fund_flow_max_pts,
             sector_fund_flow_yi_per_point=_fund_flow_yi_per_pt,
         )
@@ -1131,7 +1167,7 @@ def scan():
         data_source = "remote" if raw_ds == "remote" else "gpt"
         remote_provider = request.form.get("remote_provider", "eastmoney")
         prefer_local = request.form.get("prefer_local") == "on"
-        min_score = int(request.form.get("min_score", 70))
+        min_score = int(request.form.get("min_score", 80))
         raw_cap = str(request.form.get("max_market_cap", "")).strip()
         try:
             cap_billion = float(raw_cap) if raw_cap else 150.0
@@ -1171,7 +1207,7 @@ def scan():
     data_source = "remote" if raw_ds == "remote" else "gpt"
     remote_provider = request.form.get("remote_provider", "eastmoney")
     prefer_local = request.form.get("prefer_local") == "on"
-    min_score = int(request.form.get("min_score", 70))
+    min_score = int(request.form.get("min_score", 80))
     raw_cap = str(request.form.get("max_market_cap", "")).strip()
     if raw_cap == "":
         cap_billion = 150.0

@@ -3,7 +3,7 @@ import math
 import os
 from dataclasses import dataclass, asdict
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 import numpy as np
 
@@ -74,6 +74,17 @@ class ScanConfig:
     mode90_macd_weight: float = 1.0  # 贴轴加分再乘此系数
     mode90_macd_max_bonus: float = 12.0  # s=0 时 MACD 最高加分
     mode90_macd_s_scale: float = 0.12  # s=DIF_norm+DEA_norm+HIST_norm 达到此值时 MACD 加分为 0
+
+    # mode9/mode90：信号日全市场涨停行业 TopN 与本股行业一致时加分（0=关闭）
+    mode9_hot_industry_bonus: int = 3
+    mode9_hot_industry_top_n: int = 5
+    # 涨停行业加分上限（含按该行业当日涨停家数追加的分，见 _score_mode9）
+    mode9_hot_industry_bonus_max: int = 12
+    # 信号日前 N 个交易日（含信号日）内，本股所属行业涨停家次累计：多则加分、0 则扣分（0=关闭）
+    mode9_industry_limit_ndays: int = 0
+    mode9_industry_ndays_penalty: int = 3
+    mode9_industry_ndays_bonus_per_unit: int = 5  # 累计家次每满 per_unit 加 1 分
+    mode9_industry_ndays_bonus_cap: int = 8
 
 
 def _normalize_code(code: str) -> str:
@@ -1231,9 +1242,23 @@ def _score_mode9(
     code: str = "",
     name: str = "",
     breakdown: Optional[List[tuple]] = None,
+    industry: str = "",
+    hot_industries: Optional[Set[str]] = None,
+    mode9_hot_industry_bonus: int = 0,
+    hot_industry_counts: Optional[Dict[str, int]] = None,
+    mode9_hot_industry_bonus_max: int = 12,
+    industry_ndays_limit_total: Optional[int] = None,
+    mode9_industry_ndays_penalty: int = 0,
+    mode9_industry_ndays_bonus_per_unit: int = 5,
+    mode9_industry_ndays_bonus_cap: int = 8,
 ) -> int:
     """
     mode9 评分：在 mode3 基础上微调，使选股更准。
+    可选：信号日全市场涨停行业 TopN（与 limit_up_industry_top 一致）含本股行业时加分；
+    若提供 hot_industry_counts，则该行业当日涨停家数越多，在封顶 mode9_hot_industry_bonus_max 内额外加分
+    （资金向该板块集聚越强，排序越靠前）。
+    可选 industry_ndays_limit_total：信号日前 N 个交易日内该行业涨停家次累计（非 None 时生效）；
+    累计为 0 且配置了 penalty 则扣「资金关注度低」分，累计多则按 per_unit 加分封顶 cap。
     基于「满分100 表现最好5只 vs 最差5只」买点前特征对比：
     - 收盘距MA20 过远(>8%)略降分，偏好温和突破；
     - MA20-MA60 开口大(趋势强)额外加分；
@@ -1458,6 +1483,50 @@ def _score_mode9(
             base -= deduct
             if breakdown is not None:
                 breakdown.append((f"当日量/前一日量(约{vol_ratio_prev:.1f}倍)", -deduct))
+    # 信号日涨停家数前 N 行业与本股行业一致：基础分 + 按该行业当日涨停家数加成（有说服力地体现资金抱团）
+    if hot_industries and mode9_hot_industry_bonus > 0:
+        ind = (industry or "").strip()
+        if ind and ind in hot_industries:
+            base_pts = int(mode9_hot_industry_bonus)
+            cap = max(base_pts, int(mode9_hot_industry_bonus_max))
+            extra_pts = 0
+            if hot_industry_counts:
+                cnt = int(hot_industry_counts.get(ind, 0))
+                room = max(0, cap - base_pts)
+                extra_pts = min(room, max(0, (cnt - 1) // 2))
+            total_hot = min(cap, base_pts + extra_pts)
+            base += total_hot
+            if breakdown is not None:
+                nlu = int(hot_industry_counts.get(ind, 0)) if hot_industry_counts else 0
+                label = "信号日涨停行业TopN"
+                if nlu:
+                    label += f"（当日该行业涨停{nlu}家）"
+                breakdown.append((label, int(total_hot)))
+    # 信号日前 N 个交易日：本行业涨停家次累计（资金是否持续涌入该板块）
+    if industry_ndays_limit_total is not None:
+        ind_nd = (industry or "").strip()
+        if ind_nd:
+            if industry_ndays_limit_total <= 0 and mode9_industry_ndays_penalty > 0:
+                base -= int(mode9_industry_ndays_penalty)
+                if breakdown is not None:
+                    breakdown.append(
+                        ("近N日行业涨停累计0（资金关注度低）", -int(mode9_industry_ndays_penalty))
+                    )
+            elif industry_ndays_limit_total > 0 and mode9_industry_ndays_bonus_per_unit > 0:
+                bu = max(1, int(mode9_industry_ndays_bonus_per_unit))
+                add = min(
+                    int(mode9_industry_ndays_bonus_cap),
+                    int(industry_ndays_limit_total) // bu,
+                )
+                if add > 0:
+                    base += add
+                    if breakdown is not None:
+                        breakdown.append(
+                            (
+                                f"近N日行业涨停累计{int(industry_ndays_limit_total)}家次",
+                                int(add),
+                            )
+                        )
     return int(max(0, base))  # 不封顶，允许超过 100
 
 
@@ -1475,6 +1544,15 @@ def _score_mode90(
     mode90_macd_weight: float = 1.0,
     mode90_macd_max_bonus: float = 12.0,
     mode90_macd_s_scale: float = 0.12,
+    industry: str = "",
+    hot_industries: Optional[Set[str]] = None,
+    mode9_hot_industry_bonus: int = 0,
+    hot_industry_counts: Optional[Dict[str, int]] = None,
+    mode9_hot_industry_bonus_max: int = 12,
+    industry_ndays_limit_total: Optional[int] = None,
+    mode9_industry_ndays_penalty: int = 0,
+    mode9_industry_ndays_bonus_per_unit: int = 5,
+    mode9_industry_ndays_bonus_cap: int = 8,
 ) -> int:
     """
     mode90 = mode9 评分 + 日线 MACD「贴 0 轴」加分。
@@ -1498,6 +1576,15 @@ def _score_mode90(
         code,
         name,
         breakdown=breakdown,
+        industry=industry,
+        hot_industries=hot_industries,
+        mode9_hot_industry_bonus=mode9_hot_industry_bonus,
+        hot_industry_counts=hot_industry_counts,
+        mode9_hot_industry_bonus_max=mode9_hot_industry_bonus_max,
+        industry_ndays_limit_total=industry_ndays_limit_total,
+        mode9_industry_ndays_penalty=mode9_industry_ndays_penalty,
+        mode9_industry_ndays_bonus_per_unit=mode9_industry_ndays_bonus_per_unit,
+        mode9_industry_ndays_bonus_cap=mode9_industry_ndays_bonus_cap,
     )
 
     close_arr = np.array([r.close for r in rows], dtype=float)
@@ -1827,7 +1914,6 @@ def scan_with_mode3(
     use_mode18: bool = False,
     use_mode88: bool = False,
     sector_ak_cache_dir: Optional[str] = None,
-    sector_trend_bonus_cap: int = 0,
     sector_fund_flow_max_points: int = 5,
     sector_fund_flow_yi_per_point: float = 3.0,
 ) -> List[ScanResult]:
@@ -1839,7 +1925,6 @@ def scan_with_mode3(
         metrics_for_signal,
         parse_ths_flow_net_yi,
         sector_fund_flow_score_delta,
-        sector_score_bonus,
     )
 
     sector_dir = sector_ak_cache_dir
@@ -1931,8 +2016,9 @@ def scan_with_mode3(
         mode90_macd_weight = getattr(config, "mode90_macd_weight", 1.0)
         mode90_macd_max_bonus = getattr(config, "mode90_macd_max_bonus", 12.0)
         mode90_macd_s_scale = getattr(config, "mode90_macd_s_scale", 0.12)
-        score_fn = (
-            lambda rows,
+
+        def _score_mode90_fn(
+            rows,
             idx,
             ma10,
             ma20,
@@ -1940,7 +2026,18 @@ def scan_with_mode3(
             vol20,
             code="",
             name="",
-            breakdown=None: _score_mode90(
+            breakdown=None,
+            industry: str = "",
+            hot_industries: Optional[Set[str]] = None,
+            mode9_hot_industry_bonus: int = 0,
+            hot_industry_counts: Optional[Dict[str, int]] = None,
+            mode9_hot_industry_bonus_max: int = 12,
+            industry_ndays_limit_total: Optional[int] = None,
+            mode9_industry_ndays_penalty: int = 0,
+            mode9_industry_ndays_bonus_per_unit: int = 5,
+            mode9_industry_ndays_bonus_cap: int = 8,
+        ) -> int:
+            return _score_mode90(
                 rows,
                 idx,
                 ma10,
@@ -1954,8 +2051,18 @@ def scan_with_mode3(
                 mode90_macd_weight=mode90_macd_weight,
                 mode90_macd_max_bonus=mode90_macd_max_bonus,
                 mode90_macd_s_scale=mode90_macd_s_scale,
+                industry=industry,
+                hot_industries=hot_industries,
+                mode9_hot_industry_bonus=mode9_hot_industry_bonus,
+                hot_industry_counts=hot_industry_counts,
+                mode9_hot_industry_bonus_max=mode9_hot_industry_bonus_max,
+                industry_ndays_limit_total=industry_ndays_limit_total,
+                mode9_industry_ndays_penalty=mode9_industry_ndays_penalty,
+                mode9_industry_ndays_bonus_per_unit=mode9_industry_ndays_bonus_per_unit,
+                mode9_industry_ndays_bonus_cap=mode9_industry_ndays_bonus_cap,
             )
-        )
+
+        score_fn = _score_mode90_fn
         mode_label = "mode90"
     else:
         # mode3 / mode8 / mode9 为三套独立模型：信号上 mode8 与 mode3/mode9 不同，评分上三者均不同。见 docs/mode3_mode8_mode9_三者区别.md
@@ -1967,6 +2074,19 @@ def scan_with_mode3(
         score_fn = _score_mode8 if use_mode8 else (_score_mode9 if use_mode9 else _score_mode3)
         mode_label = "mode8" if use_mode8 else ("mode9" if use_mode9 else ("mode4" if mode4_filters else "mode3"))
     end_date = cutoff_date
+
+    hot_cache: Dict[str, Tuple[Set[str], Dict[str, int]]] = {}
+    hot_bonus = int(getattr(config, "mode9_hot_industry_bonus", 0) or 0)
+    hot_top_n = max(1, int(getattr(config, "mode9_hot_industry_top_n", 5) or 5))
+    hot_bonus_max = max(
+        hot_bonus,
+        int(getattr(config, "mode9_hot_industry_bonus_max", 12) or 12),
+    )
+    ndays_n = int(getattr(config, "mode9_industry_limit_ndays", 0) or 0)
+    ndays_pen = int(getattr(config, "mode9_industry_ndays_penalty", 3) or 0)
+    ndays_unit = int(getattr(config, "mode9_industry_ndays_bonus_per_unit", 5) or 5)
+    ndays_cap_cfg = int(getattr(config, "mode9_industry_ndays_bonus_cap", 8) or 8)
+    ndays_cache: Dict[str, Tuple[Dict[str, int], bool]] = {}
 
     for item in stock_list:
         if _is_st(item.name or ""):
@@ -2071,8 +2191,111 @@ def scan_with_mode3(
                 if _has_limit_up_then_down(rows, idx, item.code, item.name, lookback=5, min_consec_limit_up=3):
                     continue
 
-            if (use_mode9 and score_fn is _score_mode9) or (use_mode8 and score_fn is _score_mode8) or (use_mode10 and score_fn is _score_mode10) or (use_mode11 and score_fn is _score_mode11) or (use_mode12 and score_fn is _score_mode12) or (use_mode18 and score_fn is _score_mode18) or (use_mode88 and score_fn is _score_mode88) or use_mode90:
-                score = score_fn(rows, idx, ma10, ma20, ma60, vol20, item.code, item.name)
+            industry_nm = ""
+            hot_set: Optional[Set[str]] = None
+            hot_counts: Optional[Dict[str, int]] = None
+            ndays_total: Optional[int] = None
+            if (use_mode9 or use_mode90) and sector_dir:
+                from .limit_up_industry_top import (
+                    industry_limit_up_counts_for_date,
+                    industry_limit_up_sum_ndays,
+                    load_stock_industry_name,
+                )
+
+                industry_nm = load_stock_industry_name(sector_dir, item.code)
+                sig_date = rows[idx].date
+                if hot_bonus > 0:
+                    if sig_date not in hot_cache:
+                        try:
+                            counts = industry_limit_up_counts_for_date(
+                                sig_date,
+                                kline_dir=cache_dir,
+                                ak_base=sector_dir,
+                                stock_list_csv=os.path.join(GPT_DATA_DIR, "stock_list.csv"),
+                            )
+                            if not counts:
+                                hot_cache[sig_date] = (set(), {})
+                            else:
+                                ranked = sorted(counts.items(), key=lambda x: (-x[1], x[0]))
+                                hot_cache[sig_date] = (
+                                    {name for name, _ in ranked[:hot_top_n]},
+                                    counts,
+                                )
+                        except Exception:
+                            hot_cache[sig_date] = (set(), {})
+                    hot_set, hot_counts = hot_cache[sig_date]
+                if ndays_n > 0:
+                    if sig_date not in ndays_cache:
+                        try:
+                            m, valid = industry_limit_up_sum_ndays(
+                                sig_date,
+                                ndays_n,
+                                kline_dir=cache_dir,
+                                ak_base=sector_dir,
+                                stock_list_csv=os.path.join(GPT_DATA_DIR, "stock_list.csv"),
+                            )
+                            ndays_cache[sig_date] = (m, valid)
+                        except Exception:
+                            ndays_cache[sig_date] = ({}, False)
+                    nd_map, nd_ok = ndays_cache[sig_date]
+                    if nd_ok and (industry_nm or "").strip():
+                        ndays_total = int(nd_map.get((industry_nm or "").strip(), 0))
+
+            if use_mode90:
+                score = score_fn(
+                    rows,
+                    idx,
+                    ma10,
+                    ma20,
+                    ma60,
+                    vol20,
+                    item.code,
+                    item.name,
+                    None,
+                    industry=industry_nm,
+                    hot_industries=hot_set,
+                    mode9_hot_industry_bonus=hot_bonus,
+                    hot_industry_counts=hot_counts,
+                    mode9_hot_industry_bonus_max=hot_bonus_max,
+                    industry_ndays_limit_total=ndays_total,
+                    mode9_industry_ndays_penalty=ndays_pen,
+                    mode9_industry_ndays_bonus_per_unit=ndays_unit,
+                    mode9_industry_ndays_bonus_cap=ndays_cap_cfg,
+                )
+            elif (
+                (use_mode9 and score_fn is _score_mode9)
+                or (use_mode8 and score_fn is _score_mode8)
+                or (use_mode10 and score_fn is _score_mode10)
+                or (use_mode11 and score_fn is _score_mode11)
+                or (use_mode12 and score_fn is _score_mode12)
+                or (use_mode18 and score_fn is _score_mode18)
+                or (use_mode88 and score_fn is _score_mode88)
+            ):
+                if use_mode9 and score_fn is _score_mode9:
+                    score = score_fn(
+                        rows,
+                        idx,
+                        ma10,
+                        ma20,
+                        ma60,
+                        vol20,
+                        item.code,
+                        item.name,
+                        None,
+                        industry=industry_nm,
+                        hot_industries=hot_set,
+                        mode9_hot_industry_bonus=hot_bonus,
+                        hot_industry_counts=hot_counts,
+                        mode9_hot_industry_bonus_max=hot_bonus_max,
+                        industry_ndays_limit_total=ndays_total,
+                        mode9_industry_ndays_penalty=ndays_pen,
+                        mode9_industry_ndays_bonus_per_unit=ndays_unit,
+                        mode9_industry_ndays_bonus_cap=ndays_cap_cfg,
+                    )
+                else:
+                    score = score_fn(
+                        rows, idx, ma10, ma20, ma60, vol20, item.code, item.name
+                    )
             else:
                 score = score_fn(rows, idx, ma10, ma20, ma60, vol20)
 
@@ -2084,17 +2307,8 @@ def scan_with_mode3(
                 merge_ths_flow_features(
                     sector_sm, rows[idx].date, ths_features_data
                 )
-                if (
-                    sector_trend_bonus_cap > 0
-                    and use_mode9
-                    and score_fn is _score_mode9
-                ):
-                    sb = sector_score_bonus(
-                        sector_sm.get("industry_ret5"),
-                        cap=sector_trend_bonus_cap,
-                    )
-                    if sb:
-                        score = min(100, int(score) + sb)
+                # 板块热度：仅通过「信号日涨停行业 TopN + 家数」等（见 _score_mode9 与下方 reasons），
+                # 不再按行业指数涨跌幅对总分加分（避免与「只统计涨停个数」策略重复）。
 
                 # 同花顺行业净额：净流入加分、净流出减分（须 trade_date 与信号日对齐的 ths 特征）
                 if (
@@ -2166,6 +2380,8 @@ def scan_with_mode3(
                 f"5日涨幅 {ret5_val:.2f}%",
                 f"上影占比 {upper_ratio:.2%}",
             ]
+            if sector_sm.get("sub_industry"):
+                reasons.append(f"细分行业 {sector_sm['sub_industry']}")
             if sector_sm.get("industry"):
                 ir5v = sector_sm.get("industry_ret5")
                 ir5s = f"{float(ir5v):.1f}%" if ir5v is not None else "—"
@@ -2198,6 +2414,27 @@ def scan_with_mode3(
                 reasons.append(
                     f"板块资金净额约{ny_s}亿 → 评分{int(fd):+d}（每{sector_fund_flow_yi_per_point:g}亿约1分，上限±{sector_fund_flow_max_points}）"
                 )
+            if (
+                hot_bonus > 0
+                and (use_mode9 or use_mode90)
+                and industry_nm
+                and hot_set
+                and industry_nm.strip() in hot_set
+            ):
+                nlu_r = int((hot_counts or {}).get(industry_nm.strip(), 0))
+                reasons.append(
+                    f"信号日涨停行业Top{hot_top_n} 含「{industry_nm.strip()}」"
+                    f"（当日该行业涨停{nlu_r}家，资金抱团加分）"
+                )
+            if (
+                ndays_n > 0
+                and (use_mode9 or use_mode90)
+                and industry_nm
+                and ndays_total is not None
+            ):
+                reasons.append(
+                    f"近{ndays_n}个交易日本行业涨停累计{int(ndays_total)}家次"
+                )
 
             m_extra: Dict[str, Any] = {
                 "signal_date": signal_date,
@@ -2218,9 +2455,29 @@ def scan_with_mode3(
                 "has_limit_up_6d": int(
                     _has_limit_up_6d(rows, idx, item.code, item.name, lookback=6)
                 ),
+                "mode9_hot_industry_bonus_applied": int(
+                    bool(
+                        hot_bonus > 0
+                        and (use_mode9 or use_mode90)
+                        and industry_nm
+                        and hot_set
+                        and industry_nm.strip() in hot_set
+                    )
+                ),
+                "hot_industry_limit_up_count": (
+                    int((hot_counts or {}).get((industry_nm or "").strip(), 0))
+                    if ((use_mode9 or use_mode90) and hot_counts)
+                    else 0
+                ),
+                "industry_ndays_limit_up_total": (
+                    ndays_total
+                    if (use_mode9 or use_mode90) and ndays_n > 0
+                    else None
+                ),
             }
             for k in (
                 "industry",
+                "sub_industry",
                 "industry_ret5",
                 "industry_ret10",
                 "industry_ret20",

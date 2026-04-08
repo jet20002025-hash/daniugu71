@@ -5,6 +5,8 @@ import sqlite3
 import threading
 import time
 import traceback
+import subprocess
+import sys
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
@@ -121,6 +123,25 @@ scan_state = {
     "source": "",
 }
 
+# 管理后台「更新 K 线」异步任务状态（与 DEPLOY 中 update_kline_cache.py 一致）
+kline_update_state = {
+    "running": False,
+    "message": "",
+    "output": "",
+    "error": None,
+    "started_at": None,
+    "finished_at": None,
+}
+_kline_update_lock = threading.Lock()
+
+# 续费联系（登录拒绝与提示页共用）
+RENEWAL_WECHAT = "f08080808y"
+RENEWAL_PRICE_MONTH = "99"
+RENEWAL_PRICE_YEAR = "999"
+RENEWAL_HINT = (
+    f"续费请联系微信：{RENEWAL_WECHAT}（月费 {RENEWAL_PRICE_MONTH} 元 / 年费 {RENEWAL_PRICE_YEAR} 元）"
+)
+
 
 @app.before_request
 def _auto_downgrade_expired():
@@ -140,7 +161,7 @@ def _record_page_visit(response):
         path = request.path or ""
         if (
             path.startswith("/static/")
-            or path in ("/favicon.ico", "/status", "/robots.txt", "/api/cache_status")
+            or path in ("/favicon.ico", "/status", "/robots.txt", "/api/cache_status", "/admin/kline_update_status")
             or path.startswith("/status/")
         ):
             return response
@@ -153,6 +174,11 @@ def _record_page_visit(response):
 @app.before_request
 def _before_request():
     g.current_user = get_current_user()
+    # 试用/会员已过期用户：强制登出（管理员除外）
+    u = g.current_user
+    if u is not None and not u.can_use and not u.is_admin and not u.is_super_admin:
+        session.pop("user_id", None)
+        g.current_user = None
 
 
 def _parse_date(value: Optional[str]) -> Optional[datetime.date]:
@@ -1003,7 +1029,8 @@ def run_mode3_scan(
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    if g.current_user and g.current_user.can_use:
+    u = g.current_user
+    if u and (u.can_use or u.is_admin or u.is_super_admin):
         return redirect(url_for("index"))
     error = None
     if request.method == "POST":
@@ -1014,17 +1041,22 @@ def login():
         else:
             user = get_user_by_username(username)
             if user and verify_password(user, password):
-                session["user_id"] = user.id
-                session.permanent = True
-                next_url = request.args.get("next") or url_for("index")
-                return redirect(next_url)
-            error = "用户名或密码错误"
-    return render_template("login.html", error=error)
+                if not user.can_use and not user.is_admin and not user.is_super_admin:
+                    error = "账号已过期或试用已结束，无法登录。" + RENEWAL_HINT
+                else:
+                    session["user_id"] = user.id
+                    session.permanent = True
+                    next_url = request.args.get("next") or url_for("index")
+                    return redirect(next_url)
+            else:
+                error = "用户名或密码错误"
+    return render_template("login.html", error=error, renewal_hint=RENEWAL_HINT)
 
 
 @app.route("/register", methods=["GET", "POST"])
 def register():
-    if g.current_user and g.current_user.can_use:
+    u = g.current_user
+    if u and (u.can_use or u.is_admin or u.is_super_admin):
         return redirect(url_for("index"))
     error = None
     if request.method == "POST":
@@ -1080,9 +1112,14 @@ def subscription_blocked():
     user = get_current_user()
     if user is None:
         return redirect(url_for("login"))
-    if user.can_use:
+    if user.can_use or user.is_admin or user.is_super_admin:
         return redirect(url_for("index"))
-    return render_template("subscription_blocked.html", user=user)
+    return render_template(
+        "subscription_blocked.html",
+        user=user,
+        renewal_hint=RENEWAL_HINT,
+        renewal_wechat=RENEWAL_WECHAT,
+    )
 
 
 @app.route("/admin")
@@ -1108,6 +1145,8 @@ def admin():
         paid_count=paid_count,
         is_super_admin=getattr(g.current_user, "is_super_admin", False),
         visit_stats=visit_stats,
+        kline_update=kline_update_state,
+        gpt_data_dir=GPT_DATA_DIR,
     )
 
 
@@ -1137,6 +1176,73 @@ def admin_set_activated_until(user_id):
     date_str = (request.form.get("activated_until") or "").strip() or None
     set_activated_until(user_id, date_str)
     return redirect(url_for("admin"))
+
+
+def _kline_update_worker() -> None:
+    """在后台线程中执行 scripts/update_kline_cache.py（与服务器 crontab / DEPLOY 一致）。"""
+    global kline_update_state
+    script = os.path.join(BASE_DIR, "scripts", "update_kline_cache.py")
+    try:
+        kline_update_state["message"] = "正在执行 K 线更新…"
+        if not os.path.isfile(script):
+            kline_update_state["error"] = f"未找到脚本: {script}"
+            kline_update_state["message"] = "失败"
+            return
+        proc = subprocess.run(
+            [sys.executable, script],
+            cwd=BASE_DIR,
+            capture_output=True,
+            text=True,
+            timeout=7200,
+            env=os.environ.copy(),
+        )
+        combined = (proc.stdout or "") + (
+            ("\n--- stderr ---\n" + proc.stderr) if proc.stderr else ""
+        )
+        kline_update_state["output"] = combined[-12000:]
+        if proc.returncode != 0:
+            kline_update_state["error"] = f"进程退出码 {proc.returncode}"
+            kline_update_state["message"] = "已完成（有错误）"
+        else:
+            kline_update_state["error"] = None
+            kline_update_state["message"] = "更新完成"
+    except subprocess.TimeoutExpired:
+        kline_update_state["error"] = "执行超过 2 小时已中止"
+        kline_update_state["message"] = "超时"
+    except Exception as exc:
+        kline_update_state["error"] = str(exc)
+        kline_update_state["message"] = "失败"
+    finally:
+        kline_update_state["running"] = False
+        kline_update_state["finished_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+@app.route("/admin/kline_update", methods=["POST"])
+@admin_required
+def admin_kline_update():
+    """触发服务器端 K 线缓存更新（异步，全市场约数分钟～十余分钟）。"""
+    with _kline_update_lock:
+        if kline_update_state["running"]:
+            return (
+                jsonify({"ok": False, "message": "已有更新任务在运行，请稍候。"}),
+                409,
+            )
+        kline_update_state["running"] = True
+        kline_update_state["error"] = None
+        kline_update_state["output"] = ""
+        kline_update_state["started_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        kline_update_state["finished_at"] = None
+        kline_update_state["message"] = "任务已启动"
+    threading.Thread(target=_kline_update_worker, daemon=True).start()
+    return jsonify({"ok": True, "message": "已启动"})
+
+
+@app.route("/admin/kline_update_status")
+@admin_required
+def admin_kline_update_status():
+    """轮询 K 线更新任务状态（管理页 AJAX）。"""
+    data = dict(kline_update_state)
+    return jsonify(data)
 
 
 @app.route("/")

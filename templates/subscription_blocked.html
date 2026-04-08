@@ -10,15 +10,23 @@
     .block-box h1 { font-size: 24px; margin-bottom: 16px; }
     .block-box p { color: var(--muted); margin-bottom: 12px; }
     .block-box .primary { margin-top: 16px; }
+    .contact-box { margin-top: 20px; padding: 16px; background: rgba(47, 196, 178, 0.08); border: 1px solid var(--border); border-radius: 12px; text-align: left; }
+    .contact-box p { margin: 0 0 8px; font-size: 14px; }
+    .contact-box .wx { font-size: 18px; font-weight: 700; color: var(--accent-2); letter-spacing: 0.02em; }
   </style>
 </head>
 <body>
   <div class="bg" aria-hidden="true"></div>
   <main class="container">
     <div class="block-box">
-      <h1>试用已结束</h1>
-      <p>您的免费试用（1 个月）已到期。充值后请联系管理员开通，即可继续使用筛选与评分功能。</p>
+      <h1>服务已到期</h1>
+      <p>您的免费试用已结束，或付费会员已到期。需要继续使用筛选与评分功能，请先续费开通。</p>
       <p>当前账号：<strong>{{ user.username }}</strong></p>
+      <div class="contact-box">
+        <p>续费请联系微信：</p>
+        <p class="wx">{{ renewal_wechat }}</p>
+        <p>{{ renewal_hint }}</p>
+      </div>
       <a href="{{ url_for('logout') }}" class="primary" style="display:inline-block;text-decoration:none">退出登录</a>
     </div>
   </main>

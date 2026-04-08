@@ -24,13 +24,13 @@ def login_required(f):
 
 
 def subscription_required(f):
-    """已登录且（试用期内或已开通）才能访问"""
+    """已登录且（试用期内或已开通）才能访问；管理员不受试用/到期限制"""
     @wraps(f)
     def wrapped(*args, **kwargs):
         user = get_current_user()
         if user is None:
             return redirect(url_for("login", next=request.url))
-        if not user.can_use:
+        if not user.can_use and not user.is_admin and not user.is_super_admin:
             return redirect(url_for("subscription_blocked"))
         return f(*args, **kwargs)
     return wrapped

@@ -1178,8 +1178,26 @@ def admin_set_activated_until(user_id):
     return redirect(url_for("admin"))
 
 
+def _kline_update_subprocess_args() -> list:
+    """管理后台触发的 K 线更新：默认低并发、较长间隔，减轻内存与磁盘 IO。
+    可用环境变量覆盖：KLINE_UPDATE_WORKERS（默认 2，范围 1～12）、KLINE_UPDATE_DELAY（默认 0.18 秒）。"""
+    raw_w = os.environ.get("KLINE_UPDATE_WORKERS", "2").strip()
+    raw_d = os.environ.get("KLINE_UPDATE_DELAY", "0.18").strip()
+    try:
+        workers = max(1, min(12, int(raw_w)))
+    except ValueError:
+        workers = 2
+    try:
+        delay = float(raw_d)
+        if delay < 0.05:
+            delay = 0.05
+    except ValueError:
+        delay = 0.18
+    return ["--workers", str(workers), "--delay", str(delay)]
+
+
 def _kline_update_worker() -> None:
-    """在后台线程中执行 scripts/update_kline_cache.py（与服务器 crontab / DEPLOY 一致）。"""
+    """在后台线程中执行 scripts/update_kline_cache.py（默认低资源占用，见 _kline_update_subprocess_args）。"""
     global kline_update_state
     script = os.path.join(BASE_DIR, "scripts", "update_kline_cache.py")
     try:
@@ -1189,7 +1207,7 @@ def _kline_update_worker() -> None:
             kline_update_state["message"] = "失败"
             return
         proc = subprocess.run(
-            [sys.executable, script],
+            [sys.executable, script, *_kline_update_subprocess_args()],
             cwd=BASE_DIR,
             capture_output=True,
             text=True,
@@ -1220,7 +1238,7 @@ def _kline_update_worker() -> None:
 @app.route("/admin/kline_update", methods=["POST"])
 @admin_required
 def admin_kline_update():
-    """触发服务器端 K 线缓存更新（异步，全市场约数分钟～十余分钟）。"""
+    """触发服务器端 K 线缓存更新（异步；默认 2 并发、低磁盘压力，耗时可能较长）。"""
     with _kline_update_lock:
         if kline_update_state["running"]:
             return (

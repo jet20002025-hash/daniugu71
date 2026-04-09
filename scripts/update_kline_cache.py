@@ -2,9 +2,9 @@
 """
 本地批量更新 K 线缓存并写入统一目录（与在线更新一致，东财/腾讯/新浪/本地共用 code.csv）。
 已有完整历史时只拉最近约 10 根（含今天）并与缓存合并，不重拉全量；新股票或缓存不足时仍拉 300 根。
-默认 12 线程并发 + 0.1s 限速，全量更新约 5～15 分钟（原单线程约 1 小时+）。
+默认 3 线程并发 + 0.15s 限速（减轻小内存机器 IO/内存压力）；可加大 --workers 以提速。
 用法：
-  python scripts/update_kline_cache.py                  # 默认 12 线程，轮流尝试多源
+  python scripts/update_kline_cache.py                  # 默认 3 线程，轮流尝试多源
   python scripts/update_kline_cache.py --workers 1     # 单线程（慢，兼容旧行为）
   python scripts/update_kline_cache.py --source eastmoney --delay 0.05  # 单源可适当减小 delay
   python scripts/update_kline_cache.py --source sina --delay 0.15       # 新浪易限流建议 0.15
@@ -141,8 +141,8 @@ def main():
     parser.add_argument("--source", choices=choices, default="auto",
                         help="数据源：auto=轮流尝试多源（默认），或单选其一")
     parser.add_argument("--force", action="store_true", help="强制刷新，忽略已有今日数据")
-    parser.add_argument("--delay", type=float, default=0.1, help="每只股票请求间隔秒（多线程时为全局限速），建议 0.05～0.15")
-    parser.add_argument("--workers", type=int, default=12, help="并发请求数，1=单线程，12 约可缩短到 5～15 分钟")
+    parser.add_argument("--delay", type=float, default=0.15, help="每只股票请求间隔秒（多线程时为全局限速），建议 0.12～0.2 省资源")
+    parser.add_argument("--workers", type=int, default=3, help="并发请求数；低配服务器建议 1～3")
     parser.add_argument("--limit", type=int, default=0, help="最多更新 N 只，0 表示全部")
     parser.add_argument("--list", choices=["csv", "cache"], default="csv",
                         help="股票列表来源：csv=stock_list.csv，cache=已有缓存目录")

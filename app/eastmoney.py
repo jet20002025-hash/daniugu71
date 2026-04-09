@@ -356,8 +356,17 @@ def write_cached_kline(cache_path: str, rows: List[KlineRow]) -> None:
             )
 
 
-def kline_is_fresh(rows: List[KlineRow], max_age_days: int = 2) -> bool:
-    """缓存视为新鲜仅当已包含「今天」的 K 线，否则会一直用旧缓存拿不到当日数据。"""
+def kline_is_fresh(
+    rows: List[KlineRow],
+    max_age_days: int = 2,
+    cache_path: Optional[str] = None,
+) -> bool:
+    """缓存视为新鲜仅当已包含「今天」的 K 线，否则会一直用旧缓存拿不到当日数据。
+
+    max_age_days 保留与 get_kline_cached 等调用的参数兼容（当前仍以「末根日期≥今天」为准）。
+    cache_path 可选；部分脚本会传入缓存文件路径，当前不参与判断，仅保持签名兼容。
+    """
+    _ = (max_age_days, cache_path)  # 保留参数，避免调用方 TypeError
     if not rows:
         return False
     try:

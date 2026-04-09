@@ -7,6 +7,7 @@ from typing import Dict, List, Optional, Set, Tuple
 
 from app.eastmoney import stock_items_from_list_csv
 from app.paths import GPT_DATA_DIR
+from app.sector_trend import parse_eastmoney_individual_info_industries
 
 try:
     import akshare as ak
@@ -61,18 +62,18 @@ def _save_text(path: str, value: str) -> None:
         handle.write(value)
 
 
-def _fetch_industry(code: str) -> Optional[str]:
+def _fetch_industry_pair(code: str) -> Tuple[Optional[str], Optional[str]]:
+    """东财个股资料：(所属行业/行业, 细分行业展示名)。"""
     if ak is None:
-        return None
+        return None, None
     _disable_proxies()
     df = ak.stock_individual_info_em(symbol=code)
-    if df is None or df.empty:
-        return None
-    row = df[df["item"] == "所属行业"]
-    if row.empty:
-        return None
-    value = str(row["value"].iloc[0]).strip()
-    return value or None
+    return parse_eastmoney_individual_info_industries(df)
+
+
+def _fetch_industry(code: str) -> Optional[str]:
+    main, _ = _fetch_industry_pair(code)
+    return main
 
 
 def _safe_industry_name(industry: str) -> str:
@@ -299,12 +300,16 @@ def main() -> None:
                 industries.add(industry)
             if not industry:
                 try:
-                    industry = _fetch_industry(code)
+                    main, sub = _fetch_industry_pair(code)
+                    industry = main
                     if industry:
                         _save_text(ind_path, industry)
                         ok_industry += 1
                     else:
                         fail_industry += 1
+                    if sub:
+                        sub_path = _cache_path(args.ak_cache_dir, "sub_industry", f"{code}.txt")
+                        _save_text(sub_path, sub)
                 except Exception as exc:
                     fail_industry += 1
                     if args.verbose:

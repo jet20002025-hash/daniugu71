@@ -73,7 +73,7 @@
 
 4. **权重体现（当前实现）**  
    - 总分：`score += 2 * limitup_shrink_vol`  
-   - 排序：同分时按 `(-score, -limitup_shrink_vol, -buy_point_score, …)`，即 `limitup_shrink_vol` 大的排前。
+   - **排序（`scan_with_mode3` / 每日 top1）**：主键 `-score`；同分后依次为 **`ret20`、`ret5` 升序**（少追热）、`-buy_point_score`、`-limitup_shrink_vol`、**`has_limit_up_6d` 升序**（近 6 日无涨停优先，与旧版 `-has_limit_up_6d` 相反）、`close_gap`、`-vol_ratio`、均线间距、`code`。旧文档中方案 B/C 的「`-has_limit_up_6d` 有涨停排前」已不再作为同分规则。
 
 5. **若增加「仅 6 日涨停」权重（建议公式）**  
    - 加分：`score += Δ * has_limit_up_6d`，例如 `Δ = 1`。  

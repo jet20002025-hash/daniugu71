@@ -1,6 +1,7 @@
 import csv
 import json
 import os
+import shutil
 import sqlite3
 import threading
 import time
@@ -1122,21 +1123,38 @@ def admin_set_activated_until(user_id):
 
 
 def _kline_update_subprocess_args() -> list:
-    """管理后台触发的 K 线更新：默认低并发、较长间隔，减轻内存与磁盘 IO。
-    可用环境变量覆盖：KLINE_UPDATE_WORKERS（默认 2，范围 1～12）、KLINE_UPDATE_DELAY（默认 0.18 秒）。"""
-    raw_w = os.environ.get("KLINE_UPDATE_WORKERS", "2").strip()
-    raw_d = os.environ.get("KLINE_UPDATE_DELAY", "0.18").strip()
+    """管理后台触发的 K 线更新：默认单线程 + 较长间隔，尽量不占满小规格云主机。
+    环境变量：KLINE_UPDATE_WORKERS（默认 1）、KLINE_UPDATE_DELAY（默认 0.4 秒）、
+    KLINE_UPDATE_NICE（默认 15，0=不使用 nice）。"""
+    raw_w = os.environ.get("KLINE_UPDATE_WORKERS", "1").strip()
+    raw_d = os.environ.get("KLINE_UPDATE_DELAY", "0.4").strip()
     try:
         workers = max(1, min(12, int(raw_w)))
     except ValueError:
-        workers = 2
+        workers = 1
     try:
         delay = float(raw_d)
         if delay < 0.05:
             delay = 0.05
     except ValueError:
-        delay = 0.18
+        delay = 0.4
     return ["--workers", str(workers), "--delay", str(delay)]
+
+
+def _kline_update_argv(script: str) -> list:
+    """构造子进程 argv；在 Linux/macOS 上默认用 nice 降低 CPU 优先级，减轻与 gunicorn 争抢。"""
+    inner = [sys.executable, script, *_kline_update_subprocess_args()]
+    raw_nice = os.environ.get("KLINE_UPDATE_NICE", "15").strip()
+    if raw_nice == "0" or os.name != "posix":
+        return inner
+    try:
+        niceness = max(0, min(19, int(raw_nice)))
+    except ValueError:
+        niceness = 15
+    nice_bin = shutil.which("nice")
+    if nice_bin:
+        return [nice_bin, "-n", str(niceness)] + inner
+    return inner
 
 
 def _kline_update_worker() -> None:
@@ -1150,7 +1168,7 @@ def _kline_update_worker() -> None:
             kline_update_state["message"] = "失败"
             return
         proc = subprocess.run(
-            [sys.executable, script, *_kline_update_subprocess_args()],
+            _kline_update_argv(script),
             cwd=BASE_DIR,
             capture_output=True,
             text=True,
@@ -1181,7 +1199,7 @@ def _kline_update_worker() -> None:
 @app.route("/admin/kline_update", methods=["POST"])
 @admin_required
 def admin_kline_update():
-    """触发服务器端 K 线缓存更新（异步；默认 2 并发、低磁盘压力，耗时可能较长）。"""
+    """触发服务器端 K 线缓存更新（异步；默认 1 并发、nice 降优先级，耗时较长）。"""
     with _kline_update_lock:
         if kline_update_state["running"]:
             return (

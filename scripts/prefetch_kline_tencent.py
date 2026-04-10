@@ -26,9 +26,9 @@ def main() -> None:
         help="K线缓存目录",
     )
     parser.add_argument("--count", type=int, default=500, help="每只股票拉取K线条数（足够覆盖到最新）")
-    parser.add_argument("--workers", type=int, default=3, help="并发数（低配机器建议 2～3）")
+    parser.add_argument("--workers", type=int, default=2, help="并发数（低配建议 1～2）")
     parser.add_argument("--max-age-days", type=int, default=0, help="缓存最大天数，0=强制刷新")
-    parser.add_argument("--pause", type=float, default=0.12, help="请求间隔秒数（越大越省磁盘与带宽）")
+    parser.add_argument("--pause", type=float, default=0.15, help="请求间隔秒数（越大越省磁盘与带宽）")
     parser.add_argument("--limit", type=int, default=0, help="限制更新数量，0=全部")
     args = parser.parse_args()
 

@@ -147,7 +147,16 @@ def main():
     parser.add_argument("--list", choices=["csv", "cache"], default="csv",
                         help="股票列表来源：csv=stock_list.csv，cache=已有缓存目录")
     args = parser.parse_args()
+    from app.kline_resource_lock import acquire_heavy_kline, release_heavy_kline
 
+    acquire_heavy_kline()
+    try:
+        return _kline_update_main_impl(args)
+    finally:
+        release_heavy_kline()
+
+
+def _kline_update_main_impl(args):
     cache_dir = os.path.join(GPT_DATA_DIR, "kline_cache_tencent")
     os.makedirs(cache_dir, exist_ok=True)
 

@@ -16,6 +16,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
+from app.kline_resource_lock import is_heavy_kline_running
 from app.scan_queue import list_pending_jobs, SCAN_QUEUE_DIR
 from app.scanner import ScanConfig
 
@@ -114,6 +115,9 @@ def main():
 
     def worker():
         while not stop.is_set():
+            if is_heavy_kline_running():
+                stop.wait(timeout=args.interval)
+                continue
             if run_one():
                 continue
             stop.wait(timeout=args.interval)

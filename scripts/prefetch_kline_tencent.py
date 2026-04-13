@@ -31,7 +31,16 @@ def main() -> None:
     parser.add_argument("--pause", type=float, default=0.15, help="请求间隔秒数（越大越省磁盘与带宽）")
     parser.add_argument("--limit", type=int, default=0, help="限制更新数量，0=全部")
     args = parser.parse_args()
+    from app.kline_resource_lock import acquire_heavy_kline, release_heavy_kline
 
+    acquire_heavy_kline()
+    try:
+        _prefetch_main_impl(args)
+    finally:
+        release_heavy_kline()
+
+
+def _prefetch_main_impl(args) -> None:
     stock_list = stock_items_from_list_csv(args.stock_list)
     if not stock_list:
         raise RuntimeError("股票列表为空")

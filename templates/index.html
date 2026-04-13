@@ -9,6 +9,11 @@
 <body>
   <div class="bg" aria-hidden="true"></div>
   <main class="container">
+    {% if scan_busy == 'kline' %}
+    <p style="margin:0 0 14px;padding:10px 14px;background:rgba(240,180,80,0.15);border:1px solid rgba(240,180,80,0.4);border-radius:10px;font-size:14px;color:var(--text)">
+      服务器正在批量更新 K 线数据，已暂时避免新扫描与队列任务争抢资源；请稍后再试「开始筛选」。
+    </p>
+    {% endif %}
     <header class="hero">
       <div>
         <p class="eyebrow">超短线 · 右侧强势</p>

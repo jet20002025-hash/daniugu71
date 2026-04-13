@@ -1232,12 +1232,24 @@ def index():
     meta = load_meta(uid)
     results = load_results(uid)
     state = get_user_status(uid) if uid else scan_state
-    return render_template("index.html", meta=meta, results=results, state=state, user=g.current_user)
+    scan_busy = request.args.get("scan_busy")
+    return render_template(
+        "index.html",
+        meta=meta,
+        results=results,
+        state=state,
+        user=g.current_user,
+        scan_busy=scan_busy,
+    )
 
 
 @app.route("/scan", methods=["POST"])
 @subscription_required
 def scan():
+    from app.kline_resource_lock import is_heavy_kline_running
+
+    if is_heavy_kline_running():
+        return redirect(url_for("index", scan_busy="kline"))
     user_id = g.current_user.id
     if USE_SCAN_QUEUE:
         # 加入队列，由独立 worker 执行；同一时刻一个任务：先取消上一轮并清空旧任务，再入队新任务

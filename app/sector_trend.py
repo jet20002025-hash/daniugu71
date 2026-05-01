@@ -503,3 +503,288 @@ def sector_fund_flow_score_delta(
     if delta < -max_abs_points:
         return -max_abs_points
     return delta
+
+
+def load_stock_concepts(code: str, cache_dir: str) -> List[str]:
+    """
+    从缓存读取个股所属概念列表（不发起网络请求）。
+    约定路径：{cache_dir}/concept/{code}.json，内容形如 {"code":"000001","concepts":["AIGC概念",...]}
+    无文件或解析失败则返回 []。
+    """
+    code = str(code).strip().zfill(6)
+    path = os.path.join(cache_dir, "concept", f"{code}.json")
+    if not os.path.isfile(path):
+        return []
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            raw = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return []
+    concepts = raw.get("concepts") if isinstance(raw, dict) else None
+    if not isinstance(concepts, list):
+        return []
+    out: List[str] = []
+    seen = set()
+    for x in concepts:
+        s = str(x or "").strip()
+        if s and s not in seen:
+            out.append(s)
+            seen.add(s)
+    return out
+
+
+def _list_dates_leq(dir_path: str, as_of_date: str, max_n: int) -> List[str]:
+    if not os.path.isdir(dir_path):
+        return []
+    try:
+        names = [n for n in os.listdir(dir_path) if n.endswith(".json")]
+    except OSError:
+        return []
+    ds: List[str] = []
+    for n in names:
+        d = n[:-5].strip()[:10]
+        if len(d) == 10 and d <= as_of_date[:10]:
+            ds.append(d)
+    ds.sort(reverse=True)
+    return list(reversed(ds[: max(0, int(max_n))]))
+
+
+def concept_flow_best_rank_rolling(
+    ak_base: str,
+    as_of_date: str,
+    concepts: List[str],
+    window_days: int = 5,
+) -> Optional[int]:
+    """
+    概念板块“主力净流入”滚动排名（仅用 as_of_date 当日及之前的快照，无未来数据）。
+    - 快照目录：{ak_base}/concept_flow_rank_em/{YYYY-MM-DD}.json
+      格式：{"date": "...", "data_source":"eastmoney_push2", "items":[{"name","net_main",...}, ...]}
+    - 对 window_days 内每个概念累计 net_main（数值越大越靠前），再取 concepts 中“最好(最靠前)”的排名。
+    返回：排名（1=最好）或 None（数据不足/概念为空）。
+    """
+    if not concepts:
+        return None
+    window_days = max(1, int(window_days or 1))
+    dir_path = os.path.join(ak_base, "concept_flow_rank_em")
+    dates = _list_dates_leq(dir_path, as_of_date, window_days)
+    if len(dates) < window_days:
+        return None
+
+    # concept -> sum(net_main)
+    sums: Dict[str, float] = {}
+    for d in dates:
+        p = os.path.join(dir_path, f"{d}.json")
+        try:
+            with open(p, "r", encoding="utf-8") as f:
+                blob = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            return None
+        items = blob.get("items") if isinstance(blob, dict) else None
+        if not isinstance(items, list):
+            return None
+        for it in items:
+            if not isinstance(it, dict):
+                continue
+            nm = str(it.get("name") or "").strip()
+            if not nm:
+                continue
+            try:
+                v = float(it.get("net_main", 0) or 0.0)
+            except Exception:
+                v = 0.0
+            sums[nm] = sums.get(nm, 0.0) + v
+
+    if not sums:
+        return None
+
+    ranked = sorted(sums.items(), key=lambda x: (-x[1], x[0]))
+    rank_map = {name: i + 1 for i, (name, _) in enumerate(ranked)}
+    best: Optional[int] = None
+    for c in concepts:
+        r = rank_map.get(str(c).strip())
+        if r is None:
+            continue
+        best = r if best is None else min(best, r)
+    return best
+
+
+def concept_rank_score_bonus(
+    best_rank: Optional[int],
+    *,
+    max_bonus: int = 6,
+    top10_bonus: int = 6,
+    top20_bonus: int = 4,
+    top50_bonus: int = 2,
+) -> int:
+    """
+    把“概念资金滚动最好排名”转成加分（越靠前加分越多）。
+    """
+    if best_rank is None:
+        return 0
+    try:
+        r = int(best_rank)
+    except Exception:
+        return 0
+    if r <= 0:
+        return 0
+    if r <= 10:
+        return min(max_bonus, int(top10_bonus))
+    if r <= 20:
+        return min(max_bonus, int(top20_bonus))
+    if r <= 50:
+        return min(max_bonus, int(top50_bonus))
+    return 0
+
+
+def _normalize_sector_name(name: str) -> str:
+    """用于行业名与东财板块名的弱匹配（不追求完美，只避免常见标点/后缀差异）。"""
+    if not name:
+        return ""
+    s = str(name).strip()
+    for token in ["行业", "板块", "概念", "指数", "类", "Ⅱ", "Ⅰ", "Ⅲ", "Ⅳ", "Ⅴ", "Ⅵ"]:
+        s = s.replace(token, "")
+    for token in [" ", "_", "-", "/", "\\", "（", "）", "(", ")", "·", "—", "－"]:
+        s = s.replace(token, "")
+    return s.lower()
+
+
+def eastmoney_industry_flow_rank_today(
+    ak_base: str,
+    as_of_date: str,
+    industry_name: Optional[str],
+    top_n: int = 10,
+) -> Optional[int]:
+    """
+    读取当日东财板块资金 TopN（由 scripts/fetch_board_flow_top10_em.py 生成），
+    若 industry_name 命中则返回其排名（1=最好），否则 None。
+    """
+    if not industry_name:
+        return None
+    d = str(as_of_date).strip()[:10]
+    path = os.path.join(ak_base, f"eastmoney_board_flow_top10_industry_{d}.json")
+    if not os.path.isfile(path):
+        return None
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            blob = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return None
+    items = blob.get("items") if isinstance(blob, dict) else None
+    if not isinstance(items, list):
+        return None
+    want = _normalize_sector_name(str(industry_name))
+    if not want:
+        return None
+    for idx, it in enumerate(items[: max(1, int(top_n))], start=1):
+        if not isinstance(it, dict):
+            continue
+        nm = str(it.get("name") or "").strip()
+        if not nm:
+            continue
+        got = _normalize_sector_name(nm)
+        if got == want or (want and got and (want in got or got in want)):
+            return idx
+    return None
+
+
+def eastmoney_industry_flow_bonus(rank: Optional[int], *, bonus: int = 3) -> int:
+    """命中当日东财资金 TopN 行业则加分。"""
+    if rank is None:
+        return 0
+    try:
+        r = int(rank)
+    except Exception:
+        return 0
+    if r <= 0:
+        return 0
+    return int(bonus)
+
+
+def eastmoney_industry_flow_rank_rolling(
+    ak_base: str,
+    as_of_date: str,
+    industry_name: Optional[str],
+    *,
+    days: int = 10,
+    top_n: int = 5,
+    max_items_per_day: int = 400,
+) -> Optional[int]:
+    """
+    东财行业资金「滚动N日」TopN 排名（1=最好）。
+
+    数据依赖你每天落一份快照：
+    - 目录：{ak_base}/industry_flow_rank_em/{YYYY-MM-DD}.json
+    - 由 scripts/industry_flow_10d_top5_em.py 生成（或自行生成同格式文件）
+
+    计算方式：
+    - 取 as_of_date 当天及之前的最近 days 个“有快照的日期”
+    - 对每个行业累加 net_main（主力净流入 f62）
+    - 排序后返回 industry_name 的名次（弱匹配）
+    """
+    if not industry_name:
+        return None
+    want = _normalize_sector_name(str(industry_name))
+    if not want:
+        return None
+
+    d = str(as_of_date).strip()[:10]
+    dir_path = os.path.join(ak_base, "industry_flow_rank_em")
+    if not os.path.isdir(dir_path):
+        return None
+
+    files: List[str] = []
+    try:
+        for fn in os.listdir(dir_path):
+            if not fn.endswith(".json"):
+                continue
+            if len(fn) >= 15:
+                ds = fn[:10]
+                if ds <= d:
+                    files.append(os.path.join(dir_path, fn))
+    except OSError:
+        return None
+    files.sort()
+    if not files:
+        return None
+
+    picked = files[-max(1, int(days)) :]
+    agg: Dict[str, float] = {}
+    name_by_code: Dict[str, str] = {}
+    for fp in picked:
+        try:
+            with open(fp, "r", encoding="utf-8") as f:
+                blob = json.load(f)
+        except (OSError, json.JSONDecodeError):
+            continue
+        items = blob.get("items") if isinstance(blob, dict) else None
+        if not isinstance(items, list):
+            continue
+        if max_items_per_day and len(items) > int(max_items_per_day):
+            items = items[: int(max_items_per_day)]
+        for it in items:
+            if not isinstance(it, dict):
+                continue
+            code = str(it.get("code") or "").strip()
+            nm = str(it.get("name") or "").strip()
+            if not code:
+                continue
+            net = 0.0
+            try:
+                net = float(it.get("net_main") or 0.0)
+            except Exception:
+                net = 0.0
+            agg[code] = float(agg.get(code, 0.0)) + float(net)
+            if nm and (code not in name_by_code):
+                name_by_code[code] = nm
+
+    if not agg:
+        return None
+
+    ranked = sorted(agg.items(), key=lambda x: (-float(x[1]), x[0]))
+    top = ranked[: max(1, int(top_n))]
+    for idx, (code, _) in enumerate(top, start=1):
+        nm = name_by_code.get(code, code)
+        got = _normalize_sector_name(nm)
+        if got == want or (want and got and (want in got or got in want)):
+            return idx
+    return None

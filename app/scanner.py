@@ -86,6 +86,23 @@ class ScanConfig:
     mode9_industry_ndays_bonus_per_unit: int = 5  # 累计家次每满 per_unit 加 1 分
     mode9_industry_ndays_bonus_cap: int = 8
 
+    # 东财：当日主力净流入TopN行业命中加分（需提前生成快照文件）
+    em_industry_flow_top_n: int = 10
+    em_industry_flow_bonus: int = 3
+
+    # mode5：涨停锚点 + 缩量（相对涨停次日量）+ 涨停后至信号日低点≥MA10 + 信号日MA20向上 + 半年线之上
+    mode5_shrink_max_days: int = 5
+    mode5_half_year_bars: int = 120
+
+    # mode93：低位(120日最低点出现在近10天) → 次日放量≥3倍且涨停 → 回调到涨停日最低价附近
+    mode93_lookback_days: int = 20
+    mode93_low_window: int = 120
+    mode93_low_recent_days: int = 10
+    mode93_vol_mult: float = 3.0
+    mode93_pullback_min: float = 0.95
+    mode93_pullback_max: float = 1.05
+    mode93_pullback_max_days: int = 20
+
 
 def _normalize_code(code: str) -> str:
     value = str(code or "").strip()
@@ -804,6 +821,371 @@ def _mode9_signals(
 ) -> List[int]:
     """mode9：与 mode3（71倍）完全一致的信号逻辑，复制一份便于独立调参或扩展。"""
     return _mode3_signals(rows, start_date, end_date)
+
+
+def _limit_up_day(rows: List[KlineRow], i: int, code: str, name: str) -> bool:
+    """按 ST/板块涨停幅度判断第 i 日是否涨停。"""
+    if i < 0 or i >= len(rows):
+        return False
+    rate = _limit_rate(code, name)
+    limit_up = (rate * 100) - 0.5
+    return float(rows[i].pct_chg) >= float(limit_up)
+
+
+def _mode5_lows_on_or_above_ma10(
+    rows: List[KlineRow],
+    limit_idx: int,
+    until_idx: int,
+    ma10: np.ndarray,
+) -> bool:
+    """从涨停次日至 until_idx（含），每日最低价不得低于当日 MA10。"""
+    if limit_idx < 0 or until_idx >= len(rows) or until_idx < limit_idx + 1:
+        return False
+    for j in range(limit_idx + 1, until_idx + 1):
+        m = ma10[j]
+        if np.isnan(m):
+            return False
+        if float(rows[j].low) < float(m):
+            return False
+    return True
+
+
+def _mode5_anchor_detail(
+    rows: List[KlineRow],
+    s_idx: int,
+    code: str,
+    name: str,
+    *,
+    shrink_max_days: int = 5,
+    half_year_bars: int = 120,
+) -> Optional[Tuple[int, float, float]]:
+    """
+    mode5 单点判定（信号日 s_idx）：
+    - 收盘在半年线（MA half_year_bars）之上；
+    - 信号日 MA20 向上（MA20[s] > MA20[s-1]）；
+    - 存在涨停日 T，使 s ∈ [T+2, T+shrink_max_days]；
+    - 成交量：vol[s] < vol[T+1]/2（基准为涨停次日量）；
+    - 从涨停次日至信号日：low 不低于当日 MA10。
+    返回 (T, 涨停次日成交量, vol[s]/vol[T+1])；否则 None。
+    """
+    if s_idx < half_year_bars or s_idx >= len(rows):
+        return None
+    close = np.array([r.close for r in rows], dtype=float)
+    vol = np.array([r.volume for r in rows], dtype=float)
+    ma10 = _moving_mean(close, 10)
+    ma20 = _moving_mean(close, 20)
+    ma_h = _moving_mean(close, half_year_bars)
+    if np.isnan(ma_h[s_idx]) or close[s_idx] <= ma_h[s_idx]:
+        return None
+    if (
+        s_idx < 1
+        or np.isnan(ma20[s_idx])
+        or np.isnan(ma20[s_idx - 1])
+        or ma20[s_idx] <= ma20[s_idx - 1]
+    ):
+        return None
+
+    # 取 [s-shrink_max_days, s-2] 内最早满足条件的涨停日 T
+    for T in range(s_idx - shrink_max_days, s_idx - 1):
+        if T < 0:
+            continue
+        if not _limit_up_day(rows, T, code, name):
+            continue
+        if s_idx < T + 2 or s_idx > T + shrink_max_days:
+            continue
+        if T + 1 >= len(rows):
+            continue
+        v_ref = vol[T + 1]
+        if v_ref <= 0:
+            continue
+        if vol[s_idx] >= v_ref * 0.5:
+            continue
+        if not _mode5_lows_on_or_above_ma10(rows, T, s_idx, ma10):
+            continue
+        return (T, float(v_ref), float(vol[s_idx] / v_ref))
+    return None
+
+
+def _mode93_anchor_detail(
+    rows: List[KlineRow],
+    s_idx: int,
+    code: str,
+    name: str,
+    *,
+    lookback_days: int = 20,
+    low_window: int = 120,
+    low_recent_days: int = 10,
+    vol_mult: float = 3.0,
+    pullback_min: float = 0.99,
+    pullback_max: float = 1.02,
+    pullback_max_days: int = 20,
+) -> Optional[Dict[str, float]]:
+    """
+    mode93 单点判定（信号日 s_idx）：
+    - 在最近 lookback_days 内，存在“低位放量涨停”事件：低位=近 low_recent_days 天出现 low_window 日最低点；
+    - 最低点次日：成交量放大 ≥ vol_mult 倍，且当日涨停；
+    - 涨停日最低价记为 A；信号日收盘价落在 [pullback_min*A, pullback_max*A]；
+    - 信号日距离涨停日不超过 pullback_max_days。
+
+    返回关键指标用于 reasons/metrics（否则 None）。
+    """
+    n = len(rows)
+    if s_idx <= 0 or s_idx >= n:
+        return None
+    lookback_days = max(5, int(lookback_days))
+    low_window = max(30, int(low_window))
+    low_recent_days = max(2, int(low_recent_days))
+    pullback_max_days = max(3, int(pullback_max_days))
+    vol_mult = float(vol_mult or 0.0)
+    if vol_mult <= 1.0:
+        vol_mult = 3.0
+
+    close = np.array([r.close for r in rows], dtype=float)
+    low = np.array([r.low for r in rows], dtype=float)
+    vol = np.array([r.volume for r in rows], dtype=float)
+
+    # 先检查信号日回调区间（针对每个候选涨停日不同 A）
+    s_close = float(close[s_idx])
+    if not (s_close > 0):
+        return None
+
+    start = max(low_window, s_idx - lookback_days - pullback_max_days - 2)
+    end = s_idx - 1
+    if end < start:
+        return None
+
+    # 在 [start, end] 内找候选“涨停放量日”（即最低点次日）
+    for limit_idx in range(max(start + 1, s_idx - pullback_max_days), end + 1):
+        if limit_idx <= 0 or limit_idx >= n:
+            continue
+        # 低位：涨停日前 low_recent_days 天内，出现 low_window 日最低点（最低点日不要求紧挨涨停前一天）
+        # 例如 low_recent_days=10：则 [limit_idx-9, limit_idx] 这10天内只要有一天是120日最低即可
+        recent_start = max(low_window - 1, limit_idx - (low_recent_days - 1))
+        recent_end = limit_idx
+        if recent_end - recent_start + 1 < 2:
+            continue
+        is_low = False
+        low_120 = float("nan")
+        low_day_idx = None
+        for j in range(recent_start, recent_end + 1):
+            if j < low_window - 1:
+                continue
+            low_120_j = float(np.nanmin(low[j - low_window + 1 : j + 1]))
+            if not (low_120_j > 0):
+                continue
+            # j 当天 low 接近该 120 日窗口最低
+            if abs(float(low[j]) - low_120_j) / low_120_j <= 0.0008:
+                is_low = True
+                low_120 = low_120_j
+                low_day_idx = j
+                break
+        if not is_low or low_day_idx is None:
+            continue
+
+        # 次日放量 >= vol_mult 倍
+        # 仍按“涨停日相对前一日”放量（符合“第二天突然放大”）
+        base_idx = limit_idx - 1
+        v0 = float(vol[base_idx])
+        v1 = float(vol[limit_idx])
+        if not (v0 > 0 and v1 > 0):
+            continue
+        if v1 < v0 * vol_mult:
+            continue
+
+        # 次日涨停
+        if not _limit_up_day(rows, limit_idx, code, name):
+            continue
+
+        # 信号日回调到涨停日最低价 A 附近
+        A = float(rows[limit_idx].low)
+        if not (A > 0):
+            continue
+        lo = A * float(pullback_min)
+        hi = A * float(pullback_max)
+        if not (lo <= s_close <= hi):
+            continue
+
+        # 回调期间“慢慢回调”的弱约束：从涨停次日至信号日，收盘不得大幅跌破 A（避免破位太深）
+        if np.nanmin(close[limit_idx + 1 : s_idx + 1]) < A * 0.92:
+            continue
+
+        return {
+            "base_low": float(low_120),
+            "base_idx": float(low_day_idx),
+            "limit_idx": float(limit_idx),
+            "A": float(A),
+            "vol_mult": float(v1 / v0),
+            "pullback_pct": float((s_close - A) / A * 100.0),
+        }
+    return None
+
+
+def _mode93_signals(
+    rows: List[KlineRow],
+    start_date: Optional[str],
+    end_date: Optional[str],
+    *,
+    lookback_days: int = 20,
+    low_window: int = 120,
+    low_recent_days: int = 10,
+    vol_mult: float = 3.0,
+    pullback_min: float = 0.99,
+    pullback_max: float = 1.02,
+    pullback_max_days: int = 20,
+) -> List[int]:
+    if not rows or len(rows) < max(200, low_window + 10):
+        return []
+    # 日期过滤：沿用 mode3 等模式的做法（通过 rows[i].date 直接比字符串前10位）
+    st = str(start_date).strip()[:10] if start_date else ""
+    ed = str(end_date).strip()[:10] if end_date else ""
+    signals: List[int] = []
+    for i in range(low_window + 5, len(rows)):
+        d = str(rows[i].date)[:10]
+        if st and d < st:
+            continue
+        if ed and d > ed:
+            continue
+        det = _mode93_anchor_detail(
+            rows,
+            i,
+            code="",  # 占位：真正判断涨停需要 code/name，在 scan_with_mode3 内会传入
+            name="",
+            lookback_days=lookback_days,
+            low_window=low_window,
+            low_recent_days=low_recent_days,
+            vol_mult=vol_mult,
+            pullback_min=pullback_min,
+            pullback_max=pullback_max,
+            pullback_max_days=pullback_max_days,
+        )
+        # 这里无法判涨停（缺 code/name），因此 signals 由 scan_with_mode3 内再判定更合理
+        # 保留占位，避免被误用；实际 scan_with_mode3 会走 _mode93_anchor_detail 完整判定
+        if det:
+            signals.append(i)
+    return signals
+
+
+def _score_mode93(
+    rows: List[KlineRow],
+    idx: int,
+    ma10: np.ndarray,
+    ma20: np.ndarray,
+    ma60: np.ndarray,
+    vol20: np.ndarray,
+    code: str = "",
+    name: str = "",
+    breakdown: Optional[List[Tuple[str, int]]] = None,
+    *,
+    lookback_days: int = 20,
+    low_window: int = 120,
+    low_recent_days: int = 10,
+    vol_mult: float = 3.0,
+    pullback_min: float = 0.99,
+    pullback_max: float = 1.02,
+    pullback_max_days: int = 20,
+) -> int:
+    """mode93 评分（0~100）：量比越大越好、回调越贴近A越好。"""
+    _ = (ma10, ma20, ma60, vol20)  # 与其他 score_fn 签名保持一致；mode93 自身不依赖这些数组
+    det = _mode93_anchor_detail(
+        rows,
+        idx,
+        code,
+        name,
+        lookback_days=lookback_days,
+        low_window=low_window,
+        low_recent_days=low_recent_days,
+        vol_mult=vol_mult,
+        pullback_min=pullback_min,
+        pullback_max=pullback_max,
+        pullback_max_days=pullback_max_days,
+    )
+    if not det:
+        return 0
+    vmult = float(det.get("vol_mult") or 0.0)
+    pull = float(det.get("pullback_pct") or 0.0)
+    A = float(det.get("A") or 0.0)
+
+    score = 70
+    score += int(min(18.0, max(0.0, (vmult - float(vol_mult)) * 5.0)))
+    score += int(min(12.0, max(0.0, (2.0 - abs(pull)) * 6.0)))
+    score = int(max(0, min(100, score)))
+
+    if breakdown is not None:
+        breakdown.append(
+            (f"低位{low_window}日最低(近{low_recent_days}日)→次日放量涨停(量比{vmult:.2f}x)", 0)
+        )
+        breakdown.append((f"回调到涨停日低点A附近(A={A:.2f},偏离{pull:.2f}%)", 0))
+    return int(score)
+
+def _mode5_signals(
+    rows: List[KlineRow],
+    start_date: Optional[str],
+    end_date: Optional[str],
+    code: str,
+    name: str,
+    *,
+    shrink_max_days: int = 5,
+    half_year_bars: int = 120,
+) -> List[int]:
+    out: List[int] = []
+    need = half_year_bars + 2
+    if len(rows) < need:
+        return out
+    start_dt = _parse_date(start_date)
+    end_dt = _parse_date(end_date)
+    for s_idx in range(half_year_bars, len(rows)):
+        if start_dt or end_dt:
+            try:
+                row_dt = datetime.strptime(rows[s_idx].date, "%Y-%m-%d").date()
+            except Exception:
+                continue
+            if start_dt and row_dt < start_dt:
+                continue
+            if end_dt and row_dt > end_dt:
+                continue
+        if _mode5_anchor_detail(
+            rows,
+            s_idx,
+            code,
+            name,
+            shrink_max_days=shrink_max_days,
+            half_year_bars=half_year_bars,
+        ):
+            out.append(s_idx)
+    return out
+
+
+def _score_mode5(
+    rows: List[KlineRow],
+    idx: int,
+    ma10: np.ndarray,
+    ma20: np.ndarray,
+    ma60: np.ndarray,
+    vol20: np.ndarray,
+    code: str = "",
+    name: str = "",
+    shrink_max_days: int = 5,
+    half_year_bars: int = 120,
+) -> int:
+    det = _mode5_anchor_detail(
+        rows,
+        idx,
+        code,
+        name,
+        shrink_max_days=shrink_max_days,
+        half_year_bars=half_year_bars,
+    )
+    if det is None:
+        return 0
+    _T, _v_ref, ratio = det
+    base = 75
+    if ratio < 0.25:
+        base += 10
+    elif ratio < 0.35:
+        base += 6
+    elif ratio < 0.45:
+        base += 3
+    return int(min(100, base))
 
 
 def _mode8_signals(
@@ -1913,14 +2295,21 @@ def scan_with_mode3(
     use_mode12: bool = False,
     use_mode18: bool = False,
     use_mode88: bool = False,
+    use_mode5: bool = False,
+    use_mode93: bool = False,
     sector_ak_cache_dir: Optional[str] = None,
     sector_fund_flow_max_points: int = 5,
     sector_fund_flow_yi_per_point: float = 3.0,
 ) -> List[ScanResult]:
-    """use_mode8/9/90/10/11/12/18/88；mode18 为周线 MACD 金叉；mode88 为吸筹→洗盘→震仓→拉升。"""
+    """use_mode5/8/9/90/10/11/12/18/88/93；mode5 为涨停后缩量模型。"""
     results: List[ScanResult] = []
     from .paths import GPT_DATA_DIR
     from .sector_trend import (
+        concept_flow_best_rank_rolling,
+        concept_rank_score_bonus,
+        eastmoney_industry_flow_bonus,
+        eastmoney_industry_flow_rank_today,
+        load_stock_concepts,
         merge_ths_flow_features,
         metrics_for_signal,
         parse_ths_flow_net_yi,
@@ -2010,6 +2399,16 @@ def scan_with_mode3(
         )
         score_fn = _score_mode88
         mode_label = "mode88"
+    elif use_mode5:
+        # mode5 的 signals 需要 code/name，因此在循环里逐只调用 _mode5_signals
+        signal_fn = _mode3_signals
+        score_fn = _score_mode5
+        mode_label = "mode5"
+    elif use_mode93:
+        # mode93 的 signals 同样需要 code/name，因此在循环里逐只调用 _mode93_anchor_detail
+        signal_fn = _mode3_signals
+        score_fn = _score_mode93
+        mode_label = "mode93"
     elif use_mode90:
         signal_fn = _mode9_signals
         macd_norm_factor = getattr(config, "macd_norm_factor", 1.0)
@@ -2087,6 +2486,8 @@ def scan_with_mode3(
     ndays_unit = int(getattr(config, "mode9_industry_ndays_bonus_per_unit", 5) or 5)
     ndays_cap_cfg = int(getattr(config, "mode9_industry_ndays_bonus_cap", 8) or 8)
     ndays_cache: Dict[str, Tuple[Dict[str, int], bool]] = {}
+    em_top_n = int(getattr(config, "em_industry_flow_top_n", 10) or 10)
+    em_bonus = int(getattr(config, "em_industry_flow_bonus", 3) or 0)
 
     for item in stock_list:
         if _is_st(item.name or ""):
@@ -2117,7 +2518,27 @@ def scan_with_mode3(
                 )
         except Exception:
             rows = None
-        min_rows = max(80, mode8_n_bars) if use_mode8 else (100 if (use_mode10 or use_mode11 or use_mode12) else (260 if use_mode88 else (200 if use_mode18 else 80)))
+        min_rows = max(80, mode8_n_bars) if use_mode8 else (
+            100
+            if (use_mode10 or use_mode11 or use_mode12)
+            else (
+                260
+                if use_mode88
+                else (
+                    200
+                    if use_mode18
+                    else (
+                        max(130, int(getattr(config, "mode5_half_year_bars", 120)) + 5)
+                        if use_mode5
+                        else (
+                            max(160, int(getattr(config, "mode93_low_window", 120)) + 10)
+                            if use_mode93
+                            else 80
+                        )
+                    )
+                )
+            )
+        )
         if not rows or len(rows) < min_rows:
             continue
 
@@ -2145,7 +2566,52 @@ def scan_with_mode3(
             if min_low > 0 and max_high / min_low >= config.year_high_low_ratio_limit:
                 continue
 
-        signals = signal_fn(rows, start_date, end_date)
+        if use_mode5:
+            m5_shrink_d = max(3, int(getattr(config, "mode5_shrink_max_days", 5) or 5))
+            m5_hb = max(60, int(getattr(config, "mode5_half_year_bars", 120) or 120))
+            signals = _mode5_signals(
+                rows,
+                start_date,
+                end_date,
+                item.code,
+                item.name,
+                shrink_max_days=m5_shrink_d,
+                half_year_bars=m5_hb,
+            )
+        elif use_mode93:
+            # mode93: 逐点判定（需要 code/name + 参数）
+            m93_lookback = int(getattr(config, "mode93_lookback_days", 20) or 20)
+            m93_low_win = int(getattr(config, "mode93_low_window", 120) or 120)
+            m93_low_recent = int(getattr(config, "mode93_low_recent_days", 3) or 3)
+            m93_vol_mult = float(getattr(config, "mode93_vol_mult", 3.0) or 3.0)
+            m93_pb_min = float(getattr(config, "mode93_pullback_min", 0.99) or 0.99)
+            m93_pb_max = float(getattr(config, "mode93_pullback_max", 1.02) or 1.02)
+            m93_pb_days = int(getattr(config, "mode93_pullback_max_days", 20) or 20)
+            st = str(start_date).strip()[:10] if start_date else ""
+            ed = str(end_date).strip()[:10] if end_date else ""
+            signals = []
+            for i in range(max(m93_low_win + 5, 5), len(rows)):
+                d = str(rows[i].date)[:10]
+                if st and d < st:
+                    continue
+                if ed and d > ed:
+                    continue
+                if _mode93_anchor_detail(
+                    rows,
+                    i,
+                    item.code,
+                    item.name,
+                    lookback_days=m93_lookback,
+                    low_window=m93_low_win,
+                    low_recent_days=m93_low_recent,
+                    vol_mult=m93_vol_mult,
+                    pullback_min=m93_pb_min,
+                    pullback_max=m93_pb_max,
+                    pullback_max_days=m93_pb_days,
+                ):
+                    signals.append(i)
+        else:
+            signals = signal_fn(rows, start_date, end_date)
         if cutoff_date and not start_date:
             signals = [s for s in signals if rows[s].date == cutoff_date]
         if not start_date and not cutoff_date and signals:
@@ -2262,6 +2728,19 @@ def scan_with_mode3(
                     mode9_industry_ndays_bonus_per_unit=ndays_unit,
                     mode9_industry_ndays_bonus_cap=ndays_cap_cfg,
                 )
+            elif use_mode5:
+                score = _score_mode5(
+                    rows,
+                    idx,
+                    ma10,
+                    ma20,
+                    ma60,
+                    vol20,
+                    item.code,
+                    item.name,
+                    int(getattr(config, "mode5_shrink_max_days", 5) or 5),
+                    int(getattr(config, "mode5_half_year_bars", 120) or 120),
+                )
             elif (
                 (use_mode9 and score_fn is _score_mode9)
                 or (use_mode8 and score_fn is _score_mode8)
@@ -2270,6 +2749,7 @@ def scan_with_mode3(
                 or (use_mode12 and score_fn is _score_mode12)
                 or (use_mode18 and score_fn is _score_mode18)
                 or (use_mode88 and score_fn is _score_mode88)
+        or (use_mode93 and score_fn is _score_mode93)
             ):
                 if use_mode9 and score_fn is _score_mode9:
                     score = score_fn(
@@ -2332,6 +2812,38 @@ def scan_with_mode3(
                         score = min(100, int(score) + fd)
                         sector_sm["sector_fund_flow_net_yi"] = net_yi
                         sector_sm["sector_fund_flow_score_delta"] = fd
+
+                # 概念板块资金（东财 push2 快照 → 近5/10天滚动最好排名）
+                if use_mode90 or (use_mode9 and score_fn is _score_mode9):
+                    concepts = load_stock_concepts(item.code, sector_dir)
+                    if concepts:
+                        r5 = concept_flow_best_rank_rolling(
+                            sector_dir, rows[idx].date, concepts, window_days=5
+                        )
+                        r10 = concept_flow_best_rank_rolling(
+                            sector_dir, rows[idx].date, concepts, window_days=10
+                        )
+                        sector_sm["concepts"] = concepts[:12]
+                        sector_sm["concept_flow_best_rank_5d"] = r5
+                        sector_sm["concept_flow_best_rank_10d"] = r10
+                        rb = r10 if r10 is not None else r5
+                        cb = concept_rank_score_bonus(rb)
+                        if cb:
+                            score = min(100, int(score) + int(cb))
+                            sector_sm["concept_flow_score_bonus"] = int(cb)
+
+                # 东财当日行业资金TopN（需 scripts/fetch_board_flow_top10_em.py 预先落盘）
+                if em_bonus and em_top_n > 0 and (use_mode90 or (use_mode9 and score_fn is _score_mode9)):
+                    ind = sector_sm.get("industry")
+                    rk_em = eastmoney_industry_flow_rank_today(
+                        sector_dir, rows[idx].date, str(ind) if ind else None, top_n=em_top_n
+                    )
+                    if rk_em is not None:
+                        sector_sm["em_industry_flow_rank"] = int(rk_em)
+                        b = eastmoney_industry_flow_bonus(rk_em, bonus=em_bonus)
+                        if b:
+                            score = min(100, int(score) + int(b))
+                            sector_sm["em_industry_flow_bonus"] = int(b)
 
             if score < config.min_score:
                 continue
@@ -2396,6 +2908,19 @@ def scan_with_mode3(
             rk = sector_sm.get("sector_flow_rank")
             if rk is not None:
                 reasons.append(f"行业净流入排行 约第{rk}名（快照）")
+            if sector_sm.get("em_industry_flow_rank") is not None:
+                reasons.append(
+                    f"东财行业资金Top{em_top_n} 命中第{int(sector_sm['em_industry_flow_rank'])}名 评分{int(sector_sm.get('em_industry_flow_bonus') or 0):+d}"
+                )
+            if sector_sm.get("concept_flow_best_rank_10d") is not None or sector_sm.get("concept_flow_best_rank_5d") is not None:
+                r10 = sector_sm.get("concept_flow_best_rank_10d")
+                r5 = sector_sm.get("concept_flow_best_rank_5d")
+                if r10 is not None:
+                    reasons.append(f"概念资金10日滚动最好排名 第{int(r10)}名")
+                elif r5 is not None:
+                    reasons.append(f"概念资金5日滚动最好排名 第{int(r5)}名")
+            if sector_sm.get("concept_flow_score_bonus"):
+                reasons.append(f"概念资金加分 {int(sector_sm['concept_flow_score_bonus']):+d}")
             if sector_sm.get("ths_flow_rank_5d") is not None:
                 t5 = sector_sm["ths_flow_rank_5d"]
                 reasons.append(f"同花顺行业资金5日榜 第{t5}名")
@@ -2482,6 +3007,12 @@ def scan_with_mode3(
                 "industry_ret10",
                 "industry_ret20",
                 "sector_flow_rank",
+                "concepts",
+                "concept_flow_best_rank_5d",
+                "concept_flow_best_rank_10d",
+                "concept_flow_score_bonus",
+                "em_industry_flow_rank",
+                "em_industry_flow_bonus",
                 "ths_flow_rank_1d",
                 "ths_flow_rank_5d",
                 "ths_flow_rank_10d",

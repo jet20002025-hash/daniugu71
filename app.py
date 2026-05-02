@@ -786,6 +786,7 @@ def run_mode3_scan(
     use_mode11: bool = False,
     use_mode12: bool = False,
     use_mode93: bool = False,
+    use_mode98: bool = False,
     user_id: Optional[int] = None,
     throttle_free_user: bool = False,
 ) -> None:
@@ -896,6 +897,9 @@ def run_mode3_scan(
             else:
                 cap_note = f"，市值≤{config.max_market_cap / 1e8:.0f}亿"
         mode_label = (
+            "mode98"
+            if use_mode98
+            else (
             "mode93"
             if use_mode93
             else (
@@ -930,6 +934,7 @@ def run_mode3_scan(
                         )
                     )
                 )
+            )
             )
         )
         _emit({"message": f"加载{mode_label}，开始筛选（{provider_label}）{cap_note}"})
@@ -969,6 +974,7 @@ def run_mode3_scan(
             use_mode11=use_mode11,
             use_mode12=use_mode12,
             use_mode93=use_mode93,
+            use_mode98=use_mode98,
         )
         if model_tag_override:
             model_tag = model_tag_override
@@ -984,6 +990,8 @@ def run_mode3_scan(
             model_tag = "mode90"
         elif use_mode9:
             model_tag = "mode9"
+        elif use_mode98:
+            model_tag = "mode98"
         elif use_mode93:
             model_tag = "mode93"
         elif mode4_filters:
@@ -1296,7 +1304,7 @@ def scan():
         request_cancel(user_id)
         clear_pending_jobs(user_id)
         mode = request.form.get("mode", "mode9")
-        if mode not in ("mode3", "mode3ok", "mode3_avoid", "mode3_upper", "mode3_upper_strict", "mode3_upper_near", "mode4", "mode8", "mode9", "mode10", "mode11", "mode12", "mode90", "mode93"):
+        if mode not in ("mode3", "mode3ok", "mode3_avoid", "mode3_upper", "mode3_upper_strict", "mode3_upper_near", "mode4", "mode8", "mode9", "mode10", "mode11", "mode12", "mode90", "mode93", "mode98"):
             mode = "mode9"
         cutoff_date = request.form.get("cutoff_date") or None
         start_date = request.form.get("start_date") or None
@@ -1336,7 +1344,7 @@ def scan():
     # 不排队：点击即在本进程起线程扫描；先发取消标记中断上一轮，再启动新任务
     request_cancel(user_id)
     mode = request.form.get("mode", "mode9")
-    if mode not in ("mode3", "mode3ok", "mode3_avoid", "mode3_upper", "mode3_upper_strict", "mode3_upper_near", "mode4", "mode8", "mode9", "mode10", "mode11", "mode12", "mode90", "mode93"):
+    if mode not in ("mode3", "mode3ok", "mode3_avoid", "mode3_upper", "mode3_upper_strict", "mode3_upper_near", "mode4", "mode8", "mode9", "mode10", "mode11", "mode12", "mode90", "mode93", "mode98"):
         mode = "mode9"
     cutoff_date = request.form.get("cutoff_date") or None
     start_date = request.form.get("start_date") or None
@@ -1363,7 +1371,7 @@ def scan():
         max_market_cap=cap_limit,
     )
     use_startup_data = True
-    use_71x_standard = mode in ("mode3", "mode8", "mode9", "mode10", "mode11", "mode12", "mode90", "mode93")
+    use_71x_standard = mode in ("mode3", "mode8", "mode9", "mode10", "mode11", "mode12", "mode90", "mode93", "mode98")
     is_paid = (
         g.current_user.is_activated and not getattr(g.current_user, "subscription_expired", True)
         or getattr(g.current_user, "is_super_admin", False)
@@ -1395,6 +1403,7 @@ def scan():
             mode == "mode11",
             mode == "mode12",
             mode == "mode93",
+            mode == "mode98",
             user_id,
             not is_paid,
         ),

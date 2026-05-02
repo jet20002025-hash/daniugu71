@@ -9,10 +9,12 @@ import numpy as np
 
 from .eastmoney import KlineRow, StockItem
 from .weekly_ma import (
+    daily_to_monthly_with_last_index,
     daily_to_weekly_with_last_index,
     daily_to_weekly_with_volume_and_last_index,
     _rolling_mean,
     weekly_convergence_value_series,
+    weekly_kdj,
 )
 
 
@@ -102,6 +104,12 @@ class ScanConfig:
     mode93_pullback_min: float = 0.95
     mode93_pullback_max: float = 1.05
     mode93_pullback_max_days: int = 20
+
+    # mode98：日/周/月 KDJ（9,3,3）三线（K、D、J）均严格小于阈值
+    mode98_kdj_threshold: float = 20.0
+    mode98_kdj_n: int = 9
+    mode98_kdj_m1: int = 3
+    mode98_kdj_m2: int = 3
 
 
 def _normalize_code(code: str) -> str:
@@ -289,6 +297,160 @@ def _score_mode18(
         return 50
     score = 50 + min(50, dif_norm[wi] * 2500)
     return int(max(50, min(100, round(score))))
+
+
+def _mode98_kdj_triplet_ok(
+    k: np.ndarray,
+    d: np.ndarray,
+    j: np.ndarray,
+    i: int,
+    threshold: float,
+) -> bool:
+    if i < 0 or i >= len(k):
+        return False
+    if np.isnan(k[i]) or np.isnan(d[i]) or np.isnan(j[i]):
+        return False
+    return k[i] < threshold and d[i] < threshold and j[i] < threshold
+
+
+def _mode98_signals(
+    rows: List[KlineRow],
+    start_date: Optional[str],
+    end_date: Optional[str],
+    threshold: float = 20.0,
+    n: int = 9,
+    m1: int = 3,
+    m2: int = 3,
+) -> List[int]:
+    """
+    mode98：信号日当日，日线、周线、月线 KDJ（参数 n,m1,m2，默认 9,3,3）的 K、D、J 均 < threshold（默认 20）。
+    周线/月线按信号日为止的历史聚合（含未走完的当周、当月）。
+    """
+    if not rows or len(rows) < n:
+        return []
+    daily_bars = [(r.date, r.open, r.high, r.low, r.close) for r in rows]
+    kd, dd, jd = weekly_kdj(daily_bars, n=n, m1=m1, m2=m2)
+    if kd.size == 0:
+        return []
+    out: List[int] = []
+    for idx in range(n - 1, len(rows)):
+        d_str = rows[idx].date
+        if start_date and d_str < start_date:
+            continue
+        if end_date and d_str > end_date:
+            continue
+        if not _mode98_kdj_triplet_ok(kd, dd, jd, idx, threshold):
+            continue
+        sub = rows[: idx + 1]
+        wb, _ = daily_to_weekly_with_last_index(sub)
+        if len(wb) < n:
+            continue
+        kw, dw, jw = weekly_kdj(wb, n=n, m1=m1, m2=m2)
+        wi = len(wb) - 1
+        if not _mode98_kdj_triplet_ok(kw, dw, jw, wi, threshold):
+            continue
+        mb, _ = daily_to_monthly_with_last_index(sub)
+        if len(mb) < n:
+            continue
+        km, dm, jm = weekly_kdj(mb, n=n, m1=m1, m2=m2)
+        mi = len(mb) - 1
+        if not _mode98_kdj_triplet_ok(km, dm, jm, mi, threshold):
+            continue
+        out.append(idx)
+    return out
+
+
+def _mode98_kdj_metrics(
+    rows: List[KlineRow],
+    idx: int,
+    n: int = 9,
+    m1: int = 3,
+    m2: int = 3,
+) -> Dict[str, Any]:
+    """信号日 K/D/J（日、周、月），供 ScanResult.metrics。"""
+    out: Dict[str, Any] = {}
+    if idx < 0 or idx >= len(rows):
+        return out
+    sub = rows[: idx + 1]
+    daily_bars = [(r.date, r.open, r.high, r.low, r.close) for r in sub]
+    kd, dd, jd = weekly_kdj(daily_bars, n=n, m1=m1, m2=m2)
+    wb, _ = daily_to_weekly_with_last_index(sub)
+    kw, dw, jw = (
+        weekly_kdj(wb, n=n, m1=m1, m2=m2) if len(wb) >= n else (np.array([]), np.array([]), np.array([]))
+    )
+    mb, _ = daily_to_monthly_with_last_index(sub)
+    km, dm, jm = (
+        weekly_kdj(mb, n=n, m1=m1, m2=m2) if len(mb) >= n else (np.array([]), np.array([]), np.array([]))
+    )
+    di = idx
+    wi = len(wb) - 1 if wb else -1
+    mi = len(mb) - 1 if mb else -1
+
+    if kd.size > di:
+        for arr, letter in ((kd, "K"), (dd, "D"), (jd, "J")):
+            if arr.size > di and not np.isnan(arr[di]):
+                out[f"mode98_daily_{letter}"] = float(arr[di])
+    if wi >= 0 and kw.size > wi:
+        for arr, letter in ((kw, "K"), (dw, "D"), (jw, "J")):
+            if arr.size > wi and not np.isnan(arr[wi]):
+                out[f"mode98_weekly_{letter}"] = float(arr[wi])
+    if mi >= 0 and km.size > mi:
+        for arr, letter in ((km, "K"), (dm, "D"), (jm, "J")):
+            if arr.size > mi and not np.isnan(arr[mi]):
+                out[f"mode98_monthly_{letter}"] = float(arr[mi])
+    return out
+
+
+def _score_mode98(
+    rows: List[KlineRow],
+    idx: int,
+    ma10: np.ndarray,
+    ma20: np.ndarray,
+    ma60: np.ndarray,
+    vol20: np.ndarray,
+    code: str = "",
+    name: str = "",
+    breakdown: Optional[List[tuple]] = None,
+    threshold: float = 20.0,
+    n: int = 9,
+    m1: int = 3,
+    m2: int = 3,
+) -> int:
+    """mode98 评分：三线距阈值越远（超卖越深）分越高，约 55～95。"""
+    if idx < 0 or idx >= len(rows):
+        return 55
+    sub = rows[: idx + 1]
+    daily_bars = [(r.date, r.open, r.high, r.low, r.close) for r in sub]
+    kd, dd, jd = weekly_kdj(daily_bars, n=n, m1=m1, m2=m2)
+    wb, _ = daily_to_weekly_with_last_index(sub)
+    kw, dw, jw = weekly_kdj(wb, n=n, m1=m1, m2=m2)
+    mb, _ = daily_to_monthly_with_last_index(sub)
+    km, dm, jm = weekly_kdj(mb, n=n, m1=m1, m2=m2)
+    wi, mi = len(wb) - 1, len(mb) - 1
+    vals = []
+    for arr, i in (
+        (kd, idx),
+        (dd, idx),
+        (jd, idx),
+        (kw, wi),
+        (dw, wi),
+        (jw, wi),
+        (km, mi),
+        (dm, mi),
+        (jm, mi),
+    ):
+        if arr.size <= i or i < 0:
+            return 55
+        v = arr[i]
+        if np.isnan(v):
+            return 55
+        vals.append(float(v))
+    peak = max(vals)
+    if peak >= threshold:
+        return 55
+    room = threshold - peak
+    score = 55.0 + min(40.0, room * 3.0)
+    return int(max(55, min(95, round(score))))
 
 
 def _mode88_signals(
@@ -2297,11 +2459,12 @@ def scan_with_mode3(
     use_mode88: bool = False,
     use_mode5: bool = False,
     use_mode93: bool = False,
+    use_mode98: bool = False,
     sector_ak_cache_dir: Optional[str] = None,
     sector_fund_flow_max_points: int = 5,
     sector_fund_flow_yi_per_point: float = 3.0,
 ) -> List[ScanResult]:
-    """use_mode5/8/9/90/10/11/12/18/88/93；mode5 为涨停后缩量模型。"""
+    """use_mode5/8/9/90/10/11/12/18/88/93/98；mode5 为涨停后缩量模型；mode98 为日周月 KDJ 超卖共振。"""
     results: List[ScanResult] = []
     from .paths import GPT_DATA_DIR
     from .sector_trend import (
@@ -2409,6 +2572,44 @@ def scan_with_mode3(
         signal_fn = _mode3_signals
         score_fn = _score_mode93
         mode_label = "mode93"
+    elif use_mode98:
+        thr = float(getattr(config, "mode98_kdj_threshold", 20.0))
+        n_k = int(getattr(config, "mode98_kdj_n", 9) or 9)
+        m1_k = int(getattr(config, "mode98_kdj_m1", 3) or 3)
+        m2_k = int(getattr(config, "mode98_kdj_m2", 3) or 3)
+        signal_fn = lambda rows, s, e: _mode98_signals(
+            rows, s, e, threshold=thr, n=n_k, m1=m1_k, m2=m2_k
+        )
+
+        def _score_mode98_bound(
+            rows,
+            idx,
+            ma10,
+            ma20,
+            ma60,
+            vol20,
+            code="",
+            name="",
+            breakdown=None,
+        ):
+            return _score_mode98(
+                rows,
+                idx,
+                ma10,
+                ma20,
+                ma60,
+                vol20,
+                code=code,
+                name=name,
+                breakdown=breakdown,
+                threshold=thr,
+                n=n_k,
+                m1=m1_k,
+                m2=m2_k,
+            )
+
+        score_fn = _score_mode98_bound
+        mode_label = "mode98"
     elif use_mode90:
         signal_fn = _mode9_signals
         macd_norm_factor = getattr(config, "macd_norm_factor", 1.0)
@@ -2526,7 +2727,7 @@ def scan_with_mode3(
                 if use_mode88
                 else (
                     200
-                    if use_mode18
+                    if (use_mode18 or use_mode98)
                     else (
                         max(130, int(getattr(config, "mode5_half_year_bars", 120)) + 5)
                         if use_mode5
@@ -2748,6 +2949,7 @@ def scan_with_mode3(
                 or (use_mode11 and score_fn is _score_mode11)
                 or (use_mode12 and score_fn is _score_mode12)
                 or (use_mode18 and score_fn is _score_mode18)
+                or use_mode98
                 or (use_mode88 and score_fn is _score_mode88)
         or (use_mode93 and score_fn is _score_mode93)
             ):
@@ -3000,6 +3202,11 @@ def scan_with_mode3(
                     else None
                 ),
             }
+            if use_mode98:
+                _nk = int(getattr(config, "mode98_kdj_n", 9) or 9)
+                _m1k = int(getattr(config, "mode98_kdj_m1", 3) or 3)
+                _m2k = int(getattr(config, "mode98_kdj_m2", 3) or 3)
+                m_extra.update(_mode98_kdj_metrics(rows, idx, _nk, _m1k, _m2k))
             for k in (
                 "industry",
                 "sub_industry",

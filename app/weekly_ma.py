@@ -22,6 +22,15 @@ def _week_key(date_str: str) -> tuple:
         return (0, 0)
 
 
+def _month_key(date_str: str) -> tuple:
+    """返回 (year, month) 用于按自然月分组。"""
+    try:
+        d = datetime.strptime(date_str, "%Y-%m-%d").date()
+        return (d.year, d.month)
+    except Exception:
+        return (0, 0)
+
+
 def daily_to_weekly_closes(
     rows: List,
     get_date=lambda r: r.date,
@@ -115,6 +124,39 @@ def daily_to_weekly_with_volume_and_last_index(
     return result, last_indices
 
 
+def daily_to_monthly_with_last_index(
+    rows: List,
+    get_date=lambda r: r.date,
+    get_open=lambda r: r.open,
+    get_high=lambda r: r.high,
+    get_low=lambda r: r.low,
+    get_close=lambda r: r.close,
+) -> Tuple[List[tuple], List[int]]:
+    """
+    将日线按月聚合，返回 (月线列表, 每月最后一行在 rows 中的下标)。
+    月线每项为 (month_key, open, high, low, close)，month_key=(year, month)。
+    当月仅部分交易日时，仍聚合为当月一根 K 线（与周线同理，支持信号日当月未走完）。
+    """
+    by_month: dict = defaultdict(list)
+    for i, r in enumerate(rows):
+        mk = _month_key(get_date(r))
+        by_month[mk].append(
+            (i, get_open(r), get_high(r), get_low(r), get_close(r))
+        )
+    result = []
+    last_indices = []
+    for mk in sorted(by_month.keys()):
+        bars = by_month[mk]
+        indices = [b[0] for b in bars]
+        opens = [b[1] for b in bars]
+        highs = [b[2] for b in bars]
+        lows = [b[3] for b in bars]
+        closes = [b[4] for b in bars]
+        result.append((mk, opens[0], max(highs), min(lows), closes[-1]))
+        last_indices.append(max(indices))
+    return result, last_indices
+
+
 def weekly_kdj(
     weekly_bars: List[tuple],
     n: int = 9,
@@ -122,8 +164,8 @@ def weekly_kdj(
     m2: int = 3,
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     """
-    周线 KDJ（9,3,3）。
-    weekly_bars 每项为 (week_key, open, high, low, close) 或至少 (..., high, low, close) 且 high=index2, low=index3, close=index4。
+    KDJ（默认 9,3,3）。适用于任意按时间聚合的 OHLC 序列（日线 bar 列表、周线、月线等）。
+    weekly_bars 每项为 (period_key, open, high, low, close)，至少 high=index2, low=index3, close=index4。
     返回 (K, D, J) 三个与周线等长的数组，前 n-1 根为 np.nan。
     公式：RSV = (C - Ln)/(Hn - Ln)*100，K = (1/m1)*RSV + ((m1-1)/m1)*K_prev，D = (1/m2)*K + ((m2-1)/m2)*D_prev，J = 3*K - 2*D；首值 K=D=50。
     """

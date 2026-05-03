@@ -111,6 +111,17 @@ class ScanConfig:
     mode98_kdj_m1: int = 3
     mode98_kdj_m2: int = 3
 
+    # mode32（3+2）：实体首板后 5 日整理，信号日 = 首板后第 6 个交易日（尾盘上车语义）
+    mode32_sideways_days: int = 60
+    mode32_sideways_range_pct: float = 0.42  # (区间最高-最低)/区间均价，越小越「横盘」
+    mode32_day1_body_max: float = 0.50  # 首板次日实体占振幅上限
+    mode32_day1_vol_vs_limit_min: float = 1.0  # 次日量 ≥ 首板量 × 该值
+    mode32_near_high_pct: float = 0.028  # 第2～3日收盘不低于 首板最高价×(1-该值)
+    mode32_days23_low_min_frac: float = 0.97  # 第2～3日最低价不低于 首板最高价×该值
+    mode32_day45_body_max: float = 0.55  # 第4～5日实体占振幅上限
+    mode32_vol_day45_vs_day1_max: float = 0.72  # 第4、5日量相对次日量的上限比例（低迷）
+    mode32_min_close_vs_mid: float = 1.0  # 信号日收盘 ≥ 首板实体中轴×该值（1.0=不破中轴）
+
 
 def _normalize_code(code: str) -> str:
     value = str(code or "").strip()
@@ -451,6 +462,207 @@ def _score_mode98(
     room = threshold - peak
     score = 55.0 + min(40.0, room * 3.0)
     return int(max(55, min(95, round(score))))
+
+
+def _mode32_row_body_ratio(row: KlineRow) -> float:
+    rng = float(row.high) - float(row.low)
+    if rng <= 1e-12:
+        return 1.0
+    return abs(float(row.close) - float(row.open)) / rng
+
+
+def _mode32_is_yizi(rows: List[KlineRow], t: int, prev_close: float) -> bool:
+    if prev_close <= 0:
+        return True
+    return (float(rows[t].high) - float(rows[t].low)) / prev_close < 0.005
+
+
+def _mode32_is_t_board(rows: List[KlineRow], t: int, prev_close: float, rate: float) -> bool:
+    """近似 T 字：高开近涨停且下影线占振幅比例大。"""
+    row = rows[t]
+    o, h, l, c = float(row.open), float(row.high), float(row.low), float(row.close)
+    rng = h - l
+    if rng <= 1e-12:
+        return False
+    lim_ref = prev_close * (1.0 + rate)
+    near_top_open = o >= max(h - max(0.003 * prev_close, 0.02), lim_ref * 0.988)
+    lower_shadow = (min(o, c) - l) / rng
+    return near_top_open and lower_shadow >= 0.34
+
+
+def _mode32_solid_limit_ok(
+    rows: List[KlineRow],
+    t: int,
+    code: str,
+    name: str,
+    *,
+    body_min: float = 0.32,
+) -> bool:
+    if t < 1 or not _limit_up_day(rows, t, code, name):
+        return False
+    prev_close = float(rows[t - 1].close)
+    if prev_close <= 0:
+        return False
+    rate = _limit_rate(code, name)
+    if _mode32_is_yizi(rows, t, prev_close):
+        return False
+    if _mode32_is_t_board(rows, t, prev_close, rate):
+        return False
+    row = rows[t]
+    h, c = float(row.high), float(row.close)
+    br = _mode32_row_body_ratio(row)
+    closed_near_high = c >= h - max(0.004 * prev_close, 0.02)
+    return br >= body_min and closed_near_high
+
+
+def _mode32_sideways_ok(
+    rows: List[KlineRow],
+    t: int,
+    sideways_days: int,
+    sideways_range_pct: float,
+) -> bool:
+    if t < sideways_days + 1:
+        return False
+    lo = t - sideways_days
+    hi = t - 1
+    highs = [float(rows[i].high) for i in range(lo, hi + 1)]
+    lows = [float(rows[i].low) for i in range(lo, hi + 1)]
+    closes = [float(rows[i].close) for i in range(lo, hi + 1)]
+    mx, mn = max(highs), min(lows)
+    mean_c = sum(closes) / max(1, len(closes))
+    if mean_c <= 0:
+        return False
+    return (mx - mn) / mean_c <= sideways_range_pct
+
+
+def _mode32_signal_at(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    sideways_days: int = 60,
+    sideways_range_pct: float = 0.42,
+    day1_body_max: float = 0.50,
+    day1_vol_vs_limit_min: float = 1.0,
+    near_high_pct: float = 0.028,
+    days23_low_min_frac: float = 0.97,
+    day45_body_max: float = 0.55,
+    vol_day45_vs_day1_max: float = 0.72,
+    min_close_vs_mid: float = 1.0,
+) -> bool:
+    """
+    信号日在 idx = T+6（首板日 T，其后 5 日为整理），且 ST、一字、T 字板已剔除。
+    """
+    if _is_st(name or ""):
+        return False
+    T = idx - 6
+    if T < 1 or idx >= len(rows):
+        return False
+    if not _mode32_sideways_ok(rows, T, sideways_days, sideways_range_pct):
+        return False
+    if not _mode32_solid_limit_ok(rows, T, code, name):
+        return False
+
+    H0 = float(rows[T].high)
+    O0, C0 = float(rows[T].open), float(rows[T].close)
+    mid = 0.5 * (O0 + C0)
+    Vlim = float(rows[T].volume)
+
+    # Day1 = T+1
+    d1 = rows[T + 1]
+    if Vlim <= 0 or float(d1.volume) + 1e-9 < Vlim * day1_vol_vs_limit_min:
+        return False
+    if _mode32_row_body_ratio(d1) > day1_body_max:
+        return False
+
+    # Days 2–3：缩量梯形 + 收盘贴近首板高、低点不破过多
+    v1 = float(rows[T + 1].volume)
+    v2 = float(rows[T + 2].volume)
+    v3 = float(rows[T + 3].volume)
+    if not (v2 < v1 and v3 < v2):
+        return False
+    band_low = H0 * (1.0 - near_high_pct)
+    floor_low = H0 * days23_low_min_frac
+    for j in (T + 2, T + 3):
+        rj = rows[j]
+        if float(rj.close) < band_low:
+            return False
+        if float(rj.low) < floor_low:
+            return False
+
+    # Days 4–5：小实体 + 量能低迷
+    v4 = float(rows[T + 4].volume)
+    v5 = float(rows[T + 5].volume)
+    if not (v4 <= v3 * 1.08 and v5 <= v4 * 1.08):
+        return False
+    if v4 > v1 * vol_day45_vs_day1_max + 1e-9 or v5 > v1 * vol_day45_vs_day1_max + 1e-9:
+        return False
+    for j in (T + 4, T + 5):
+        if _mode32_row_body_ratio(rows[j]) > day45_body_max:
+            return False
+
+    # 信号日收盘仍在中轴之上（防守位语义）
+    if float(rows[idx].close) + 1e-9 < mid * min_close_vs_mid:
+        return False
+
+    # 整理五日最低价不破首板实体中轴过多（承接仍有效）
+    min_low_5 = min(float(rows[j].low) for j in range(T + 1, T + 6))
+    if min_low_5 + 1e-9 < mid * 0.98:
+        return False
+
+    return True
+
+
+def _mode32_metrics(
+    rows: List[KlineRow],
+    idx: int,
+) -> Dict[str, Any]:
+    T = idx - 6
+    H0 = float(rows[T].high)
+    O0, C0 = float(rows[T].open), float(rows[T].close)
+    mid = 0.5 * (O0 + C0)
+    return {
+        "mode32_limit_date": rows[T].date,
+        "mode32_limit_high": round(H0, 4),
+        "mode32_mid_stop": round(mid, 4),
+        "mode32_vol_day1_vs_limit": round(float(rows[T + 1].volume) / max(float(rows[T].volume), 1e-9), 4),
+        "mode32_vol_day5_vs_day1": round(float(rows[T + 5].volume) / max(float(rows[T + 1].volume), 1e-9), 4),
+    }
+
+
+def _score_mode32(
+    rows: List[KlineRow],
+    idx: int,
+    ma10: np.ndarray,
+    ma20: np.ndarray,
+    ma60: np.ndarray,
+    vol20: np.ndarray,
+    code: str = "",
+    name: str = "",
+    breakdown: Optional[List[tuple]] = None,
+) -> int:
+    """mode32 评分：横盘越紧、量缩得越干净分略高，约 62～92。"""
+    if idx < 6 or idx >= len(rows):
+        return 62
+    T = idx - 6
+    prev_seg = rows[max(0, T - 60) : T]
+    if len(prev_seg) < 30:
+        return 62
+    closes = np.array([float(r.close) for r in prev_seg], dtype=float)
+    highs = np.array([float(r.high) for r in prev_seg], dtype=float)
+    lows = np.array([float(r.low) for r in prev_seg], dtype=float)
+    mean_c = float(np.mean(closes))
+    if mean_c <= 0:
+        return 62
+    tight = (float(np.max(highs)) - float(np.min(lows))) / mean_c
+    # tight 越小越好：0.25→加分多，0.4→少
+    bonus_tight = max(0.0, min(22.0, (0.45 - tight) * 80.0))
+    v1 = float(rows[T + 1].volume)
+    v5 = float(rows[T + 5].volume)
+    shrink = v5 / max(v1, 1e-9)
+    bonus_vol = max(0.0, min(18.0, (0.65 - shrink) * 50.0))
+    score = 62.0 + bonus_tight + bonus_vol
+    return int(max(62, min(92, round(score))))
 
 
 def _mode88_signals(
@@ -2460,11 +2672,12 @@ def scan_with_mode3(
     use_mode5: bool = False,
     use_mode93: bool = False,
     use_mode98: bool = False,
+    use_mode32: bool = False,
     sector_ak_cache_dir: Optional[str] = None,
     sector_fund_flow_max_points: int = 5,
     sector_fund_flow_yi_per_point: float = 3.0,
 ) -> List[ScanResult]:
-    """use_mode5/8/9/90/10/11/12/18/88/93/98；mode5 为涨停后缩量模型；mode98 为日周月 KDJ 超卖共振。"""
+    """use_mode5/8/9/90/10/11/12/18/88/93/98/32；mode5 涨停缩量；mode98 日周月 KDJ；mode32 为实体首板后 3+2 整理。"""
     results: List[ScanResult] = []
     from .paths import GPT_DATA_DIR
     from .sector_trend import (
@@ -2610,6 +2823,10 @@ def scan_with_mode3(
 
         score_fn = _score_mode98_bound
         mode_label = "mode98"
+    elif use_mode32:
+        signal_fn = _mode3_signals
+        score_fn = _score_mode32
+        mode_label = "mode32"
     elif use_mode90:
         signal_fn = _mode9_signals
         macd_norm_factor = getattr(config, "macd_norm_factor", 1.0)
@@ -2727,7 +2944,7 @@ def scan_with_mode3(
                 if use_mode88
                 else (
                     200
-                    if (use_mode18 or use_mode98)
+                    if (use_mode18 or use_mode98 or use_mode32)
                     else (
                         max(130, int(getattr(config, "mode5_half_year_bars", 120)) + 5)
                         if use_mode5
@@ -2779,6 +2996,42 @@ def scan_with_mode3(
                 shrink_max_days=m5_shrink_d,
                 half_year_bars=m5_hb,
             )
+        elif use_mode32:
+            L = int(getattr(config, "mode32_sideways_days", 60) or 60)
+            sr = float(getattr(config, "mode32_sideways_range_pct", 0.42) or 0.42)
+            d1b = float(getattr(config, "mode32_day1_body_max", 0.50) or 0.50)
+            d1v = float(getattr(config, "mode32_day1_vol_vs_limit_min", 1.0) or 1.0)
+            nh = float(getattr(config, "mode32_near_high_pct", 0.028) or 0.028)
+            d23 = float(getattr(config, "mode32_days23_low_min_frac", 0.97) or 0.97)
+            d45b = float(getattr(config, "mode32_day45_body_max", 0.55) or 0.55)
+            v45 = float(getattr(config, "mode32_vol_day45_vs_day1_max", 0.72) or 0.72)
+            midm = float(getattr(config, "mode32_min_close_vs_mid", 1.0) or 1.0)
+            st = str(start_date).strip()[:10] if start_date else ""
+            ed = str(end_date).strip()[:10] if end_date else ""
+            signals = []
+            start_i = max(L + 6, 7)
+            for i in range(start_i, len(rows)):
+                d = str(rows[i].date)[:10]
+                if st and d < st:
+                    continue
+                if ed and d > ed:
+                    continue
+                if _mode32_signal_at(
+                    rows,
+                    i,
+                    item.code,
+                    item.name,
+                    sideways_days=L,
+                    sideways_range_pct=sr,
+                    day1_body_max=d1b,
+                    day1_vol_vs_limit_min=d1v,
+                    near_high_pct=nh,
+                    days23_low_min_frac=d23,
+                    day45_body_max=d45b,
+                    vol_day45_vs_day1_max=v45,
+                    min_close_vs_mid=midm,
+                ):
+                    signals.append(i)
         elif use_mode93:
             # mode93: 逐点判定（需要 code/name + 参数）
             m93_lookback = int(getattr(config, "mode93_lookback_days", 20) or 20)
@@ -2950,6 +3203,7 @@ def scan_with_mode3(
                 or (use_mode12 and score_fn is _score_mode12)
                 or (use_mode18 and score_fn is _score_mode18)
                 or use_mode98
+                or use_mode32
                 or (use_mode88 and score_fn is _score_mode88)
         or (use_mode93 and score_fn is _score_mode93)
             ):
@@ -3207,6 +3461,8 @@ def scan_with_mode3(
                 _m1k = int(getattr(config, "mode98_kdj_m1", 3) or 3)
                 _m2k = int(getattr(config, "mode98_kdj_m2", 3) or 3)
                 m_extra.update(_mode98_kdj_metrics(rows, idx, _nk, _m1k, _m2k))
+            if use_mode32:
+                m_extra.update(_mode32_metrics(rows, idx))
             for k in (
                 "industry",
                 "sub_industry",

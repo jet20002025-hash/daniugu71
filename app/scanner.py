@@ -105,6 +105,16 @@ class ScanConfig:
     mode93_pullback_max: float = 1.05
     mode93_pullback_max_days: int = 20
 
+    # mode底部大阳线：低位区间 + 倍量大阳线 + 突发放量
+    modebbd_low_lookback: int = 60
+    modebbd_bottom_pos_max: float = 0.50
+    modebbd_big_pct_min: float = 5.0
+    modebbd_body_ratio_min: float = 0.55
+    modebbd_vol_mult: float = 2.0
+    modebbd_vol_ma: int = 20
+    modebbd_sudden_days: int = 5
+    modebbd_prior_vol_ratio_max: float = 0.65
+
     # mode98：日/周/月 KDJ（9,3,3）三线（K、D、J）均严格小于阈值
     mode98_kdj_threshold: float = 20.0
     mode98_kdj_n: int = 9
@@ -1491,6 +1501,152 @@ def _score_mode93(
         breakdown.append((f"回调到涨停日低点A附近(A={A:.2f},偏离{pull:.2f}%)", 0))
     return int(score)
 
+
+def _is_big_yang_row_modebbd(
+    r: KlineRow,
+    code: str,
+    name: str,
+    *,
+    big_pct_min: float,
+    body_ratio_min: float,
+) -> bool:
+    o, c, h, l_ = float(r.open), float(r.close), float(r.high), float(r.low)
+    if c <= o:
+        return False
+    pct = float(getattr(r, "pct_chg", 0.0) or 0.0)
+    if pct < big_pct_min:
+        return False
+    if pct >= _limit_rate(code, name) * 100 - 0.6:
+        return False
+    rng = h - l_
+    if rng <= 0:
+        return False
+    if (c - o) / rng < body_ratio_min:
+        return False
+    return True
+
+
+def _match_mode_bottom_big_yang(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    *,
+    low_lookback: int = 60,
+    bottom_pos_max: float = 0.50,
+    big_pct_min: float = 5.0,
+    body_ratio_min: float = 0.55,
+    vol_mult: float = 2.0,
+    vol_ma: int = 20,
+    sudden_days: int = 5,
+    prior_vol_ratio_max: float = 0.65,
+) -> Optional[Dict[str, float]]:
+    n = len(rows)
+    need = max(low_lookback + 1, vol_ma + 1, sudden_days + 2)
+    if idx < need or idx >= n:
+        return None
+    r = rows[idx]
+    if not _is_big_yang_row_modebbd(
+        r, code, name, big_pct_min=big_pct_min, body_ratio_min=body_ratio_min
+    ):
+        return None
+    close = float(r.close)
+    volume = float(r.volume)
+    high_arr = np.array([float(x.high) for x in rows], dtype=float)
+    low_arr = np.array([float(x.low) for x in rows], dtype=float)
+    vol_arr = np.array([float(x.volume) for x in rows], dtype=float)
+    seg_lo = idx - low_lookback
+    h_max = float(np.max(high_arr[seg_lo : idx + 1]))
+    l_min = float(np.min(low_arr[seg_lo : idx + 1]))
+    rng = h_max - l_min
+    if rng <= 0:
+        return None
+    pos = (close - l_min) / rng
+    if pos > bottom_pos_max:
+        return None
+    v_prev = float(vol_arr[idx - 1]) if idx >= 1 else 0.0
+    v_ma = float(np.mean(vol_arr[idx - vol_ma : idx])) if idx >= vol_ma else 0.0
+    v_base = max(v_prev, v_ma)
+    if v_base <= 0 or volume < vol_mult * v_base:
+        return None
+    for j in range(idx - sudden_days, idx):
+        if j < 0:
+            continue
+        if _is_big_yang_row_modebbd(
+            rows[j], code, name, big_pct_min=big_pct_min, body_ratio_min=body_ratio_min
+        ):
+            return None
+    if sudden_days > 0 and idx >= sudden_days:
+        v_prior = float(np.mean(vol_arr[idx - sudden_days : idx]))
+        if v_prior > prior_vol_ratio_max * volume:
+            return None
+    o, c, h, l_ = float(r.open), float(r.close), float(r.high), float(r.low)
+    rng_d = h - l_
+    body_ratio = (c - o) / rng_d if rng_d > 0 else 0.0
+    pct = float(getattr(r, "pct_chg", 0.0) or 0.0)
+    return {
+        "close": close,
+        "low_pos_pct": pos * 100.0,
+        "range_low": l_min,
+        "range_high": h_max,
+        "vol_today": volume,
+        "vol_base": v_base,
+        "vol_ratio": volume / v_base,
+        "pct_chg": pct,
+        "body_ratio": body_ratio,
+    }
+
+
+def _score_mode_bottom_big_yang(
+    rows: List[KlineRow],
+    idx: int,
+    ma10: np.ndarray,
+    ma20: np.ndarray,
+    ma60: np.ndarray,
+    vol20: np.ndarray,
+    code: str = "",
+    name: str = "",
+    breakdown: Optional[List[tuple]] = None,
+    *,
+    low_lookback: int = 60,
+    bottom_pos_max: float = 0.50,
+    big_pct_min: float = 5.0,
+    body_ratio_min: float = 0.55,
+    vol_mult: float = 2.0,
+    vol_ma: int = 20,
+    sudden_days: int = 5,
+    prior_vol_ratio_max: float = 0.65,
+) -> int:
+    _ = (ma10, ma20, ma60, vol20)
+    det = _match_mode_bottom_big_yang(
+        rows,
+        idx,
+        code,
+        name,
+        low_lookback=low_lookback,
+        bottom_pos_max=bottom_pos_max,
+        big_pct_min=big_pct_min,
+        body_ratio_min=body_ratio_min,
+        vol_mult=vol_mult,
+        vol_ma=vol_ma,
+        sudden_days=sudden_days,
+        prior_vol_ratio_max=prior_vol_ratio_max,
+    )
+    if not det:
+        return 0
+    vr = float(det["vol_ratio"])
+    pct = float(det["pct_chg"])
+    score = int(min(100, max(0, round(55 + vr * 8 + pct * 1.5))))
+    if breakdown is not None:
+        breakdown.append(
+            (
+                f"低位{low_lookback}日位置{det['low_pos_pct']:.1f}% 量比{vr:.2f} 涨{pct:.2f}%",
+                0,
+            )
+        )
+    return score
+
+
 def _mode5_signals(
     rows: List[KlineRow],
     start_date: Optional[str],
@@ -2023,6 +2179,8 @@ def _score_mode9(
     - MA5 斜率过于陡峭(5日内MA5涨幅>15%)降分，避免短期冲得过猛（如金时科技 17.44%）。
     - 量能放大太快（多看3～5日）：近3日均量/再前3日>2 或 当日量/5日前量>2.8 降分，可能快到顶。
     - 均线整齐度（参考明阳电路 vs 神开股份）：当日 MA5>MA10>MA20 加分；近5日内均线交叉次数多则降分。
+    - 近20日前高（不含当日）：收盘略高于前高且突破幅度≤1%视为「当天刚刚突破前高」，+1（与「贴近前高蓄势」可叠加）。
+    - 前期高点距信号日 21～59 日、收盘贴近该前高（0.95～1.03 倍）、近 5 日量能温和放大、当日量接近前 100 日（不含当日）最大量（0.9～1.5 倍）：+4（见下方 MODE9_PEAKDIST_VOL_BONUS）。
     """
     base = _score_mode3(rows, idx, ma10, ma20, ma60, vol20)
     close_arr = np.array([r.close for r in rows], dtype=float)
@@ -2192,6 +2350,45 @@ def _score_mode9(
                 base -= 2  # 已远离前高，追高
                 if breakdown is not None:
                     breakdown.append(("已远离前高追高", -2))
+            # 当天刚刚突破前高：收盘略高于近20日前高（不含当日），幅度越小越「刚突破」，+1 便于同分区内排序靠前
+            if 0 < break_gap_pct <= 1.0:
+                base += 1
+                if breakdown is not None:
+                    breakdown.append(("当天刚刚突破前高(≤1%)", 1))
+    # 前期高点（21～59 日前区间内最高价日，同价取最近一日）+ 收盘贴近前高 + 近 5 日温和放量 + 当日量贴近前 100 日最大量
+    MODE9_PEAKDIST_VOL_BONUS = 4  # 多条件同时满足，与「适度突破前高+3」同级略高
+    if idx >= 100:
+        high_arr_pk = np.array([r.high for r in rows], dtype=float)
+        w_lo, w_hi = idx - 59, idx - 21  # 距信号日 21～59 个交易日
+        seg_h = high_arr_pk[w_lo : w_hi + 1]
+        if seg_h.size > 0 and np.all(np.isfinite(seg_h)):
+            # 区间内最高价；同价取距信号日最近的一日（右端优先）
+            peak_idx = int(w_hi - int(np.argmax(seg_h[::-1])))
+            days_pk = idx - peak_idx
+            if 21 <= days_pk <= 59:
+                peak_high = float(high_arr_pk[peak_idx])
+                if peak_high > 0 and (0.95 * peak_high <= close <= 1.03 * peak_high):
+                    hist_max_vol = float(np.max(volume[idx - 100 : idx]))
+                    v_today = float(volume[idx])
+                    if hist_max_vol > 0 and (0.9 * hist_max_vol <= v_today < 1.5 * hist_max_vol):
+                        v_last5 = volume[idx - 4 : idx + 1]
+                        v_prev5 = volume[idx - 9 : idx - 4]
+                        if v_last5.size == 5 and v_prev5.size == 5 and np.all(v_last5 > 0) and np.all(v_prev5 > 0):
+                            a5 = float(np.mean(v_last5))
+                            a5p = float(np.mean(v_prev5))
+                            gentle = 1.05 <= (a5 / a5p) <= 1.30
+                            mx5, mn5 = float(np.max(v_last5)), float(np.min(v_last5))
+                            not_spiky = (mn5 > 0) and ((mx5 / mn5) < 2.2)
+                            if gentle and not_spiky:
+                                base += MODE9_PEAKDIST_VOL_BONUS
+                                if breakdown is not None:
+                                    pxr = close / peak_high
+                                    breakdown.append(
+                                        (
+                                            f"前高距{days_pk}日+收盘/前高{pxr:.2f}+近5日温和放量+量近100日高({v_today/hist_max_vol:.2f}倍)",
+                                            MODE9_PEAKDIST_VOL_BONUS,
+                                        )
+                                    )
     # 量能放大太快（多看3～5日）：最好组 近3日/再前3日 1.27、最差组 2.13；当日/5日前 最好2.71、最差3.06
     if idx >= 6:
         vol_3d_recent = (volume[idx] + volume[idx - 1] + volume[idx - 2]) / 3.0
@@ -2671,13 +2868,14 @@ def scan_with_mode3(
     use_mode88: bool = False,
     use_mode5: bool = False,
     use_mode93: bool = False,
+    use_mode_bottom_big_yang: bool = False,
     use_mode98: bool = False,
     use_mode32: bool = False,
     sector_ak_cache_dir: Optional[str] = None,
     sector_fund_flow_max_points: int = 5,
     sector_fund_flow_yi_per_point: float = 3.0,
 ) -> List[ScanResult]:
-    """use_mode5/8/9/90/10/11/12/18/88/93/98/32；mode5 涨停缩量；mode98 日周月 KDJ；mode32 为实体首板后 3+2 整理。"""
+    """use_mode5/8/9/90/10/11/12/18/88/93/底部大阳线/98/32；mode5 涨停缩量；mode98 日周月 KDJ；mode32 为实体首板后 3+2 整理。"""
     results: List[ScanResult] = []
     from .paths import GPT_DATA_DIR
     from .sector_trend import (
@@ -2785,6 +2983,10 @@ def scan_with_mode3(
         signal_fn = _mode3_signals
         score_fn = _score_mode93
         mode_label = "mode93"
+    elif use_mode_bottom_big_yang:
+        signal_fn = _mode3_signals
+        score_fn = _score_mode_bottom_big_yang
+        mode_label = "mode底部大阳线"
     elif use_mode98:
         thr = float(getattr(config, "mode98_kdj_threshold", 20.0))
         n_k = int(getattr(config, "mode98_kdj_n", 9) or 9)
@@ -2951,7 +3153,16 @@ def scan_with_mode3(
                         else (
                             max(160, int(getattr(config, "mode93_low_window", 120)) + 10)
                             if use_mode93
-                            else 80
+                            else (
+                                max(
+                                    70,
+                                    int(getattr(config, "modebbd_low_lookback", 60))
+                                    + int(getattr(config, "modebbd_vol_ma", 20))
+                                    + 5,
+                                )
+                                if use_mode_bottom_big_yang
+                                else 80
+                            )
                         )
                     )
                 )
@@ -3062,6 +3273,40 @@ def scan_with_mode3(
                     pullback_min=m93_pb_min,
                     pullback_max=m93_pb_max,
                     pullback_max_days=m93_pb_days,
+                ):
+                    signals.append(i)
+        elif use_mode_bottom_big_yang:
+            mbbd_low = int(getattr(config, "modebbd_low_lookback", 60) or 60)
+            mbbd_pos = float(getattr(config, "modebbd_bottom_pos_max", 0.50) or 0.50)
+            mbbd_pct = float(getattr(config, "modebbd_big_pct_min", 5.0) or 5.0)
+            mbbd_body = float(getattr(config, "modebbd_body_ratio_min", 0.55) or 0.55)
+            mbbd_vm = float(getattr(config, "modebbd_vol_mult", 2.0) or 2.0)
+            mbbd_vma = int(getattr(config, "modebbd_vol_ma", 20) or 20)
+            mbbd_sd = int(getattr(config, "modebbd_sudden_days", 5) or 5)
+            mbbd_pvr = float(getattr(config, "modebbd_prior_vol_ratio_max", 0.65) or 0.65)
+            need_i = max(mbbd_low + 1, mbbd_vma + 1, mbbd_sd + 2)
+            st = str(start_date).strip()[:10] if start_date else ""
+            ed = str(end_date).strip()[:10] if end_date else ""
+            signals = []
+            for i in range(need_i, len(rows)):
+                d = str(rows[i].date)[:10]
+                if st and d < st:
+                    continue
+                if ed and d > ed:
+                    continue
+                if _match_mode_bottom_big_yang(
+                    rows,
+                    i,
+                    item.code,
+                    item.name,
+                    low_lookback=mbbd_low,
+                    bottom_pos_max=mbbd_pos,
+                    big_pct_min=mbbd_pct,
+                    body_ratio_min=mbbd_body,
+                    vol_mult=mbbd_vm,
+                    vol_ma=mbbd_vma,
+                    sudden_days=mbbd_sd,
+                    prior_vol_ratio_max=mbbd_pvr,
                 ):
                     signals.append(i)
         else:
@@ -3206,6 +3451,7 @@ def scan_with_mode3(
                 or use_mode32
                 or (use_mode88 and score_fn is _score_mode88)
         or (use_mode93 and score_fn is _score_mode93)
+                or use_mode_bottom_big_yang
             ):
                 if use_mode9 and score_fn is _score_mode9:
                     score = score_fn(

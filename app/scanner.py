@@ -3116,6 +3116,7 @@ def scan_with_mode3(
     use_mode5: bool = False,
     use_mode93: bool = False,
     use_mode_bottom_big_yang: bool = False,
+    use_mode_platform_breakout_first_yang: bool = False,
     use_mode98: bool = False,
     use_mode32: bool = False,
     sector_ak_cache_dir: Optional[str] = None,
@@ -3234,6 +3235,10 @@ def scan_with_mode3(
         signal_fn = _mode3_signals
         score_fn = _score_mode_bottom_big_yang
         mode_label = "mode底部大阳线"
+    elif use_mode_platform_breakout_first_yang:
+        signal_fn = _mode3_signals
+        score_fn = _score_mode_platform_breakout_first_yang
+        mode_label = "mode平台突破首阳"
     elif use_mode98:
         thr = float(getattr(config, "mode98_kdj_threshold", 20.0))
         n_k = int(getattr(config, "mode98_kdj_n", 9) or 9)
@@ -3408,7 +3413,16 @@ def scan_with_mode3(
                                     + 5,
                                 )
                                 if use_mode_bottom_big_yang
-                                else 80
+                                else (
+                                    max(
+                                        120,
+                                        int(getattr(config, "modepbs_phase_days_max", 95))
+                                        + int(getattr(config, "modepbs_high100_lookback", 100))
+                                        + 5,
+                                    )
+                                    if use_mode_platform_breakout_first_yang
+                                    else 80
+                                )
                             )
                         )
                     )
@@ -3556,6 +3570,59 @@ def scan_with_mode3(
                     prior_vol_ratio_max=mbbd_pvr,
                 ):
                     signals.append(i)
+        elif use_mode_platform_breakout_first_yang:
+            mpbs_pmin = int(getattr(config, "modepbs_phase_days_min", 45) or 45)
+            mpbs_pmax = int(getattr(config, "modepbs_phase_days_max", 95) or 95)
+            mpbs_rmin = float(getattr(config, "modepbs_rise_from_low_min", 0.20) or 0.20)
+            mpbs_rmax = float(getattr(config, "modepbs_rise_from_low_max", 0.55) or 0.55)
+            mpbs_cd = int(getattr(config, "modepbs_consolid_days", 20) or 20)
+            mpbs_ca = float(getattr(config, "modepbs_consolid_amp_max", 0.20) or 0.20)
+            mpbs_bl = int(getattr(config, "modepbs_breakout_lookback", 60) or 60)
+            mpbs_pct = float(getattr(config, "modepbs_big_pct_min", 7.0) or 7.0)
+            mpbs_body = float(getattr(config, "modepbs_body_ratio_min", 0.55) or 0.55)
+            mpbs_vm = float(getattr(config, "modepbs_vol_mult", 1.25) or 1.25)
+            mpbs_vma = int(getattr(config, "modepbs_vol_ma", 20) or 20)
+            mpbs_gap = int(getattr(config, "modepbs_big_yang_gap", 15) or 15)
+            mpbs_h100 = int(getattr(config, "modepbs_high100_lookback", 100) or 100)
+            mpbs_h100n = float(getattr(config, "modepbs_high100_near_min", 0.95) or 0.95)
+            need_i = max(
+                mpbs_pmax + 1,
+                mpbs_bl + 1,
+                mpbs_h100 + 1,
+                mpbs_cd + 1,
+                mpbs_vma + 1,
+                mpbs_gap + 2,
+            )
+            st = str(start_date).strip()[:10] if start_date else ""
+            ed = str(end_date).strip()[:10] if end_date else ""
+            signals = []
+            for i in range(need_i, len(rows)):
+                d = str(rows[i].date)[:10]
+                if st and d < st:
+                    continue
+                if ed and d > ed:
+                    continue
+                if _match_mode_platform_breakout_first_yang(
+                    rows,
+                    i,
+                    item.code,
+                    item.name,
+                    phase_days_min=mpbs_pmin,
+                    phase_days_max=mpbs_pmax,
+                    rise_from_low_min=mpbs_rmin,
+                    rise_from_low_max=mpbs_rmax,
+                    consolid_days=mpbs_cd,
+                    consolid_amp_max=mpbs_ca,
+                    breakout_lookback=mpbs_bl,
+                    big_pct_min=mpbs_pct,
+                    body_ratio_min=mpbs_body,
+                    vol_mult=mpbs_vm,
+                    vol_ma=mpbs_vma,
+                    big_yang_gap=mpbs_gap,
+                    high100_lookback=mpbs_h100,
+                    high100_near_min=mpbs_h100n,
+                ):
+                    signals.append(i)
         else:
             signals = signal_fn(rows, start_date, end_date)
         if cutoff_date and not start_date:
@@ -3699,6 +3766,7 @@ def scan_with_mode3(
                 or (use_mode88 and score_fn is _score_mode88)
         or (use_mode93 and score_fn is _score_mode93)
                 or use_mode_bottom_big_yang
+                or use_mode_platform_breakout_first_yang
             ):
                 if use_mode9 and score_fn is _score_mode9:
                     score = score_fn(

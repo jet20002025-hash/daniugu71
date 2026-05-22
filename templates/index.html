@@ -106,8 +106,11 @@
     <section class="panel table-panel">
       <div class="table-header">
         <h2>候选列表（{{ meta.count }}）</h2>
-        <span>按信号打分降序</span>
-        <span class="hint-inline">（T+1 信号日不可交易，当天涨跌幅仅供参考）</span>
+        <div class="table-header-actions">
+          <button type="button" class="copy-btn" id="copy-stocks-btn" {% if not results %}disabled{% endif %}>一键复制代码名称</button>
+          <span>按信号打分降序</span>
+          <span class="hint-inline">（T+1 信号日不可交易，当天涨跌幅仅供参考）</span>
+        </div>
       </div>
       {% if meta.score_buckets %}
       <div class="bucket-row">
@@ -132,9 +135,9 @@
               <th title="信号日前最近6个交易日内是否出现过涨停（仅看有/无）">最近6日有涨停</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody id="results-tbody">
             {% for row in results %}
-            <tr>
+            <tr class="stock-row" data-code="{{ row.code }}" data-name="{{ row.name }}">
               <td>{{ row.code }}</td>
               <td>{{ row.name }}</td>
               <td class="score">{{ row.score }}</td>
@@ -240,6 +243,46 @@
       } catch (e) { document.getElementById('status-cache').textContent = '—'; }
     }
     loadCacheStatus();
+
+    const copyStocksBtn = document.getElementById('copy-stocks-btn');
+    if (copyStocksBtn) {
+      copyStocksBtn.addEventListener('click', async () => {
+        const rows = document.querySelectorAll('#results-tbody tr.stock-row');
+        if (!rows.length) return;
+        const lines = Array.from(rows).map((tr) => {
+          const code = (tr.dataset.code || '').trim();
+          const name = (tr.dataset.name || '').trim();
+          return code + '\t' + name;
+        });
+        const text = lines.join('\n');
+        const ok = await (async () => {
+          try {
+            if (navigator.clipboard && window.isSecureContext) {
+              await navigator.clipboard.writeText(text);
+              return true;
+            }
+          } catch (err) {
+            // fallback below
+          }
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed';
+          ta.style.left = '-9999px';
+          document.body.appendChild(ta);
+          ta.select();
+          try {
+            return document.execCommand('copy');
+          } finally {
+            document.body.removeChild(ta);
+          }
+        })();
+        if (ok) {
+          const prev = copyStocksBtn.textContent;
+          copyStocksBtn.textContent = '已复制 ' + rows.length + ' 只';
+          setTimeout(() => { copyStocksBtn.textContent = prev; }, 1800);
+        }
+      });
+    }
   </script>
 </body>
 </html>

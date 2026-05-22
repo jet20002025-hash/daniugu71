@@ -204,6 +204,36 @@ select {
   margin: 0;
 }
 
+.table-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.copy-btn {
+  background: rgba(242, 177, 52, 0.12);
+  color: var(--accent-2, #f2b134);
+  border: 1px solid rgba(242, 177, 52, 0.35);
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.copy-btn:hover:not(:disabled) {
+  background: rgba(242, 177, 52, 0.22);
+  border-color: rgba(242, 177, 52, 0.55);
+}
+
+.copy-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 .table-wrap {
   overflow-x: auto;
 }

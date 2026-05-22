@@ -115,6 +115,20 @@ class ScanConfig:
     modebbd_sudden_days: int = 5
     modebbd_prior_vol_ratio_max: float = 0.65
 
+    # mode平台突破首阳：约3个月吸筹震仓后，突破平台的第一根放量大阳线（买点）
+    modepbs_phase_days_min: int = 45
+    modepbs_phase_days_max: int = 95
+    modepbs_rise_from_low_min: float = 0.20
+    modepbs_rise_from_low_max: float = 0.55
+    modepbs_consolid_days: int = 20
+    modepbs_consolid_amp_max: float = 0.20
+    modepbs_breakout_lookback: int = 60
+    modepbs_big_pct_min: float = 7.0
+    modepbs_body_ratio_min: float = 0.55
+    modepbs_vol_mult: float = 1.25
+    modepbs_vol_ma: int = 20
+    modepbs_big_yang_gap: int = 15
+
     # mode98：日/周/月 KDJ（9,3,3）三线（K、D、J）均严格小于阈值
     mode98_kdj_threshold: float = 20.0
     mode98_kdj_n: int = 9
@@ -1641,6 +1655,218 @@ def _score_mode_bottom_big_yang(
         breakdown.append(
             (
                 f"低位{low_lookback}日位置{det['low_pos_pct']:.1f}% 量比{vr:.2f} 涨{pct:.2f}%",
+                0,
+            )
+        )
+    return score
+
+
+def _is_big_yang_row_modepbs(
+    r: KlineRow,
+    code: str,
+    name: str,
+    *,
+    big_pct_min: float,
+    body_ratio_min: float,
+) -> bool:
+    """平台突破首阳：允许 10% 板接近涨停的强阳（买点常为板块内最大阳）。"""
+    o, c, h, l_ = float(r.open), float(r.close), float(r.high), float(r.low)
+    if c <= o:
+        return False
+    pct = float(getattr(r, "pct_chg", 0.0) or 0.0)
+    if pct < big_pct_min:
+        return False
+    limit_pct = _limit_rate(code, name) * 100
+    if pct >= limit_pct - 0.001:
+        return False
+    rng = h - l_
+    if rng <= 0:
+        return False
+    if (c - o) / rng < body_ratio_min:
+        return False
+    return True
+
+
+def _match_mode_platform_breakout_first_yang(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    *,
+    phase_days_min: int = 45,
+    phase_days_max: int = 95,
+    rise_from_low_min: float = 0.20,
+    rise_from_low_max: float = 0.55,
+    consolid_days: int = 20,
+    consolid_amp_max: float = 0.20,
+    breakout_lookback: int = 60,
+    big_pct_min: float = 7.0,
+    body_ratio_min: float = 0.55,
+    vol_mult: float = 1.25,
+    vol_ma: int = 20,
+    big_yang_gap: int = 15,
+) -> Optional[Dict[str, float]]:
+    """mode平台突破首阳：阶段低点→约3个月震仓整理→突破平台首根放量大阳线。"""
+    n = len(rows)
+    need = max(
+        phase_days_max + 1,
+        breakout_lookback + 1,
+        consolid_days + 1,
+        vol_ma + 1,
+        big_yang_gap + 2,
+    )
+    if idx < need or idx >= n:
+        return None
+
+    r = rows[idx]
+    if not _is_big_yang_row_modepbs(
+        r, code, name, big_pct_min=big_pct_min, body_ratio_min=body_ratio_min
+    ):
+        return None
+
+    high_arr = np.array([float(x.high) for x in rows], dtype=float)
+    low_arr = np.array([float(x.low) for x in rows], dtype=float)
+    close_arr = np.array([float(x.close) for x in rows], dtype=float)
+    vol_arr = np.array([float(x.volume) for x in rows], dtype=float)
+
+    lo = idx - phase_days_max
+    hi = idx - phase_days_min
+    if lo < 0 or hi < lo:
+        return None
+    seg = low_arr[lo : hi + 1]
+    i_low = lo + int(np.argmin(seg))
+    phase_days = idx - i_low
+    if phase_days < phase_days_min or phase_days > phase_days_max:
+        return None
+
+    low_price = float(low_arr[i_low])
+    if low_price <= 0:
+        return None
+    close = float(r.close)
+    high = float(r.high)
+    volume = float(r.volume)
+    rise = (close - low_price) / low_price
+    if rise < rise_from_low_min or rise > rise_from_low_max:
+        return None
+
+    if idx < consolid_days:
+        return None
+    c_seg = rows[idx - consolid_days : idx]
+    c_closes = [float(x.close) for x in c_seg]
+    c_highs = [float(x.high) for x in c_seg]
+    c_lows = [float(x.low) for x in c_seg]
+    mean_c = float(np.mean(c_closes))
+    if mean_c <= 0:
+        return None
+    consolid_amp = (max(c_highs) - min(c_lows)) / mean_c
+    if consolid_amp > consolid_amp_max:
+        return None
+
+    if idx < breakout_lookback:
+        return None
+    prior_high = float(np.max(high_arr[idx - breakout_lookback : idx]))
+    if high <= prior_high:
+        return None
+    breakout_pct = (high - prior_high) / prior_high * 100.0
+
+    for j in range(idx - big_yang_gap, idx):
+        if j < 0:
+            continue
+        if _is_big_yang_row_modepbs(
+            rows[j], code, name, big_pct_min=big_pct_min, body_ratio_min=body_ratio_min
+        ):
+            return None
+
+    v_prev = float(vol_arr[idx - 1]) if idx >= 1 else 0.0
+    v_ma = float(np.mean(vol_arr[idx - vol_ma : idx])) if idx >= vol_ma else 0.0
+    v_base = max(v_prev, v_ma)
+    if v_base <= 0 or volume < vol_mult * v_base:
+        return None
+
+    o, c, h, l_ = float(r.open), float(r.close), float(r.high), float(r.low)
+    rng_d = h - l_
+    body_ratio = (c - o) / rng_d if rng_d > 0 else 0.0
+    pct = float(getattr(r, "pct_chg", 0.0) or 0.0)
+
+    wash_cnt = 0
+    for j in range(i_low, idx):
+        if _is_big_yang_row_modepbs(
+            rows[j], code, name, big_pct_min=big_pct_min, body_ratio_min=body_ratio_min
+        ):
+            wash_cnt += 1
+
+    return {
+        "close": close,
+        "low_date_idx": float(i_low),
+        "low_price": low_price,
+        "phase_days": float(phase_days),
+        "rise_from_low_pct": rise * 100.0,
+        "consolid_amp_pct": consolid_amp * 100.0,
+        "prior_high": prior_high,
+        "breakout_pct": breakout_pct,
+        "vol_today": volume,
+        "vol_base": v_base,
+        "vol_ratio": volume / v_base,
+        "pct_chg": pct,
+        "body_ratio": body_ratio,
+        "wash_big_yang_cnt": float(wash_cnt),
+    }
+
+
+def _score_mode_platform_breakout_first_yang(
+    rows: List[KlineRow],
+    idx: int,
+    ma10: np.ndarray,
+    ma20: np.ndarray,
+    ma60: np.ndarray,
+    vol20: np.ndarray,
+    code: str = "",
+    name: str = "",
+    breakdown: Optional[List[tuple]] = None,
+    *,
+    phase_days_min: int = 45,
+    phase_days_max: int = 95,
+    rise_from_low_min: float = 0.20,
+    rise_from_low_max: float = 0.55,
+    consolid_days: int = 20,
+    consolid_amp_max: float = 0.20,
+    breakout_lookback: int = 60,
+    big_pct_min: float = 7.0,
+    body_ratio_min: float = 0.55,
+    vol_mult: float = 1.25,
+    vol_ma: int = 20,
+    big_yang_gap: int = 15,
+) -> int:
+    _ = (ma10, ma20, ma60, vol20)
+    det = _match_mode_platform_breakout_first_yang(
+        rows,
+        idx,
+        code,
+        name,
+        phase_days_min=phase_days_min,
+        phase_days_max=phase_days_max,
+        rise_from_low_min=rise_from_low_min,
+        rise_from_low_max=rise_from_low_max,
+        consolid_days=consolid_days,
+        consolid_amp_max=consolid_amp_max,
+        breakout_lookback=breakout_lookback,
+        big_pct_min=big_pct_min,
+        body_ratio_min=body_ratio_min,
+        vol_mult=vol_mult,
+        vol_ma=vol_ma,
+        big_yang_gap=big_yang_gap,
+    )
+    if not det:
+        return 0
+    vr = float(det["vol_ratio"])
+    pct = float(det["pct_chg"])
+    brk = float(det["breakout_pct"])
+    score = int(min(100, max(0, round(52 + vr * 5 + pct * 1.2 + brk * 1.5))))
+    if breakdown is not None:
+        breakdown.append(
+            (
+                f"震仓{int(det['phase_days'])}日 自低+{det['rise_from_low_pct']:.1f}% "
+                f"突破+{brk:.1f}% 量比{vr:.2f} 涨{pct:.1f}%",
                 0,
             )
         )

@@ -128,6 +128,8 @@ class ScanConfig:
     modepbs_vol_mult: float = 1.25
     modepbs_vol_ma: int = 20
     modepbs_big_yang_gap: int = 15
+    modepbs_high100_lookback: int = 100
+    modepbs_high100_near_min: float = 0.95  # 信号日最高 >= 前100日最高×该值（贴近或刚突破100日新高）
 
     # mode98：日/周/月 KDJ（9,3,3）三线（K、D、J）均严格小于阈值
     mode98_kdj_threshold: float = 20.0
@@ -1705,12 +1707,15 @@ def _match_mode_platform_breakout_first_yang(
     vol_mult: float = 1.25,
     vol_ma: int = 20,
     big_yang_gap: int = 15,
+    high100_lookback: int = 100,
+    high100_near_min: float = 0.95,
 ) -> Optional[Dict[str, float]]:
     """mode平台突破首阳：阶段低点→约3个月震仓整理→突破平台首根放量大阳线。"""
     n = len(rows)
     need = max(
         phase_days_max + 1,
         breakout_lookback + 1,
+        high100_lookback + 1,
         consolid_days + 1,
         vol_ma + 1,
         big_yang_gap + 2,
@@ -1769,6 +1774,15 @@ def _match_mode_platform_breakout_first_yang(
         return None
     breakout_pct = (high - prior_high) / prior_high * 100.0
 
+    if idx < high100_lookback:
+        return None
+    prior_high100 = float(np.max(high_arr[idx - high100_lookback : idx]))
+    if prior_high100 <= 0:
+        return None
+    high100_ratio = high / prior_high100
+    if high100_ratio < high100_near_min:
+        return None
+
     for j in range(idx - big_yang_gap, idx):
         if j < 0:
             continue
@@ -1804,6 +1818,8 @@ def _match_mode_platform_breakout_first_yang(
         "consolid_amp_pct": consolid_amp * 100.0,
         "prior_high": prior_high,
         "breakout_pct": breakout_pct,
+        "prior_high100": prior_high100,
+        "high100_ratio": high100_ratio,
         "vol_today": volume,
         "vol_base": v_base,
         "vol_ratio": volume / v_base,
@@ -1836,6 +1852,8 @@ def _score_mode_platform_breakout_first_yang(
     vol_mult: float = 1.25,
     vol_ma: int = 20,
     big_yang_gap: int = 15,
+    high100_lookback: int = 100,
+    high100_near_min: float = 0.95,
 ) -> int:
     _ = (ma10, ma20, ma60, vol20)
     det = _match_mode_platform_breakout_first_yang(
@@ -1855,18 +1873,21 @@ def _score_mode_platform_breakout_first_yang(
         vol_mult=vol_mult,
         vol_ma=vol_ma,
         big_yang_gap=big_yang_gap,
+        high100_lookback=high100_lookback,
+        high100_near_min=high100_near_min,
     )
     if not det:
         return 0
     vr = float(det["vol_ratio"])
     pct = float(det["pct_chg"])
     brk = float(det["breakout_pct"])
-    score = int(min(100, max(0, round(52 + vr * 5 + pct * 1.2 + brk * 1.5))))
+    h100r = float(det["high100_ratio"])
+    score = int(min(100, max(0, round(50 + vr * 5 + pct * 1.2 + brk * 1.5 + (h100r - 0.95) * 80))))
     if breakdown is not None:
         breakdown.append(
             (
                 f"震仓{int(det['phase_days'])}日 自低+{det['rise_from_low_pct']:.1f}% "
-                f"突破+{brk:.1f}% 量比{vr:.2f} 涨{pct:.1f}%",
+                f"100日高比{h100r:.2f} 突破+{brk:.1f}% 量比{vr:.2f} 涨{pct:.1f}%",
                 0,
             )
         )

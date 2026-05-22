@@ -7,6 +7,7 @@ mode平台突破首阳
 - **阶段低点 L**：在信号日前 45～95 日内寻最低低点，自 L 收盘涨幅 20%～55%
 - **末段整理**：信号前 consolid_days 日振幅/均价 <= consolid_amp_max（默认 20%）
 - **突破**：当日最高价 > 近 breakout_lookback 日最高（默认 60）
+- **100日新高**：当日最高价 >= 前 100 日最高 × high100_near_min（默认 0.95，贴近或刚突破）
 - **大阳线**：收阳；涨幅 >= big_pct_min；实体/振幅 >= body_ratio_min
 - **放量**：量 >= vol_mult × max(昨量, vol_ma 日均量)
 - **首阳**：前 big_yang_gap 日无同标准大阳线
@@ -62,6 +63,8 @@ def main() -> None:
     ap.add_argument("--vol-mult", type=float, default=1.25)
     ap.add_argument("--vol-ma", type=int, default=20)
     ap.add_argument("--big-yang-gap", type=int, default=15)
+    ap.add_argument("--high100-lookback", type=int, default=100)
+    ap.add_argument("--high100-near-min", type=float, default=0.95, help="信号日最高/前100日最高下限")
     ap.add_argument("--skip-st", action="store_true")
     ap.add_argument("--allow-refresh", action="store_true")
     ap.add_argument("--out", default="")
@@ -82,6 +85,8 @@ def main() -> None:
         vol_mult=float(args.vol_mult),
         vol_ma=int(args.vol_ma),
         big_yang_gap=int(args.big_yang_gap),
+        high100_lookback=int(args.high100_lookback),
+        high100_near_min=float(args.high100_near_min),
     )
 
     name_map = load_stock_list_csv(STOCK_LIST_CSV) if os.path.exists(STOCK_LIST_CSV) else {}
@@ -92,7 +97,7 @@ def main() -> None:
 
     hits: List[Tuple[str, str, Dict[str, float], str, str]] = []
 
-    min_len = max(120, int(args.phase_days_max) + int(args.breakout_lookback) + 5)
+    min_len = max(120, int(args.phase_days_max) + int(args.high100_lookback) + 5)
 
     for item in stock_list:
         if args.skip_st and _is_st(item.name or ""):
@@ -157,6 +162,8 @@ def main() -> None:
                 "consolid_amp_pct",
                 "prior_high",
                 "breakout_pct",
+                "prior_high100",
+                "high100_ratio",
                 "body_ratio",
                 "wash_big_yang_cnt",
             ]
@@ -176,6 +183,8 @@ def main() -> None:
                     f"{m['consolid_amp_pct']:.2f}",
                     f"{m['prior_high']:.4f}",
                     f"{m['breakout_pct']:.2f}",
+                    f"{m['prior_high100']:.4f}",
+                    f"{m['high100_ratio']:.3f}",
                     f"{m['body_ratio']:.3f}",
                     int(m["wash_big_yang_cnt"]),
                 ]
@@ -187,17 +196,18 @@ def main() -> None:
         f"  震仓 {args.phase_days_min}～{args.phase_days_max} 日  "
         f"自低涨幅 {args.rise_min:.0%}～{args.rise_max:.0%}  "
         f"前{args.consolid_days}日振幅≤{args.consolid_amp_max:.0%}  "
-        f"突破{args.breakout_lookback}日高  大阳≥{args.big_pct_min}%  "
+        f"突破{args.breakout_lookback}日高  100日高比≥{args.high100_near_min:.0%}  "
+        f"大阳≥{args.big_pct_min}%  "
         f"量≥{args.vol_mult}×"
     )
     print(f"命中 {len(hits)} 只\n")
-    print("代码      名称            低日期      震仓  突破%  量比  涨幅%  自低%")
+    print("代码      名称            低日期      震仓  100日  突破%  量比  涨幅%")
     print("-" * 72)
     for code, name, m, sig_date, low_date in hits[:50]:
         print(
             f"{code}  {(name or '')[:10]:<10}  {low_date}  "
-            f"{int(m['phase_days']):3d}  {m['breakout_pct']:5.1f}  "
-            f"{m['vol_ratio']:4.1f}  {m['pct_chg']:5.1f}  {m['rise_from_low_pct']:5.1f}"
+            f"{int(m['phase_days']):3d}  {m['high100_ratio']:4.2f}  "
+            f"{m['breakout_pct']:5.1f}  {m['vol_ratio']:4.1f}  {m['pct_chg']:5.1f}"
         )
     if len(hits) > 50:
         print(f"... 共 {len(hits)} 只，见 CSV")

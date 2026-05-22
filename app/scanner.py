@@ -123,13 +123,22 @@ class ScanConfig:
     modepbs_consolid_days: int = 20
     modepbs_consolid_amp_max: float = 0.20
     modepbs_breakout_lookback: int = 60
+    modepbs_breakout_near_min: float = 0.93  # 信号日最高 >= 近60日最高×该值（贴近或突破箱顶）
     modepbs_big_pct_min: float = 7.0
     modepbs_body_ratio_min: float = 0.55
     modepbs_vol_mult: float = 1.25
     modepbs_vol_ma: int = 20
     modepbs_big_yang_gap: int = 15
     modepbs_high100_lookback: int = 100
-    modepbs_high100_near_min: float = 0.95  # 信号日最高 >= 前100日最高×该值（贴近或刚突破100日新高）
+    modepbs_high100_near_min: float = 0.93  # 信号日最高 >= 前100日最高×该值（贴近或刚突破100日新高）
+    modepbs_vol_ratio_max: float = 4.0  # 量比上限，排除异常放量试探（0=不限）
+    modepbs_vol_ratio_extended_max: float = 6.5  # 100日突破且震仓大阳≥3时允许更高量比
+    modepbs_vol_high100_wash_min: int = 3
+    modepbs_upper_ratio_max: float = 0.20  # 上影线/振幅上限，排除长上影假突破
+    modepbs_upper_ratio_extended_max: float = 0.30  # 100日突破且量比≥4时放宽上影
+    modepbs_upper_high100_vol_min: float = 4.0
+    modepbs_wash_close_min_cnt: int = 2  # 震仓期大阳线≥该值时，要求收盘贴近箱顶
+    modepbs_wash_close60_min: float = 0.98  # 上述情况下 close >= 近60日高×该值（100日突破可豁免）
 
     # mode98：日/周/月 KDJ（9,3,3）三线（K、D、J）均严格小于阈值
     mode98_kdj_threshold: float = 20.0
@@ -1702,15 +1711,24 @@ def _match_mode_platform_breakout_first_yang(
     consolid_days: int = 20,
     consolid_amp_max: float = 0.20,
     breakout_lookback: int = 60,
+    breakout_near_min: float = 0.93,
     big_pct_min: float = 7.0,
     body_ratio_min: float = 0.55,
     vol_mult: float = 1.25,
     vol_ma: int = 20,
     big_yang_gap: int = 15,
     high100_lookback: int = 100,
-    high100_near_min: float = 0.95,
+    high100_near_min: float = 0.93,
+    vol_ratio_max: float = 4.0,
+    vol_ratio_extended_max: float = 6.5,
+    vol_high100_wash_min: int = 3,
+    upper_ratio_max: float = 0.20,
+    upper_ratio_extended_max: float = 0.30,
+    upper_high100_vol_min: float = 4.0,
+    wash_close_min_cnt: int = 2,
+    wash_close60_min: float = 0.98,
 ) -> Optional[Dict[str, float]]:
-    """mode平台突破首阳：阶段低点→约3个月震仓整理→突破平台首根放量大阳线。"""
+    """mode平台突破首阳：阶段低点→约3个月震仓整理→贴近/突破平台首根放量大阳线。"""
     n = len(rows)
     need = max(
         phase_days_max + 1,
@@ -1770,7 +1788,10 @@ def _match_mode_platform_breakout_first_yang(
     if idx < breakout_lookback:
         return None
     prior_high = float(np.max(high_arr[idx - breakout_lookback : idx]))
-    if high <= prior_high:
+    if prior_high <= 0:
+        return None
+    breakout_ratio = high / prior_high
+    if breakout_ratio < breakout_near_min:
         return None
     breakout_pct = (high - prior_high) / prior_high * 100.0
 
@@ -1800,7 +1821,9 @@ def _match_mode_platform_breakout_first_yang(
     o, c, h, l_ = float(r.open), float(r.close), float(r.high), float(r.low)
     rng_d = h - l_
     body_ratio = (c - o) / rng_d if rng_d > 0 else 0.0
+    upper_ratio = (h - max(o, c)) / rng_d if rng_d > 0 else 0.0
     pct = float(getattr(r, "pct_chg", 0.0) or 0.0)
+    vol_ratio = volume / v_base
 
     wash_cnt = 0
     for j in range(i_low, idx):
@@ -1808,6 +1831,32 @@ def _match_mode_platform_breakout_first_yang(
             rows[j], code, name, big_pct_min=big_pct_min, body_ratio_min=body_ratio_min
         ):
             wash_cnt += 1
+
+    if vol_ratio_max > 0 and vol_ratio > vol_ratio_max:
+        ext_ok = (
+            vol_ratio_extended_max > 0
+            and vol_ratio <= vol_ratio_extended_max
+            and high100_ratio >= 1.0
+            and vol_high100_wash_min > 0
+            and wash_cnt >= vol_high100_wash_min
+        )
+        if not ext_ok:
+            return None
+    if upper_ratio_max > 0 and upper_ratio > upper_ratio_max:
+        ext_ok = (
+            upper_ratio_extended_max > 0
+            and upper_ratio <= upper_ratio_extended_max
+            and high100_ratio >= 1.0
+            and upper_high100_vol_min > 0
+            and vol_ratio >= upper_high100_vol_min
+        )
+        if not ext_ok:
+            return None
+
+    close_break60 = close / prior_high if prior_high > 0 else 0.0
+    if wash_close_min_cnt > 0 and wash_cnt >= wash_close_min_cnt:
+        if close_break60 < wash_close60_min and high100_ratio < 1.0:
+            return None
 
     return {
         "close": close,
@@ -1817,14 +1866,17 @@ def _match_mode_platform_breakout_first_yang(
         "rise_from_low_pct": rise * 100.0,
         "consolid_amp_pct": consolid_amp * 100.0,
         "prior_high": prior_high,
+        "breakout_ratio": breakout_ratio,
         "breakout_pct": breakout_pct,
         "prior_high100": prior_high100,
         "high100_ratio": high100_ratio,
         "vol_today": volume,
         "vol_base": v_base,
-        "vol_ratio": volume / v_base,
+        "vol_ratio": vol_ratio,
         "pct_chg": pct,
         "body_ratio": body_ratio,
+        "upper_ratio": upper_ratio,
+        "close_break60": close_break60,
         "wash_big_yang_cnt": float(wash_cnt),
     }
 
@@ -1847,13 +1899,22 @@ def _score_mode_platform_breakout_first_yang(
     consolid_days: int = 20,
     consolid_amp_max: float = 0.20,
     breakout_lookback: int = 60,
+    breakout_near_min: float = 0.93,
     big_pct_min: float = 7.0,
     body_ratio_min: float = 0.55,
     vol_mult: float = 1.25,
     vol_ma: int = 20,
     big_yang_gap: int = 15,
     high100_lookback: int = 100,
-    high100_near_min: float = 0.95,
+    high100_near_min: float = 0.93,
+    vol_ratio_max: float = 4.0,
+    vol_ratio_extended_max: float = 6.5,
+    vol_high100_wash_min: int = 3,
+    upper_ratio_max: float = 0.20,
+    upper_ratio_extended_max: float = 0.30,
+    upper_high100_vol_min: float = 4.0,
+    wash_close_min_cnt: int = 2,
+    wash_close60_min: float = 0.98,
 ) -> int:
     _ = (ma10, ma20, ma60, vol20)
     det = _match_mode_platform_breakout_first_yang(
@@ -1868,6 +1929,7 @@ def _score_mode_platform_breakout_first_yang(
         consolid_days=consolid_days,
         consolid_amp_max=consolid_amp_max,
         breakout_lookback=breakout_lookback,
+        breakout_near_min=breakout_near_min,
         big_pct_min=big_pct_min,
         body_ratio_min=body_ratio_min,
         vol_mult=vol_mult,
@@ -1875,6 +1937,14 @@ def _score_mode_platform_breakout_first_yang(
         big_yang_gap=big_yang_gap,
         high100_lookback=high100_lookback,
         high100_near_min=high100_near_min,
+        vol_ratio_max=vol_ratio_max,
+        upper_ratio_max=upper_ratio_max,
+        vol_ratio_extended_max=vol_ratio_extended_max,
+        vol_high100_wash_min=vol_high100_wash_min,
+        upper_ratio_extended_max=upper_ratio_extended_max,
+        upper_high100_vol_min=upper_high100_vol_min,
+        wash_close_min_cnt=wash_close_min_cnt,
+        wash_close60_min=wash_close60_min,
     )
     if not det:
         return 0
@@ -1882,12 +1952,16 @@ def _score_mode_platform_breakout_first_yang(
     pct = float(det["pct_chg"])
     brk = float(det["breakout_pct"])
     h100r = float(det["high100_ratio"])
-    score = int(min(100, max(0, round(50 + vr * 5 + pct * 1.2 + brk * 1.5 + (h100r - 0.95) * 80))))
+    br = float(det["breakout_ratio"])
+    platform_pts = max(brk * 1.5, 0.0) + max(h100r - high100_near_min, 0.0) * 100.0
+    platform_pts += max(br - breakout_near_min, 0.0) * 80.0
+    score = int(min(100, max(0, round(50 + vr * 5 + pct * 1.2 + platform_pts))))
     if breakdown is not None:
+        brk_label = f"突破+{brk:.1f}%" if brk >= 0 else f"贴顶{br:.2f}"
         breakdown.append(
             (
                 f"震仓{int(det['phase_days'])}日 自低+{det['rise_from_low_pct']:.1f}% "
-                f"100日高比{h100r:.2f} 突破+{brk:.1f}% 量比{vr:.2f} 涨{pct:.1f}%",
+                f"100日高比{h100r:.2f} {brk_label} 量比{vr:.2f} 涨{pct:.1f}%",
                 0,
             )
         )
@@ -3578,13 +3652,22 @@ def scan_with_mode3(
             mpbs_cd = int(getattr(config, "modepbs_consolid_days", 20) or 20)
             mpbs_ca = float(getattr(config, "modepbs_consolid_amp_max", 0.20) or 0.20)
             mpbs_bl = int(getattr(config, "modepbs_breakout_lookback", 60) or 60)
+            mpbs_bn = float(getattr(config, "modepbs_breakout_near_min", 0.93) or 0.93)
             mpbs_pct = float(getattr(config, "modepbs_big_pct_min", 7.0) or 7.0)
             mpbs_body = float(getattr(config, "modepbs_body_ratio_min", 0.55) or 0.55)
             mpbs_vm = float(getattr(config, "modepbs_vol_mult", 1.25) or 1.25)
             mpbs_vma = int(getattr(config, "modepbs_vol_ma", 20) or 20)
             mpbs_gap = int(getattr(config, "modepbs_big_yang_gap", 15) or 15)
             mpbs_h100 = int(getattr(config, "modepbs_high100_lookback", 100) or 100)
-            mpbs_h100n = float(getattr(config, "modepbs_high100_near_min", 0.95) or 0.95)
+            mpbs_h100n = float(getattr(config, "modepbs_high100_near_min", 0.93) or 0.93)
+            mpbs_vmax = float(getattr(config, "modepbs_vol_ratio_max", 4.0) or 4.0)
+            mpbs_vext = float(getattr(config, "modepbs_vol_ratio_extended_max", 6.5) or 6.5)
+            mpbs_vhw = int(getattr(config, "modepbs_vol_high100_wash_min", 3) or 3)
+            mpbs_umax = float(getattr(config, "modepbs_upper_ratio_max", 0.20) or 0.20)
+            mpbs_uext = float(getattr(config, "modepbs_upper_ratio_extended_max", 0.30) or 0.30)
+            mpbs_uhv = float(getattr(config, "modepbs_upper_high100_vol_min", 4.0) or 4.0)
+            mpbs_wcm = int(getattr(config, "modepbs_wash_close_min_cnt", 2) or 2)
+            mpbs_wc60 = float(getattr(config, "modepbs_wash_close60_min", 0.98) or 0.98)
             need_i = max(
                 mpbs_pmax + 1,
                 mpbs_bl + 1,
@@ -3614,6 +3697,7 @@ def scan_with_mode3(
                     consolid_days=mpbs_cd,
                     consolid_amp_max=mpbs_ca,
                     breakout_lookback=mpbs_bl,
+                    breakout_near_min=mpbs_bn,
                     big_pct_min=mpbs_pct,
                     body_ratio_min=mpbs_body,
                     vol_mult=mpbs_vm,
@@ -3621,6 +3705,14 @@ def scan_with_mode3(
                     big_yang_gap=mpbs_gap,
                     high100_lookback=mpbs_h100,
                     high100_near_min=mpbs_h100n,
+                    vol_ratio_max=mpbs_vmax,
+                    vol_ratio_extended_max=mpbs_vext,
+                    vol_high100_wash_min=mpbs_vhw,
+                    upper_ratio_max=mpbs_umax,
+                    upper_ratio_extended_max=mpbs_uext,
+                    upper_high100_vol_min=mpbs_uhv,
+                    wash_close_min_cnt=mpbs_wcm,
+                    wash_close60_min=mpbs_wc60,
                 ):
                     signals.append(i)
         else:

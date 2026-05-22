@@ -6,13 +6,14 @@ mode平台突破首阳
 
 - **阶段低点 L**：在信号日前 45～95 日内寻最低低点，自 L 收盘涨幅 20%～55%
 - **末段整理**：信号前 consolid_days 日振幅/均价 <= consolid_amp_max（默认 20%）
-- **突破**：当日最高价 > 近 breakout_lookback 日最高（默认 60）
-- **100日新高**：当日最高价 >= 前 100 日最高 × high100_near_min（默认 0.95，贴近或刚突破）
+- **突破**：当日最高价 >= 近 breakout_lookback 日最高 × breakout_near_min（默认 0.93，贴近或突破箱顶）
+- **100日新高**：当日最高价 >= 前 100 日最高 × high100_near_min（默认 0.93，贴近或刚突破）
+- **质量过滤**：量比 ≤ vol_ratio_max（默认 4）；上影/振幅 ≤ upper_ratio_max（默认 0.20）；震仓期大阳线 ≥ wash_close_min_cnt 时，收盘须 ≥ 近60日高 × wash_close60_min（默认 0.98）
 - **大阳线**：收阳；涨幅 >= big_pct_min；实体/振幅 >= body_ratio_min
 - **放量**：量 >= vol_mult × max(昨量, vol_ma 日均量)
 - **首阳**：前 big_yang_gap 日无同标准大阳线
 
-参考样本：京源环保 688096（2026-05-08）、斯达半导 603290（2026-05-13）
+参考样本：京源环保 688096（2026-05-08）、泰和新材 002254（2026-05-12）、斯达半导 603290（2026-05-13）
 
 用法:
   python3 scripts/scan_platform_breakout_first_yang.py --date 2026-05-15 --skip-st
@@ -58,13 +59,18 @@ def main() -> None:
     ap.add_argument("--consolid-days", type=int, default=20)
     ap.add_argument("--consolid-amp-max", type=float, default=0.20)
     ap.add_argument("--breakout-lookback", type=int, default=60)
+    ap.add_argument("--breakout-near-min", type=float, default=0.93, help="信号日最高/近60日最高下限")
     ap.add_argument("--big-pct-min", type=float, default=7.0)
     ap.add_argument("--body-ratio-min", type=float, default=0.55)
     ap.add_argument("--vol-mult", type=float, default=1.25)
     ap.add_argument("--vol-ma", type=int, default=20)
     ap.add_argument("--big-yang-gap", type=int, default=15)
     ap.add_argument("--high100-lookback", type=int, default=100)
-    ap.add_argument("--high100-near-min", type=float, default=0.95, help="信号日最高/前100日最高下限")
+    ap.add_argument("--high100-near-min", type=float, default=0.93, help="信号日最高/前100日最高下限")
+    ap.add_argument("--vol-ratio-max", type=float, default=4.0, help="量比上限，0=不限")
+    ap.add_argument("--upper-ratio-max", type=float, default=0.20, help="上影线/振幅上限，0=不限")
+    ap.add_argument("--wash-close-min-cnt", type=int, default=2, help="震仓期大阳线≥该值时要求收盘贴近箱顶")
+    ap.add_argument("--wash-close60-min", type=float, default=0.98, help="上述情况下收盘/近60日高下限")
     ap.add_argument("--skip-st", action="store_true")
     ap.add_argument("--allow-refresh", action="store_true")
     ap.add_argument("--out", default="")
@@ -80,6 +86,7 @@ def main() -> None:
         consolid_days=int(args.consolid_days),
         consolid_amp_max=float(args.consolid_amp_max),
         breakout_lookback=int(args.breakout_lookback),
+        breakout_near_min=float(args.breakout_near_min),
         big_pct_min=float(args.big_pct_min),
         body_ratio_min=float(args.body_ratio_min),
         vol_mult=float(args.vol_mult),
@@ -87,6 +94,10 @@ def main() -> None:
         big_yang_gap=int(args.big_yang_gap),
         high100_lookback=int(args.high100_lookback),
         high100_near_min=float(args.high100_near_min),
+        vol_ratio_max=float(args.vol_ratio_max),
+        upper_ratio_max=float(args.upper_ratio_max),
+        wash_close_min_cnt=int(args.wash_close_min_cnt),
+        wash_close60_min=float(args.wash_close60_min),
     )
 
     name_map = load_stock_list_csv(STOCK_LIST_CSV) if os.path.exists(STOCK_LIST_CSV) else {}
@@ -196,7 +207,8 @@ def main() -> None:
         f"  震仓 {args.phase_days_min}～{args.phase_days_max} 日  "
         f"自低涨幅 {args.rise_min:.0%}～{args.rise_max:.0%}  "
         f"前{args.consolid_days}日振幅≤{args.consolid_amp_max:.0%}  "
-        f"突破{args.breakout_lookback}日高  100日高比≥{args.high100_near_min:.0%}  "
+        f"{args.breakout_lookback}日高比≥{args.breakout_near_min:.0%}  "
+        f"100日高比≥{args.high100_near_min:.0%}  "
         f"大阳≥{args.big_pct_min}%  "
         f"量≥{args.vol_mult}×"
     )

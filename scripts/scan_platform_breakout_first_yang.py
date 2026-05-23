@@ -5,15 +5,15 @@ mode平台突破首阳
 约 3 个月（45～95 交易日）吸筹/震仓/整理后，信号日为突破平台的第一根放量大阳线（买点）：
 
 - **阶段低点 L**：在信号日前 45～95 日内寻最低低点，自 L 收盘涨幅 20%～55%
-- **末段整理**：信号前 consolid_days 日振幅/均价 <= consolid_amp_max（默认 20%）
+- **末段整理**：信号前 consolid_days 日振幅/均价 <= consolid_amp_max（默认 21%）
 - **突破**：当日最高价 >= 近 breakout_lookback 日最高 × breakout_near_min（默认 0.93，贴近或突破箱顶）
 - **100日新高**：当日最高价 >= 前 100 日最高 × high100_near_min（默认 0.93，贴近或刚突破）
 - **质量过滤**：量比 ≤ vol_ratio_max（默认 4）；上影/振幅 ≤ upper_ratio_max（默认 0.20）；震仓期大阳线 ≥ wash_close_min_cnt 时，收盘须 ≥ 近60日高 × wash_close60_min（默认 0.98）
 - **大阳线**：收阳；涨幅 >= big_pct_min；实体/振幅 >= body_ratio_min
 - **放量**：量 >= vol_mult × max(昨量, vol_ma 日均量)
-- **首阳**：前 big_yang_gap 日无同标准大阳线
+- **首阳**：前 big_yang_gap 日内无「贴顶大阳」（该日 60 日高比 >= gap_breakout_near_min，默认 0.93）；震仓期低位反弹大阳不计占用
 
-参考样本：京源环保 688096（2026-05-08）、泰和新材 002254（2026-05-12）、斯达半导 603290（2026-05-13）
+参考样本：京源环保 688096（2026-05-08）、泰和新材 002254（2026-05-12）、农尚环境 300536（2026-04-30）、斯达半导 603290（2026-05-13）
 
 用法:
   python3 scripts/scan_platform_breakout_first_yang.py --date 2026-05-15 --skip-st
@@ -57,7 +57,7 @@ def main() -> None:
     ap.add_argument("--rise-min", type=float, default=0.20, help="自阶段低点最低涨幅(比例)")
     ap.add_argument("--rise-max", type=float, default=0.55, help="自阶段低点最高涨幅(比例)")
     ap.add_argument("--consolid-days", type=int, default=20)
-    ap.add_argument("--consolid-amp-max", type=float, default=0.20)
+    ap.add_argument("--consolid-amp-max", type=float, default=0.21)
     ap.add_argument("--breakout-lookback", type=int, default=60)
     ap.add_argument("--breakout-near-min", type=float, default=0.93, help="信号日最高/近60日最高下限")
     ap.add_argument("--big-pct-min", type=float, default=7.0)
@@ -65,6 +65,7 @@ def main() -> None:
     ap.add_argument("--vol-mult", type=float, default=1.25)
     ap.add_argument("--vol-ma", type=int, default=20)
     ap.add_argument("--big-yang-gap", type=int, default=15)
+    ap.add_argument("--gap-breakout-near-min", type=float, default=0.93, help="前序大阳占用首阳须达到的60日高比")
     ap.add_argument("--high100-lookback", type=int, default=100)
     ap.add_argument("--high100-near-min", type=float, default=0.93, help="信号日最高/前100日最高下限")
     ap.add_argument("--vol-ratio-max", type=float, default=4.0, help="量比上限，0=不限")
@@ -92,6 +93,7 @@ def main() -> None:
         vol_mult=float(args.vol_mult),
         vol_ma=int(args.vol_ma),
         big_yang_gap=int(args.big_yang_gap),
+        gap_breakout_near_min=float(args.gap_breakout_near_min),
         high100_lookback=int(args.high100_lookback),
         high100_near_min=float(args.high100_near_min),
         vol_ratio_max=float(args.vol_ratio_max),

@@ -121,7 +121,7 @@ class ScanConfig:
     modepbs_rise_from_low_min: float = 0.20
     modepbs_rise_from_low_max: float = 0.55
     modepbs_consolid_days: int = 20
-    modepbs_consolid_amp_max: float = 0.20
+    modepbs_consolid_amp_max: float = 0.21
     modepbs_breakout_lookback: int = 60
     modepbs_breakout_near_min: float = 0.93  # 信号日最高 >= 近60日最高×该值（贴近或突破箱顶）
     modepbs_big_pct_min: float = 7.0
@@ -129,6 +129,7 @@ class ScanConfig:
     modepbs_vol_mult: float = 1.25
     modepbs_vol_ma: int = 20
     modepbs_big_yang_gap: int = 15
+    modepbs_gap_breakout_near_min: float = 0.93  # 前序大阳须贴顶(60日高比≥该值)才算占用首阳
     modepbs_high100_lookback: int = 100
     modepbs_high100_near_min: float = 0.93  # 信号日最高 >= 前100日最高×该值（贴近或刚突破100日新高）
     modepbs_vol_ratio_max: float = 4.0  # 量比上限，排除异常放量试探（0=不限）
@@ -1709,7 +1710,7 @@ def _match_mode_platform_breakout_first_yang(
     rise_from_low_min: float = 0.20,
     rise_from_low_max: float = 0.55,
     consolid_days: int = 20,
-    consolid_amp_max: float = 0.20,
+    consolid_amp_max: float = 0.21,
     breakout_lookback: int = 60,
     breakout_near_min: float = 0.93,
     big_pct_min: float = 7.0,
@@ -1717,6 +1718,7 @@ def _match_mode_platform_breakout_first_yang(
     vol_mult: float = 1.25,
     vol_ma: int = 20,
     big_yang_gap: int = 15,
+    gap_breakout_near_min: float = 0.93,
     high100_lookback: int = 100,
     high100_near_min: float = 0.93,
     vol_ratio_max: float = 4.0,
@@ -1807,9 +1809,16 @@ def _match_mode_platform_breakout_first_yang(
     for j in range(idx - big_yang_gap, idx):
         if j < 0:
             continue
-        if _is_big_yang_row_modepbs(
+        if not _is_big_yang_row_modepbs(
             rows[j], code, name, big_pct_min=big_pct_min, body_ratio_min=body_ratio_min
         ):
+            continue
+        if j < breakout_lookback:
+            continue
+        prior_high_j = float(np.max(high_arr[j - breakout_lookback : j]))
+        if prior_high_j <= 0:
+            continue
+        if float(rows[j].high) / prior_high_j >= gap_breakout_near_min:
             return None
 
     v_prev = float(vol_arr[idx - 1]) if idx >= 1 else 0.0
@@ -1897,7 +1906,7 @@ def _score_mode_platform_breakout_first_yang(
     rise_from_low_min: float = 0.20,
     rise_from_low_max: float = 0.55,
     consolid_days: int = 20,
-    consolid_amp_max: float = 0.20,
+    consolid_amp_max: float = 0.21,
     breakout_lookback: int = 60,
     breakout_near_min: float = 0.93,
     big_pct_min: float = 7.0,
@@ -1905,6 +1914,7 @@ def _score_mode_platform_breakout_first_yang(
     vol_mult: float = 1.25,
     vol_ma: int = 20,
     big_yang_gap: int = 15,
+    gap_breakout_near_min: float = 0.93,
     high100_lookback: int = 100,
     high100_near_min: float = 0.93,
     vol_ratio_max: float = 4.0,
@@ -1935,6 +1945,7 @@ def _score_mode_platform_breakout_first_yang(
         vol_mult=vol_mult,
         vol_ma=vol_ma,
         big_yang_gap=big_yang_gap,
+        gap_breakout_near_min=gap_breakout_near_min,
         high100_lookback=high100_lookback,
         high100_near_min=high100_near_min,
         vol_ratio_max=vol_ratio_max,
@@ -3650,7 +3661,7 @@ def scan_with_mode3(
             mpbs_rmin = float(getattr(config, "modepbs_rise_from_low_min", 0.20) or 0.20)
             mpbs_rmax = float(getattr(config, "modepbs_rise_from_low_max", 0.55) or 0.55)
             mpbs_cd = int(getattr(config, "modepbs_consolid_days", 20) or 20)
-            mpbs_ca = float(getattr(config, "modepbs_consolid_amp_max", 0.20) or 0.20)
+            mpbs_ca = float(getattr(config, "modepbs_consolid_amp_max", 0.21) or 0.21)
             mpbs_bl = int(getattr(config, "modepbs_breakout_lookback", 60) or 60)
             mpbs_bn = float(getattr(config, "modepbs_breakout_near_min", 0.93) or 0.93)
             mpbs_pct = float(getattr(config, "modepbs_big_pct_min", 7.0) or 7.0)
@@ -3658,6 +3669,7 @@ def scan_with_mode3(
             mpbs_vm = float(getattr(config, "modepbs_vol_mult", 1.25) or 1.25)
             mpbs_vma = int(getattr(config, "modepbs_vol_ma", 20) or 20)
             mpbs_gap = int(getattr(config, "modepbs_big_yang_gap", 15) or 15)
+            mpbs_gbn = float(getattr(config, "modepbs_gap_breakout_near_min", 0.93) or 0.93)
             mpbs_h100 = int(getattr(config, "modepbs_high100_lookback", 100) or 100)
             mpbs_h100n = float(getattr(config, "modepbs_high100_near_min", 0.93) or 0.93)
             mpbs_vmax = float(getattr(config, "modepbs_vol_ratio_max", 4.0) or 4.0)
@@ -3703,6 +3715,7 @@ def scan_with_mode3(
                     vol_mult=mpbs_vm,
                     vol_ma=mpbs_vma,
                     big_yang_gap=mpbs_gap,
+                    gap_breakout_near_min=mpbs_gbn,
                     high100_lookback=mpbs_h100,
                     high100_near_min=mpbs_h100n,
                     vol_ratio_max=mpbs_vmax,

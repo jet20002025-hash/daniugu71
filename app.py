@@ -788,6 +788,7 @@ def run_mode3_scan(
     use_mode93: bool = False,
     use_mode_bottom_big_yang: bool = False,
     use_mode_platform_breakout_first_yang: bool = False,
+    use_mode_mid_big_yang: bool = False,
     use_mode98: bool = False,
     use_mode32: bool = False,
     user_id: Optional[int] = None,
@@ -915,6 +916,9 @@ def run_mode3_scan(
             "mode平台突破首阳"
             if use_mode_platform_breakout_first_yang
             else (
+            "mode中位大阳线"
+            if use_mode_mid_big_yang
+            else (
                 "mode12"
                 if use_mode12
                 else (
@@ -946,6 +950,7 @@ def run_mode3_scan(
                         )
                     )
                 )
+            )
             )
             )
             )
@@ -991,6 +996,7 @@ def run_mode3_scan(
             use_mode93=use_mode93,
             use_mode_bottom_big_yang=use_mode_bottom_big_yang,
             use_mode_platform_breakout_first_yang=use_mode_platform_breakout_first_yang,
+            use_mode_mid_big_yang=use_mode_mid_big_yang,
             use_mode98=use_mode98,
             use_mode32=use_mode32,
         )
@@ -1018,6 +1024,8 @@ def run_mode3_scan(
             model_tag = "mode底部大阳线"
         elif use_mode_platform_breakout_first_yang:
             model_tag = "mode平台突破首阳"
+        elif use_mode_mid_big_yang:
+            model_tag = "mode中位大阳线"
         elif mode4_filters:
             model_tag = "mode4"
         elif require_upper_shadow:
@@ -1328,7 +1336,7 @@ def scan():
         request_cancel(user_id)
         clear_pending_jobs(user_id)
         mode = request.form.get("mode", "mode9")
-        if mode not in ("mode3", "mode3ok", "mode3_avoid", "mode3_upper", "mode3_upper_strict", "mode3_upper_near", "mode4", "mode8", "mode9", "mode10", "mode11", "mode12", "mode90", "mode93", "mode底部大阳线", "mode平台突破首阳", "mode98", "mode32"):
+        if mode not in ("mode3", "mode3ok", "mode3_avoid", "mode3_upper", "mode3_upper_strict", "mode3_upper_near", "mode4", "mode8", "mode9", "mode10", "mode11", "mode12", "mode90", "mode93", "mode底部大阳线", "mode平台突破首阳", "mode中位大阳线", "mode98", "mode32"):
             mode = "mode9"
         cutoff_date = request.form.get("cutoff_date") or None
         start_date = request.form.get("start_date") or None
@@ -1368,7 +1376,7 @@ def scan():
     # 不排队：点击即在本进程起线程扫描；先发取消标记中断上一轮，再启动新任务
     request_cancel(user_id)
     mode = request.form.get("mode", "mode9")
-    if mode not in ("mode3", "mode3ok", "mode3_avoid", "mode3_upper", "mode3_upper_strict", "mode3_upper_near", "mode4", "mode8", "mode9", "mode10", "mode11", "mode12", "mode90", "mode93", "mode底部大阳线", "mode平台突破首阳", "mode98", "mode32"):
+    if mode not in ("mode3", "mode3ok", "mode3_avoid", "mode3_upper", "mode3_upper_strict", "mode3_upper_near", "mode4", "mode8", "mode9", "mode10", "mode11", "mode12", "mode90", "mode93", "mode底部大阳线", "mode平台突破首阳", "mode中位大阳线", "mode98", "mode32"):
         mode = "mode9"
     cutoff_date = request.form.get("cutoff_date") or None
     start_date = request.form.get("start_date") or None
@@ -1395,7 +1403,7 @@ def scan():
         max_market_cap=cap_limit,
     )
     use_startup_data = True
-    use_71x_standard = mode in ("mode3", "mode8", "mode9", "mode10", "mode11", "mode12", "mode90", "mode93", "mode底部大阳线", "mode平台突破首阳", "mode98", "mode32")
+    use_71x_standard = mode in ("mode3", "mode8", "mode9", "mode10", "mode11", "mode12", "mode90", "mode93", "mode底部大阳线", "mode平台突破首阳", "mode中位大阳线", "mode98", "mode32")
     is_paid = (
         g.current_user.is_activated and not getattr(g.current_user, "subscription_expired", True)
         or getattr(g.current_user, "is_super_admin", False)
@@ -1429,6 +1437,7 @@ def scan():
             mode == "mode93",
             mode == "mode底部大阳线",
             mode == "mode平台突破首阳",
+            mode == "mode中位大阳线",
             mode == "mode98",
             mode == "mode32",
             user_id,

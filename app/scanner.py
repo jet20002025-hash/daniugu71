@@ -143,6 +143,33 @@ class ScanConfig:
     modepbs_wash_close60_min: float = 0.98  # 上述情况下 close >= 近60日高×该值（100日突破可豁免）
     modepbs_pre_rise5_min: float = -0.05  # 信号前5日涨幅须 > 该值（默认-5%，排除急跌反弹）
 
+    # mode中位大阳线：主力介入大阳(锚点)→吸筹震仓→突破大阳买点（参考埃科光电688610）
+    mode_mby_anchor_days_min: int = 30
+    mode_mby_anchor_days_max: int = 90
+    mode_mby_anchor_vol_mult: float = 1.5
+    mode_mby_rise_from_anchor_min: float = 0.20
+    mode_mby_rise_from_anchor_max: float = 1.20
+    mode_mby_consolid_days: int = 20
+    mode_mby_consolid_amp_max: float = 0.35
+    mode_mby_breakout_lookback: int = 60
+    mode_mby_breakout_min: float = 1.0  # 信号日最高须严格突破近60日高
+    mode_mby_high100_lookback: int = 100
+    mode_mby_high100_min: float = 1.0
+    mode_mby_tight_consolid_amp_max: float = 0.15  # 末段整理极窄时允许更早突破
+    mode_mby_tight_vol_ratio_min: float = 1.8
+    mode_mby_tight_rise_from_anchor_min: float = 0.10
+    mode_mby_tight_high100_min: float = 0.985
+    mode_mby_big_pct_min: float = 7.0
+    mode_mby_big_pct_min_main: float = 4.5
+    mode_mby_body_ratio_min: float = 0.55
+    mode_mby_vol_mult: float = 1.25
+    mode_mby_vol_ma: int = 20
+    mode_mby_vol_ratio_max: float = 4.0
+    mode_mby_upper_ratio_max: float = 0.40
+    mode_mby_close_break60_min: float = 1.0
+    mode_mby_pre_rise5_min: float = -0.05
+    mode_mby_pre_rise5_max: float = 0.15  # 信号前5日涨幅须 <=15%，排除连板追高
+
     # mode98：日/周/月 KDJ（9,3,3）三线（K、D、J）均严格小于阈值
     mode98_kdj_threshold: float = 20.0
     mode98_kdj_n: int = 9
@@ -2021,6 +2048,295 @@ def _score_mode_platform_breakout_first_yang(
     return score
 
 
+def _vol_ratio_at(rows: List[KlineRow], idx: int, vol_ma: int) -> float:
+    vol_arr = np.array([float(x.volume) for x in rows], dtype=float)
+    v_prev = float(vol_arr[idx - 1]) if idx >= 1 else 0.0
+    v_ma = float(np.mean(vol_arr[idx - vol_ma : idx])) if idx >= vol_ma else 0.0
+    v_base = max(v_prev, v_ma)
+    if v_base <= 0:
+        return 0.0
+    return float(vol_arr[idx]) / v_base
+
+
+def _find_mode_mid_big_yang_anchor(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    *,
+    anchor_days_min: int,
+    anchor_days_max: int,
+    anchor_vol_mult: float,
+    big_pct_min: float,
+    big_pct_min_main: float,
+    body_ratio_min: float,
+    vol_ma: int,
+) -> Optional[int]:
+    """最早的主力介入大阳（锚点）：锚点前 anchor_days_min～max 日内，放量大阳线。"""
+    lo = max(vol_ma + 1, idx - anchor_days_max)
+    hi = idx - anchor_days_min
+    if hi < lo:
+        return None
+    anchor_idx: Optional[int] = None
+    for j in range(lo, hi + 1):
+        if not _is_big_yang_row_modepbs(
+            rows[j],
+            code,
+            name,
+            big_pct_min=big_pct_min,
+            big_pct_min_main=big_pct_min_main,
+            body_ratio_min=body_ratio_min,
+            for_signal=True,
+        ):
+            continue
+        if _vol_ratio_at(rows, j, vol_ma) < anchor_vol_mult:
+            continue
+        if anchor_idx is None or j < anchor_idx:
+            anchor_idx = j
+    return anchor_idx
+
+
+def _match_mode_mid_big_yang(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    *,
+    anchor_days_min: int = 30,
+    anchor_days_max: int = 90,
+    anchor_vol_mult: float = 1.5,
+    rise_from_anchor_min: float = 0.20,
+    rise_from_anchor_max: float = 1.20,
+    consolid_days: int = 20,
+    consolid_amp_max: float = 0.35,
+    breakout_lookback: int = 60,
+    breakout_min: float = 1.0,
+    high100_lookback: int = 100,
+    high100_min: float = 1.0,
+    tight_consolid_amp_max: float = 0.15,
+    tight_vol_ratio_min: float = 1.8,
+    tight_rise_from_anchor_min: float = 0.10,
+    tight_high100_min: float = 0.985,
+    big_pct_min: float = 7.0,
+    big_pct_min_main: float = 4.5,
+    body_ratio_min: float = 0.55,
+    vol_mult: float = 1.25,
+    vol_ma: int = 20,
+    vol_ratio_max: float = 4.0,
+    upper_ratio_max: float = 0.40,
+    close_break60_min: float = 1.0,
+    pre_rise5_min: float = -0.05,
+    pre_rise5_max: float = 0.15,
+) -> Optional[Dict[str, float]]:
+    """mode中位大阳线：锚点主力大阳→震仓→突破大阳（自锚点已有较大涨幅）。"""
+    n = len(rows)
+    need = max(
+        anchor_days_max + 1,
+        breakout_lookback + 1,
+        high100_lookback + 1,
+        consolid_days + 1,
+        vol_ma + 1,
+        6,
+    )
+    if idx < need or idx >= n:
+        return None
+
+    r = rows[idx]
+    if not _is_big_yang_row_modepbs(
+        r,
+        code,
+        name,
+        big_pct_min=big_pct_min,
+        big_pct_min_main=big_pct_min_main,
+        body_ratio_min=body_ratio_min,
+        for_signal=True,
+    ):
+        return None
+
+    i_anchor = _find_mode_mid_big_yang_anchor(
+        rows,
+        idx,
+        code,
+        name,
+        anchor_days_min=anchor_days_min,
+        anchor_days_max=anchor_days_max,
+        anchor_vol_mult=anchor_vol_mult,
+        big_pct_min=big_pct_min,
+        big_pct_min_main=big_pct_min_main,
+        body_ratio_min=body_ratio_min,
+        vol_ma=vol_ma,
+    )
+    if i_anchor is None:
+        return None
+
+    high_arr = np.array([float(x.high) for x in rows], dtype=float)
+    close_arr = np.array([float(x.close) for x in rows], dtype=float)
+    close = float(r.close)
+    high = float(r.high)
+    volume = float(r.volume)
+    anchor_close = float(close_arr[i_anchor])
+    if anchor_close <= 0:
+        return None
+    phase_days = idx - i_anchor
+
+    if idx < consolid_days:
+        return None
+    c_seg = rows[idx - consolid_days : idx]
+    mean_c = float(np.mean([float(x.close) for x in c_seg]))
+    if mean_c <= 0:
+        return None
+    consolid_amp = (
+        max(float(x.high) for x in c_seg) - min(float(x.low) for x in c_seg)
+    ) / mean_c
+    if consolid_amp > consolid_amp_max:
+        return None
+
+    vol_ratio = _vol_ratio_at(rows, idx, vol_ma)
+    tight_breakout = (
+        consolid_amp <= tight_consolid_amp_max
+        and vol_ratio >= tight_vol_ratio_min
+    )
+    eff_rise_min = (
+        tight_rise_from_anchor_min if tight_breakout else rise_from_anchor_min
+    )
+    eff_high100_min = tight_high100_min if tight_breakout else high100_min
+
+    rise_anchor = (close - anchor_close) / anchor_close
+    if rise_anchor < eff_rise_min or rise_anchor > rise_from_anchor_max:
+        return None
+
+    if idx < breakout_lookback:
+        return None
+    prior_high = float(np.max(high_arr[idx - breakout_lookback : idx]))
+    if prior_high <= 0:
+        return None
+    breakout_ratio = high / prior_high
+    if breakout_ratio < breakout_min:
+        return None
+    breakout_pct = (high - prior_high) / prior_high * 100.0
+
+    if idx < high100_lookback:
+        return None
+    prior_high100 = float(np.max(high_arr[idx - high100_lookback : idx]))
+    if prior_high100 <= 0:
+        return None
+    high100_ratio = high / prior_high100
+    if high100_ratio < eff_high100_min:
+        return None
+
+    if volume < vol_mult * max(
+        float(rows[idx - 1].volume) if idx >= 1 else 0.0,
+        float(np.mean([float(x.volume) for x in rows[idx - vol_ma : idx]])) if idx >= vol_ma else 0.0,
+    ):
+        return None
+    if vol_ratio_max > 0 and vol_ratio > vol_ratio_max:
+        return None
+
+    o, c, h, l_ = float(r.open), float(r.close), float(r.high), float(r.low)
+    rng_d = h - l_
+    upper_ratio = (h - max(o, c)) / rng_d if rng_d > 0 else 0.0
+    if upper_ratio_max > 0 and upper_ratio > upper_ratio_max:
+        return None
+
+    close_break60 = close / prior_high if prior_high > 0 else 0.0
+    if close_break60_min > 0 and close_break60 < close_break60_min:
+        return None
+
+    if idx >= 6:
+        pre_close = float(close_arr[idx - 1])
+        base_close = float(close_arr[idx - 6])
+        if base_close > 0:
+            pre_rise5 = (pre_close - base_close) / base_close
+            if pre_rise5 <= pre_rise5_min:
+                return None
+            if pre_rise5_max > 0 and pre_rise5 > pre_rise5_max:
+                return None
+
+    anchor_vr = _vol_ratio_at(rows, i_anchor, vol_ma)
+    body_ratio = (c - o) / rng_d if rng_d > 0 else 0.0
+    pct = float(getattr(r, "pct_chg", 0.0) or 0.0)
+    pre_rise5_pct = 0.0
+    if idx >= 6 and float(close_arr[idx - 6]) > 0:
+        pre_rise5_pct = (
+            (float(close_arr[idx - 1]) - float(close_arr[idx - 6]))
+            / float(close_arr[idx - 6])
+            * 100.0
+        )
+
+    return {
+        "close": close,
+        "anchor_date_idx": float(i_anchor),
+        "anchor_close": anchor_close,
+        "anchor_vol_ratio": anchor_vr,
+        "phase_days": float(phase_days),
+        "rise_from_anchor_pct": rise_anchor * 100.0,
+        "consolid_amp_pct": consolid_amp * 100.0,
+        "prior_high": prior_high,
+        "breakout_ratio": breakout_ratio,
+        "breakout_pct": breakout_pct,
+        "prior_high100": prior_high100,
+        "high100_ratio": high100_ratio,
+        "vol_ratio": vol_ratio,
+        "pct_chg": pct,
+        "body_ratio": body_ratio,
+        "upper_ratio": upper_ratio,
+        "close_break60": close_break60,
+        "pre_rise5_pct": pre_rise5_pct,
+        "tight_breakout": float(1 if tight_breakout else 0),
+    }
+
+
+def _score_mode_mid_big_yang(
+    rows: List[KlineRow],
+    idx: int,
+    ma10: np.ndarray,
+    ma20: np.ndarray,
+    ma60: np.ndarray,
+    vol20: np.ndarray,
+    code: str = "",
+    name: str = "",
+    breakdown: Optional[List[tuple]] = None,
+    **kwargs,
+) -> int:
+    _ = (ma10, ma20, ma60, vol20, kwargs)
+    det = _match_mode_mid_big_yang(rows, idx, code, name)
+    if not det:
+        return 0
+    vr = float(det["vol_ratio"])
+    pct = float(det["pct_chg"])
+    brk = float(det["breakout_pct"])
+    h100r = float(det["high100_ratio"])
+    rise_a = float(det["rise_from_anchor_pct"])
+    score = int(
+        min(
+            100,
+            max(
+                0,
+                round(
+                    45
+                    + vr * 4
+                    + pct * 1.0
+                    + brk * 1.2
+                    + (h100r - 1.0) * 80
+                    + min(rise_a, 80) * 0.15
+                ),
+            ),
+        )
+    )
+    if breakdown is not None:
+        i_a = int(det["anchor_date_idx"])
+        anchor_date = str(rows[i_a].date)[:10]
+        breakdown.append(
+            (
+                f"锚点{anchor_date} 震仓{int(det['phase_days'])}日 "
+                f"自锚点+{rise_a:.1f}% 突破+{brk:.1f}% 100日{h100r:.2f} "
+                f"量比{vr:.2f} 涨{pct:.1f}%",
+                0,
+            )
+        )
+    return score
+
+
 def _mode5_signals(
     rows: List[KlineRow],
     start_date: Optional[str],
@@ -3244,6 +3560,7 @@ def scan_with_mode3(
     use_mode93: bool = False,
     use_mode_bottom_big_yang: bool = False,
     use_mode_platform_breakout_first_yang: bool = False,
+    use_mode_mid_big_yang: bool = False,
     use_mode98: bool = False,
     use_mode32: bool = False,
     sector_ak_cache_dir: Optional[str] = None,
@@ -3366,6 +3683,10 @@ def scan_with_mode3(
         signal_fn = _mode3_signals
         score_fn = _score_mode_platform_breakout_first_yang
         mode_label = "mode平台突破首阳"
+    elif use_mode_mid_big_yang:
+        signal_fn = _mode3_signals
+        score_fn = _score_mode_mid_big_yang
+        mode_label = "mode中位大阳线"
     elif use_mode98:
         thr = float(getattr(config, "mode98_kdj_threshold", 20.0))
         n_k = int(getattr(config, "mode98_kdj_n", 9) or 9)
@@ -3548,7 +3869,16 @@ def scan_with_mode3(
                                         + 5,
                                     )
                                     if use_mode_platform_breakout_first_yang
-                                    else 80
+                                    else (
+                                        max(
+                                            120,
+                                            int(getattr(config, "mode_mby_anchor_days_max", 90))
+                                            + int(getattr(config, "mode_mby_high100_lookback", 100))
+                                            + 5,
+                                        )
+                                        if use_mode_mid_big_yang
+                                        else 80
+                                    )
                                 )
                             )
                         )
@@ -3774,6 +4104,80 @@ def scan_with_mode3(
                     pre_rise5_min=mpbs_pr5,
                 ):
                     signals.append(i)
+        elif use_mode_mid_big_yang:
+            mby_amin = int(getattr(config, "mode_mby_anchor_days_min", 30) or 30)
+            mby_amax = int(getattr(config, "mode_mby_anchor_days_max", 90) or 90)
+            mby_avm = float(getattr(config, "mode_mby_anchor_vol_mult", 1.5) or 1.5)
+            mby_rmin = float(getattr(config, "mode_mby_rise_from_anchor_min", 0.20) or 0.20)
+            mby_rmax = float(getattr(config, "mode_mby_rise_from_anchor_max", 1.20) or 1.20)
+            mby_cd = int(getattr(config, "mode_mby_consolid_days", 20) or 20)
+            mby_ca = float(getattr(config, "mode_mby_consolid_amp_max", 0.35) or 0.35)
+            mby_bl = int(getattr(config, "mode_mby_breakout_lookback", 60) or 60)
+            mby_bmin = float(getattr(config, "mode_mby_breakout_min", 1.0) or 1.0)
+            mby_h100 = int(getattr(config, "mode_mby_high100_lookback", 100) or 100)
+            mby_h100m = float(getattr(config, "mode_mby_high100_min", 1.0) or 1.0)
+            mby_tc_amp = float(getattr(config, "mode_mby_tight_consolid_amp_max", 0.15) or 0.15)
+            mby_tc_vol = float(getattr(config, "mode_mby_tight_vol_ratio_min", 1.8) or 1.8)
+            mby_tc_rmin = float(getattr(config, "mode_mby_tight_rise_from_anchor_min", 0.10) or 0.10)
+            mby_tc_h100 = float(getattr(config, "mode_mby_tight_high100_min", 0.985) or 0.985)
+            mby_pct = float(getattr(config, "mode_mby_big_pct_min", 7.0) or 7.0)
+            mby_pct_main = float(getattr(config, "mode_mby_big_pct_min_main", 4.5) or 4.5)
+            mby_body = float(getattr(config, "mode_mby_body_ratio_min", 0.55) or 0.55)
+            mby_vm = float(getattr(config, "mode_mby_vol_mult", 1.25) or 1.25)
+            mby_vma = int(getattr(config, "mode_mby_vol_ma", 20) or 20)
+            mby_vmax = float(getattr(config, "mode_mby_vol_ratio_max", 4.0) or 4.0)
+            mby_umax = float(getattr(config, "mode_mby_upper_ratio_max", 0.40) or 0.40)
+            mby_cb60 = float(getattr(config, "mode_mby_close_break60_min", 1.0) or 1.0)
+            mby_pr5 = float(getattr(config, "mode_mby_pre_rise5_min", -0.05))
+            mby_pr5max = float(getattr(config, "mode_mby_pre_rise5_max", 0.15))
+            need_i = max(
+                mby_amax + 1,
+                mby_bl + 1,
+                mby_h100 + 1,
+                mby_cd + 1,
+                mby_vma + 1,
+            )
+            st = str(start_date).strip()[:10] if start_date else ""
+            ed = str(end_date).strip()[:10] if end_date else ""
+            signals = []
+            for i in range(need_i, len(rows)):
+                d = str(rows[i].date)[:10]
+                if st and d < st:
+                    continue
+                if ed and d > ed:
+                    continue
+                if _match_mode_mid_big_yang(
+                    rows,
+                    i,
+                    item.code,
+                    item.name,
+                    anchor_days_min=mby_amin,
+                    anchor_days_max=mby_amax,
+                    anchor_vol_mult=mby_avm,
+                    rise_from_anchor_min=mby_rmin,
+                    rise_from_anchor_max=mby_rmax,
+                    consolid_days=mby_cd,
+                    consolid_amp_max=mby_ca,
+                    breakout_lookback=mby_bl,
+                    breakout_min=mby_bmin,
+                    high100_lookback=mby_h100,
+                    high100_min=mby_h100m,
+                    tight_consolid_amp_max=mby_tc_amp,
+                    tight_vol_ratio_min=mby_tc_vol,
+                    tight_rise_from_anchor_min=mby_tc_rmin,
+                    tight_high100_min=mby_tc_h100,
+                    big_pct_min=mby_pct,
+                    big_pct_min_main=mby_pct_main,
+                    body_ratio_min=mby_body,
+                    vol_mult=mby_vm,
+                    vol_ma=mby_vma,
+                    vol_ratio_max=mby_vmax,
+                    upper_ratio_max=mby_umax,
+                    close_break60_min=mby_cb60,
+                    pre_rise5_min=mby_pr5,
+                    pre_rise5_max=mby_pr5max,
+                ):
+                    signals.append(i)
         else:
             signals = signal_fn(rows, start_date, end_date)
         if cutoff_date and not start_date:
@@ -3918,6 +4322,7 @@ def scan_with_mode3(
         or (use_mode93 and score_fn is _score_mode93)
                 or use_mode_bottom_big_yang
                 or use_mode_platform_breakout_first_yang
+                or use_mode_mid_big_yang
             ):
                 if use_mode9 and score_fn is _score_mode9:
                     score = score_fn(

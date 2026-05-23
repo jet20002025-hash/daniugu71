@@ -124,7 +124,8 @@ class ScanConfig:
     modepbs_consolid_amp_max: float = 0.21
     modepbs_breakout_lookback: int = 60
     modepbs_breakout_near_min: float = 0.93  # 信号日最高 >= 近60日最高×该值（贴近或突破箱顶）
-    modepbs_big_pct_min: float = 7.0
+    modepbs_big_pct_min: float = 7.0  # 创业板/科创板等大阳涨幅下限
+    modepbs_big_pct_min_main: float = 4.5  # 主板(10%板)大阳涨幅下限
     modepbs_body_ratio_min: float = 0.55
     modepbs_vol_mult: float = 1.25
     modepbs_vol_ma: int = 20
@@ -1674,20 +1675,40 @@ def _score_mode_bottom_big_yang(
     return score
 
 
+def _modepbs_big_pct_threshold(
+    code: str, name: str, *, big_pct_min: float, big_pct_min_main: float
+) -> float:
+    """主板(10%板)用 big_pct_min_main，科创/创业板/北交所等用 big_pct_min。"""
+    if _limit_rate(code, name) >= 0.15 or _is_st(name or ""):
+        return big_pct_min
+    return big_pct_min_main
+
+
 def _is_big_yang_row_modepbs(
     r: KlineRow,
     code: str,
     name: str,
     *,
     big_pct_min: float,
+    big_pct_min_main: float = 4.5,
     body_ratio_min: float,
+    for_signal: bool = True,
 ) -> bool:
-    """平台突破首阳：允许 10% 板接近涨停的强阳（买点常为板块内最大阳）。"""
+    """平台突破首阳：允许 10% 板接近涨停的强阳（买点常为板块内最大阳）。
+
+    for_signal=True 时主板用 big_pct_min_main(4.5%)；震仓/首阳回溯用 big_pct_min(7%)。
+    """
     o, c, h, l_ = float(r.open), float(r.close), float(r.high), float(r.low)
     if c <= o:
         return False
     pct = float(getattr(r, "pct_chg", 0.0) or 0.0)
-    if pct < big_pct_min:
+    if for_signal:
+        pct_min = _modepbs_big_pct_threshold(
+            code, name, big_pct_min=big_pct_min, big_pct_min_main=big_pct_min_main
+        )
+    else:
+        pct_min = big_pct_min
+    if pct < pct_min:
         return False
     limit_pct = _limit_rate(code, name) * 100
     if pct >= limit_pct - 0.001:
@@ -1715,6 +1736,7 @@ def _match_mode_platform_breakout_first_yang(
     breakout_lookback: int = 60,
     breakout_near_min: float = 0.93,
     big_pct_min: float = 7.0,
+    big_pct_min_main: float = 4.5,
     body_ratio_min: float = 0.55,
     vol_mult: float = 1.25,
     vol_ma: int = 20,
@@ -1747,7 +1769,7 @@ def _match_mode_platform_breakout_first_yang(
 
     r = rows[idx]
     if not _is_big_yang_row_modepbs(
-        r, code, name, big_pct_min=big_pct_min, body_ratio_min=body_ratio_min
+        r, code, name, big_pct_min=big_pct_min, big_pct_min_main=big_pct_min_main, body_ratio_min=body_ratio_min, for_signal=True
     ):
         return None
 
@@ -1812,7 +1834,7 @@ def _match_mode_platform_breakout_first_yang(
         if j < 0:
             continue
         if not _is_big_yang_row_modepbs(
-            rows[j], code, name, big_pct_min=big_pct_min, body_ratio_min=body_ratio_min
+            rows[j], code, name, big_pct_min=big_pct_min, big_pct_min_main=big_pct_min_main, body_ratio_min=body_ratio_min, for_signal=False
         ):
             continue
         if j < breakout_lookback:
@@ -1847,7 +1869,7 @@ def _match_mode_platform_breakout_first_yang(
     wash_cnt = 0
     for j in range(i_low, idx):
         if _is_big_yang_row_modepbs(
-            rows[j], code, name, big_pct_min=big_pct_min, body_ratio_min=body_ratio_min
+            rows[j], code, name, big_pct_min=big_pct_min, big_pct_min_main=big_pct_min_main, body_ratio_min=body_ratio_min, for_signal=False
         ):
             wash_cnt += 1
 
@@ -1926,6 +1948,7 @@ def _score_mode_platform_breakout_first_yang(
     breakout_lookback: int = 60,
     breakout_near_min: float = 0.93,
     big_pct_min: float = 7.0,
+    big_pct_min_main: float = 4.5,
     body_ratio_min: float = 0.55,
     vol_mult: float = 1.25,
     vol_ma: int = 20,
@@ -1958,6 +1981,7 @@ def _score_mode_platform_breakout_first_yang(
         breakout_lookback=breakout_lookback,
         breakout_near_min=breakout_near_min,
         big_pct_min=big_pct_min,
+        big_pct_min_main=big_pct_min_main,
         body_ratio_min=body_ratio_min,
         vol_mult=vol_mult,
         vol_ma=vol_ma,
@@ -3683,6 +3707,7 @@ def scan_with_mode3(
             mpbs_bl = int(getattr(config, "modepbs_breakout_lookback", 60) or 60)
             mpbs_bn = float(getattr(config, "modepbs_breakout_near_min", 0.93) or 0.93)
             mpbs_pct = float(getattr(config, "modepbs_big_pct_min", 7.0) or 7.0)
+            mpbs_pct_main = float(getattr(config, "modepbs_big_pct_min_main", 4.5) or 4.5)
             mpbs_body = float(getattr(config, "modepbs_body_ratio_min", 0.55) or 0.55)
             mpbs_vm = float(getattr(config, "modepbs_vol_mult", 1.25) or 1.25)
             mpbs_vma = int(getattr(config, "modepbs_vol_ma", 20) or 20)
@@ -3730,6 +3755,7 @@ def scan_with_mode3(
                     breakout_lookback=mpbs_bl,
                     breakout_near_min=mpbs_bn,
                     big_pct_min=mpbs_pct,
+                    big_pct_min_main=mpbs_pct_main,
                     body_ratio_min=mpbs_body,
                     vol_mult=mpbs_vm,
                     vol_ma=mpbs_vma,

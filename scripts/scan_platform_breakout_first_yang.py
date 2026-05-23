@@ -10,7 +10,7 @@ mode平台突破首阳
 - **100日新高**：当日最高价 >= 前 100 日最高 × high100_near_min（默认 0.93，贴近或刚突破）
 - **质量过滤**：量比 ≤ vol_ratio_max（默认 4）；上影/振幅 ≤ upper_ratio_max（默认 0.20）；震仓期大阳线 ≥ wash_close_min_cnt 时，收盘须 ≥ 近60日高 × wash_close60_min（默认 0.98）
 - **排除急跌反弹**：信号前 5 日涨幅须 > pre_rise5_min（默认 -5%）
-- **大阳线**：收阳；涨幅 >= big_pct_min；实体/振幅 >= body_ratio_min
+- **大阳线**：收阳；主板涨幅 >= big_pct_min_main（默认 4.5%），科创/创业板等 >= big_pct_min（默认 7%）；实体/振幅 >= body_ratio_min
 - **放量**：量 >= vol_mult × max(昨量, vol_ma 日均量)
 - **首阳**：前 big_yang_gap 日内无「贴顶大阳」（该日 60 日高比 >= gap_breakout_near_min，默认 0.93）；震仓期低位反弹大阳不计占用
 
@@ -61,7 +61,8 @@ def main() -> None:
     ap.add_argument("--consolid-amp-max", type=float, default=0.21)
     ap.add_argument("--breakout-lookback", type=int, default=60)
     ap.add_argument("--breakout-near-min", type=float, default=0.93, help="信号日最高/近60日最高下限")
-    ap.add_argument("--big-pct-min", type=float, default=7.0)
+    ap.add_argument("--big-pct-min", type=float, default=7.0, help="科创/创业板等大阳涨幅下限")
+    ap.add_argument("--big-pct-min-main", type=float, default=4.5, help="主板(10%%板)大阳涨幅下限")
     ap.add_argument("--body-ratio-min", type=float, default=0.55)
     ap.add_argument("--vol-mult", type=float, default=1.25)
     ap.add_argument("--vol-ma", type=int, default=20)
@@ -91,6 +92,7 @@ def main() -> None:
         breakout_lookback=int(args.breakout_lookback),
         breakout_near_min=float(args.breakout_near_min),
         big_pct_min=float(args.big_pct_min),
+        big_pct_min_main=float(args.big_pct_min_main),
         body_ratio_min=float(args.body_ratio_min),
         vol_mult=float(args.vol_mult),
         vol_ma=int(args.vol_ma),

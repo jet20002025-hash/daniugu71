@@ -136,7 +136,7 @@ class ScanConfig:
     modepbs_vol_ratio_max: float = 4.0  # 量比上限，排除异常放量试探（0=不限）
     modepbs_vol_ratio_extended_max: float = 6.5  # 100日突破且震仓大阳≥3时允许更高量比
     modepbs_vol_high100_wash_min: int = 3
-    modepbs_upper_ratio_max: float = 0.20  # 上影线/振幅上限，排除长上影假突破
+    modepbs_upper_ratio_max: float = 0.40  # 上影线/振幅上限，排除长上影假突破
     modepbs_upper_ratio_extended_max: float = 0.30  # 100日突破且量比≥4时放宽上影
     modepbs_upper_high100_vol_min: float = 4.0
     modepbs_wash_close_min_cnt: int = 2  # 震仓期大阳线≥该值时，要求收盘贴近箱顶
@@ -1747,7 +1747,7 @@ def _match_mode_platform_breakout_first_yang(
     vol_ratio_max: float = 4.0,
     vol_ratio_extended_max: float = 6.5,
     vol_high100_wash_min: int = 3,
-    upper_ratio_max: float = 0.20,
+    upper_ratio_max: float = 0.40,
     upper_ratio_extended_max: float = 0.30,
     upper_high100_vol_min: float = 4.0,
     wash_close_min_cnt: int = 2,
@@ -1959,7 +1959,7 @@ def _score_mode_platform_breakout_first_yang(
     vol_ratio_max: float = 4.0,
     vol_ratio_extended_max: float = 6.5,
     vol_high100_wash_min: int = 3,
-    upper_ratio_max: float = 0.20,
+    upper_ratio_max: float = 0.40,
     upper_ratio_extended_max: float = 0.30,
     upper_high100_vol_min: float = 4.0,
     wash_close_min_cnt: int = 2,
@@ -3718,7 +3718,7 @@ def scan_with_mode3(
             mpbs_vmax = float(getattr(config, "modepbs_vol_ratio_max", 4.0) or 4.0)
             mpbs_vext = float(getattr(config, "modepbs_vol_ratio_extended_max", 6.5) or 6.5)
             mpbs_vhw = int(getattr(config, "modepbs_vol_high100_wash_min", 3) or 3)
-            mpbs_umax = float(getattr(config, "modepbs_upper_ratio_max", 0.20) or 0.20)
+            mpbs_umax = float(getattr(config, "modepbs_upper_ratio_max", 0.40) or 0.40)
             mpbs_uext = float(getattr(config, "modepbs_upper_ratio_extended_max", 0.30) or 0.30)
             mpbs_uhv = float(getattr(config, "modepbs_upper_high100_vol_min", 4.0) or 4.0)
             mpbs_wcm = int(getattr(config, "modepbs_wash_close_min_cnt", 2) or 2)

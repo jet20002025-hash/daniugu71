@@ -8,7 +8,7 @@ mode平台突破首阳
 - **末段整理**：信号前 consolid_days 日振幅/均价 <= consolid_amp_max（默认 21%）
 - **突破**：当日最高价 >= 近 breakout_lookback 日最高 × breakout_near_min（默认 0.93，贴近或突破箱顶）
 - **100日新高**：当日最高价 >= 前 100 日最高 × high100_near_min（默认 0.93，贴近或刚突破）
-- **质量过滤**：量比 ≤ vol_ratio_max（默认 4）；上影/振幅 ≤ upper_ratio_max（默认 0.20）；震仓期大阳线 ≥ wash_close_min_cnt 时，收盘须 ≥ 近60日高 × wash_close60_min（默认 0.98）
+- **质量过滤**：量比 ≤ vol_ratio_max（默认 4）；上影/振幅 ≤ upper_ratio_max（默认 0.40）；震仓期大阳线 ≥ wash_close_min_cnt 时，收盘须 ≥ 近60日高 × wash_close60_min（默认 0.98）
 - **排除急跌反弹**：信号前 5 日涨幅须 > pre_rise5_min（默认 -5%）
 - **大阳线**：收阳；主板涨幅 >= big_pct_min_main（默认 4.5%），科创/创业板等 >= big_pct_min（默认 7%）；实体/振幅 >= body_ratio_min
 - **放量**：量 >= vol_mult × max(昨量, vol_ma 日均量)
@@ -71,7 +71,7 @@ def main() -> None:
     ap.add_argument("--high100-lookback", type=int, default=100)
     ap.add_argument("--high100-near-min", type=float, default=0.93, help="信号日最高/前100日最高下限")
     ap.add_argument("--vol-ratio-max", type=float, default=4.0, help="量比上限，0=不限")
-    ap.add_argument("--upper-ratio-max", type=float, default=0.20, help="上影线/振幅上限，0=不限")
+    ap.add_argument("--upper-ratio-max", type=float, default=0.40, help="上影线/振幅上限，0=不限")
     ap.add_argument("--wash-close-min-cnt", type=int, default=2, help="震仓期大阳线≥该值时要求收盘贴近箱顶")
     ap.add_argument("--wash-close60-min", type=float, default=0.98, help="上述情况下收盘/近60日高下限")
     ap.add_argument("--pre-rise5-min", type=float, default=-0.05, help="信号前5日涨幅下限(>)，默认-5%排除急跌反弹")

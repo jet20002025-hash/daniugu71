@@ -9,7 +9,7 @@ mode平台突破首阳
 - **突破**：当日最高价 >= 近 breakout_lookback 日最高 × breakout_near_min（默认 0.93，贴近或突破箱顶）
 - **100日新高**：当日最高价 >= 前 100 日最高 × high100_near_min（默认 0.93，贴近或刚突破）
 - **质量过滤**：量比 ≤ vol_ratio_max（默认 4）；上影/振幅 ≤ upper_ratio_max（默认 0.20）；震仓期大阳线 ≥ wash_close_min_cnt 时，收盘须 ≥ 近60日高 × wash_close60_min（默认 0.98）
-- **排除急跌反弹**：信号前 5 日涨幅须 > pre_rise5_min（默认 0，即前 5 日净涨）
+- **排除急跌反弹**：信号前 5 日涨幅须 > pre_rise5_min（默认 -5%）
 - **大阳线**：收阳；涨幅 >= big_pct_min；实体/振幅 >= body_ratio_min
 - **放量**：量 >= vol_mult × max(昨量, vol_ma 日均量)
 - **首阳**：前 big_yang_gap 日内无「贴顶大阳」（该日 60 日高比 >= gap_breakout_near_min，默认 0.93）；震仓期低位反弹大阳不计占用
@@ -73,7 +73,7 @@ def main() -> None:
     ap.add_argument("--upper-ratio-max", type=float, default=0.20, help="上影线/振幅上限，0=不限")
     ap.add_argument("--wash-close-min-cnt", type=int, default=2, help="震仓期大阳线≥该值时要求收盘贴近箱顶")
     ap.add_argument("--wash-close60-min", type=float, default=0.98, help="上述情况下收盘/近60日高下限")
-    ap.add_argument("--pre-rise5-min", type=float, default=0.0, help="信号前5日涨幅下限(>)，排除急跌反弹")
+    ap.add_argument("--pre-rise5-min", type=float, default=-0.05, help="信号前5日涨幅下限(>)，默认-5%排除急跌反弹")
     ap.add_argument("--skip-st", action="store_true")
     ap.add_argument("--allow-refresh", action="store_true")
     ap.add_argument("--out", default="")

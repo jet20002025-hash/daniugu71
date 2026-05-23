@@ -140,7 +140,7 @@ class ScanConfig:
     modepbs_upper_high100_vol_min: float = 4.0
     modepbs_wash_close_min_cnt: int = 2  # 震仓期大阳线≥该值时，要求收盘贴近箱顶
     modepbs_wash_close60_min: float = 0.98  # 上述情况下 close >= 近60日高×该值（100日突破可豁免）
-    modepbs_pre_rise5_min: float = 0.0  # 信号前5日涨幅须 > 该值（默认0，排除急跌反弹）
+    modepbs_pre_rise5_min: float = -0.05  # 信号前5日涨幅须 > 该值（默认-5%，排除急跌反弹）
 
     # mode98：日/周/月 KDJ（9,3,3）三线（K、D、J）均严格小于阈值
     mode98_kdj_threshold: float = 20.0
@@ -1730,7 +1730,7 @@ def _match_mode_platform_breakout_first_yang(
     upper_high100_vol_min: float = 4.0,
     wash_close_min_cnt: int = 2,
     wash_close60_min: float = 0.98,
-    pre_rise5_min: float = 0.0,
+    pre_rise5_min: float = -0.05,
 ) -> Optional[Dict[str, float]]:
     """mode平台突破首阳：阶段低点→约3个月震仓整理→贴近/突破平台首根放量大阳线。"""
     n = len(rows)
@@ -1941,7 +1941,7 @@ def _score_mode_platform_breakout_first_yang(
     upper_high100_vol_min: float = 4.0,
     wash_close_min_cnt: int = 2,
     wash_close60_min: float = 0.98,
-    pre_rise5_min: float = 0.0,
+    pre_rise5_min: float = -0.05,
 ) -> int:
     _ = (ma10, ma20, ma60, vol20)
     det = _match_mode_platform_breakout_first_yang(
@@ -3698,7 +3698,7 @@ def scan_with_mode3(
             mpbs_uhv = float(getattr(config, "modepbs_upper_high100_vol_min", 4.0) or 4.0)
             mpbs_wcm = int(getattr(config, "modepbs_wash_close_min_cnt", 2) or 2)
             mpbs_wc60 = float(getattr(config, "modepbs_wash_close60_min", 0.98) or 0.98)
-            mpbs_pr5 = float(getattr(config, "modepbs_pre_rise5_min", 0.0) or 0.0)
+            mpbs_pr5 = float(getattr(config, "modepbs_pre_rise5_min", -0.05))
             need_i = max(
                 mpbs_pmax + 1,
                 mpbs_bl + 1,

@@ -140,6 +140,7 @@ class ScanConfig:
     modepbs_upper_high100_vol_min: float = 4.0
     modepbs_wash_close_min_cnt: int = 2  # 震仓期大阳线≥该值时，要求收盘贴近箱顶
     modepbs_wash_close60_min: float = 0.98  # 上述情况下 close >= 近60日高×该值（100日突破可豁免）
+    modepbs_pre_rise5_min: float = 0.0  # 信号前5日涨幅须 > 该值（默认0，排除急跌反弹）
 
     # mode98：日/周/月 KDJ（9,3,3）三线（K、D、J）均严格小于阈值
     mode98_kdj_threshold: float = 20.0
@@ -1729,6 +1730,7 @@ def _match_mode_platform_breakout_first_yang(
     upper_high100_vol_min: float = 4.0,
     wash_close_min_cnt: int = 2,
     wash_close60_min: float = 0.98,
+    pre_rise5_min: float = 0.0,
 ) -> Optional[Dict[str, float]]:
     """mode平台突破首阳：阶段低点→约3个月震仓整理→贴近/突破平台首根放量大阳线。"""
     n = len(rows)
@@ -1821,6 +1823,14 @@ def _match_mode_platform_breakout_first_yang(
         if float(rows[j].high) / prior_high_j >= gap_breakout_near_min:
             return None
 
+    if idx >= 6:
+        pre_close = float(close_arr[idx - 1])
+        base_close = float(close_arr[idx - 6])
+        if base_close > 0:
+            pre_rise5 = (pre_close - base_close) / base_close
+            if pre_rise5 <= pre_rise5_min:
+                return None
+
     v_prev = float(vol_arr[idx - 1]) if idx >= 1 else 0.0
     v_ma = float(np.mean(vol_arr[idx - vol_ma : idx])) if idx >= vol_ma else 0.0
     v_base = max(v_prev, v_ma)
@@ -1863,6 +1873,11 @@ def _match_mode_platform_breakout_first_yang(
             return None
 
     close_break60 = close / prior_high if prior_high > 0 else 0.0
+    pre_rise5_pct = 0.0
+    if idx >= 6 and float(close_arr[idx - 6]) > 0:
+        pre_rise5_pct = (float(close_arr[idx - 1]) - float(close_arr[idx - 6])) / float(
+            close_arr[idx - 6]
+        ) * 100.0
     if wash_close_min_cnt > 0 and wash_cnt >= wash_close_min_cnt:
         if close_break60 < wash_close60_min and high100_ratio < 1.0:
             return None
@@ -1886,6 +1901,7 @@ def _match_mode_platform_breakout_first_yang(
         "body_ratio": body_ratio,
         "upper_ratio": upper_ratio,
         "close_break60": close_break60,
+        "pre_rise5_pct": pre_rise5_pct,
         "wash_big_yang_cnt": float(wash_cnt),
     }
 
@@ -1925,6 +1941,7 @@ def _score_mode_platform_breakout_first_yang(
     upper_high100_vol_min: float = 4.0,
     wash_close_min_cnt: int = 2,
     wash_close60_min: float = 0.98,
+    pre_rise5_min: float = 0.0,
 ) -> int:
     _ = (ma10, ma20, ma60, vol20)
     det = _match_mode_platform_breakout_first_yang(
@@ -1956,6 +1973,7 @@ def _score_mode_platform_breakout_first_yang(
         upper_high100_vol_min=upper_high100_vol_min,
         wash_close_min_cnt=wash_close_min_cnt,
         wash_close60_min=wash_close60_min,
+        pre_rise5_min=pre_rise5_min,
     )
     if not det:
         return 0
@@ -3680,6 +3698,7 @@ def scan_with_mode3(
             mpbs_uhv = float(getattr(config, "modepbs_upper_high100_vol_min", 4.0) or 4.0)
             mpbs_wcm = int(getattr(config, "modepbs_wash_close_min_cnt", 2) or 2)
             mpbs_wc60 = float(getattr(config, "modepbs_wash_close60_min", 0.98) or 0.98)
+            mpbs_pr5 = float(getattr(config, "modepbs_pre_rise5_min", 0.0) or 0.0)
             need_i = max(
                 mpbs_pmax + 1,
                 mpbs_bl + 1,
@@ -3726,6 +3745,7 @@ def scan_with_mode3(
                     upper_high100_vol_min=mpbs_uhv,
                     wash_close_min_cnt=mpbs_wcm,
                     wash_close60_min=mpbs_wc60,
+                    pre_rise5_min=mpbs_pr5,
                 ):
                     signals.append(i)
         else:

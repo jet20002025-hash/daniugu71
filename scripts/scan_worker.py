@@ -83,7 +83,7 @@ def run_one():
             mode4_filters=(mode == "mode4"),
             model_tag_override="mode3ok" if mode == "mode3ok" else None,
             use_startup_modes_data=True,
-            use_71x_standard=(mode in ("mode3", "mode8", "mode9", "mode10", "mode11", "mode12", "mode90", "mode93", "mode底部大阳线", "mode平台突破首阳", "mode中位大阳线", "mode98", "mode32")),
+            use_71x_standard=(mode in ("mode3", "mode8", "mode9", "mode10", "mode11", "mode12", "mode90", "mode93", "mode底部大阳线", "mode平台突破首阳", "mode中位大阳线", "mode底部支撑", "mode最后震仓", "mode98", "mode32")),
             use_mode8=False,  # 网络版 mode8 用 mode88 替代
             use_mode88=(mode == "mode8"),
             use_mode9=(mode == "mode9"),
@@ -95,6 +95,8 @@ def run_one():
             use_mode_bottom_big_yang=(mode == "mode底部大阳线"),
             use_mode_platform_breakout_first_yang=(mode == "mode平台突破首阳"),
             use_mode_mid_big_yang=(mode == "mode中位大阳线"),
+            use_mode_bottom_support=(mode == "mode底部支撑"),
+            use_mode_final_shakeout=(mode == "mode最后震仓"),
             use_mode98=(mode == "mode98"),
             use_mode32=(mode == "mode32"),
             user_id=user_id,

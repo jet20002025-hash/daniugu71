@@ -14,6 +14,7 @@ mode中位大阳线
 
 用法:
   python3 scripts/scan_mid_big_yang.py --date 2026-04-13 --skip-st
+  python3 scripts/scan_mid_big_yang.py --start 2026-05-01 --end 2026-05-31 --skip-st
   python3 scripts/scan_mid_big_yang.py --code 688610 --date 2026-04-13
 """
 from __future__ import annotations
@@ -48,10 +49,12 @@ def _find_date_index(rows: List[KlineRow], ymd: str) -> Optional[int]:
 
 def main() -> None:
     ap = argparse.ArgumentParser(description="mode中位大阳线")
-    ap.add_argument("--date", default="", help="信号日，默认各股缓存最后一根")
+    ap.add_argument("--date", default="", help="单日信号日")
+    ap.add_argument("--start", default="", help="区间起始（含），与 --end 联用")
+    ap.add_argument("--end", default="", help="区间结束（含）")
     ap.add_argument("--code", default="", help="仅测单股代码")
     ap.add_argument("--anchor-days-min", type=int, default=30)
-    ap.add_argument("--anchor-days-max", type=int, default=90)
+    ap.add_argument("--anchor-days-max", type=int, default=200)
     ap.add_argument("--anchor-vol-mult", type=float, default=1.5)
     ap.add_argument("--rise-min", type=float, default=0.20, help="自锚点最低涨幅(比例)")
     ap.add_argument("--rise-max", type=float, default=1.20, help="自锚点最高涨幅(比例)")
@@ -70,7 +73,7 @@ def main() -> None:
     ap.add_argument("--body-ratio-min", type=float, default=0.55)
     ap.add_argument("--vol-mult", type=float, default=1.25)
     ap.add_argument("--vol-ma", type=int, default=20)
-    ap.add_argument("--vol-ratio-max", type=float, default=4.0)
+    ap.add_argument("--vol-ratio-max", type=float, default=5.0)
     ap.add_argument("--upper-ratio-max", type=float, default=0.40)
     ap.add_argument("--close-break60-min", type=float, default=1.0)
     ap.add_argument("--pre-rise5-min", type=float, default=-0.05)
@@ -81,6 +84,8 @@ def main() -> None:
     args = ap.parse_args()
     prefer_local = not args.allow_refresh
     target = str(args.date).strip()[:10] if args.date else ""
+    start_ymd = str(args.start).strip()[:10] if args.start else ""
+    end_ymd = str(args.end).strip()[:10] if args.end else ""
     only_code = str(args.code).strip()
 
     kw = dict(
@@ -140,25 +145,34 @@ def main() -> None:
             )
         if not rows or len(rows) < min_len:
             continue
-        if target:
-            idx = _find_date_index(rows, target)
-            if idx is None:
-                continue
-            sig_date = target
-        else:
-            idx = len(rows) - 1
-            sig_date = str(rows[idx].date)[:10]
 
-        m = _match_mode_mid_big_yang(rows, idx, item.code, item.name or "", **kw)
-        if m is None:
-            continue
-        i_a = int(m["anchor_date_idx"])
-        anchor_date = str(rows[i_a].date)[:10]
-        code = item.code.zfill(6) if len(item.code) < 6 else item.code
-        hits.append((code, (item.name or "").strip(), m, sig_date, anchor_date))
+        if start_ymd and end_ymd:
+            check_indices = [
+                i
+                for i, r in enumerate(rows)
+                if start_ymd <= str(r.date)[:10] <= end_ymd
+            ]
+        elif target:
+            idx = _find_date_index(rows, target)
+            check_indices = [idx] if idx is not None else []
+        else:
+            check_indices = [len(rows) - 1]
+
+        for idx in check_indices:
+            if idx is None or idx < min_len:
+                continue
+            sig_date = str(rows[idx].date)[:10]
+            m = _match_mode_mid_big_yang(rows, idx, item.code, item.name or "", **kw)
+            if m is None:
+                continue
+            i_a = int(m["anchor_date_idx"])
+            anchor_date = str(rows[i_a].date)[:10]
+            code = item.code.zfill(6) if len(item.code) < 6 else item.code
+            hits.append((code, (item.name or "").strip(), m, sig_date, anchor_date))
 
     hits.sort(
         key=lambda x: (
+            x[3],
             -x[2]["breakout_pct"],
             -x[2]["vol_ratio"],
             -x[2]["pct_chg"],
@@ -166,7 +180,10 @@ def main() -> None:
         )
     )
 
-    out_path = args.out.strip() or os.path.join(GPT_DATA_DIR, "results", "mid_big_yang.csv")
+    default_name = "mid_big_yang.csv"
+    if start_ymd and end_ymd:
+        default_name = f"mid_big_yang_{start_ymd[:7].replace('-', '_')}.csv"
+    out_path = args.out.strip() or os.path.join(GPT_DATA_DIR, "results", default_name)
     os.makedirs(os.path.dirname(out_path), exist_ok=True)
     with open(out_path, "w", encoding="utf-8-sig", newline="") as f:
         w = csv.writer(f)

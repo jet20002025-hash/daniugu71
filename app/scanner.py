@@ -145,7 +145,7 @@ class ScanConfig:
 
     # mode中位大阳线：主力介入大阳(锚点)→吸筹震仓→突破大阳买点（参考埃科光电688610）
     mode_mby_anchor_days_min: int = 30
-    mode_mby_anchor_days_max: int = 90
+    mode_mby_anchor_days_max: int = 200
     mode_mby_anchor_vol_mult: float = 1.5
     mode_mby_rise_from_anchor_min: float = 0.20
     mode_mby_rise_from_anchor_max: float = 1.20
@@ -164,11 +164,67 @@ class ScanConfig:
     mode_mby_body_ratio_min: float = 0.55
     mode_mby_vol_mult: float = 1.25
     mode_mby_vol_ma: int = 20
-    mode_mby_vol_ratio_max: float = 4.0
+    mode_mby_vol_ratio_max: float = 5.0
     mode_mby_upper_ratio_max: float = 0.40
     mode_mby_close_break60_min: float = 1.0
     mode_mby_pre_rise5_min: float = -0.05
     mode_mby_pre_rise5_max: float = 0.15  # 信号前5日涨幅须 <=15%，排除连板追高
+
+    # mode底部支撑：底部起量大阳→拉升→回调至起量位获支撑→再拉升→再回调至支撑（抄底）
+    mode_mbs_anchor_days_min: int = 30
+    mode_mbs_anchor_days_max: int = 200
+    mode_mbs_low_lookback: int = 60
+    mode_mbs_bottom_pos_max: float = 0.50
+    mode_mbs_anchor_vol_mult: float = 2.0
+    mode_mbs_anchor_vol_ma: int = 20
+    mode_mbs_big_pct_min: float = 5.0
+    mode_mbs_body_ratio_min: float = 0.55
+    mode_mbs_min_rally_pct: float = 0.15  # 锚点后须有明显拉升
+    mode_mbs_support_near_max: float = 0.15  # 信号日低点距支撑 <=15%
+    mode_mbs_support_break_min: float = 0.97  # 低点不可有效跌破支撑×该值
+    mode_mbs_test_tol: float = 0.15  # 历史回踩容差
+    mode_mbs_min_support_tests: int = 1  # 至少一次历史支撑验证
+    mode_mbs_bounce_days: int = 5
+    mode_mbs_weekly_vol_mult: float = 1.5  # 锚点周量 >= 该值×周均量
+
+    # mode最后震仓：起量吸筹→箱体整理→最后震仓→反包/突破（参考金利华电300069）
+    mode_mfs_phase_days_min: int = 30
+    mode_mfs_phase_days_max: int = 90
+    mode_mfs_anchor_vol_mult: float = 1.5
+    mode_mfs_min_rally_pct: float = 0.10
+    mode_mfs_consolid_days: int = 20
+    mode_mfs_consolid_amp_max: float = 0.15
+    mode_mfs_peak_lookback: int = 15
+    mode_mfs_shakeout_days_min: int = 3
+    mode_mfs_shakeout_days_max: int = 7
+    mode_mfs_shakeout_drop_min: float = 0.10
+    mode_mfs_shakeout_drop_max: float = 0.22
+    mode_mfs_phase_low_lookback: int = 90
+    mode_mfs_phase_low_break_min: float = 0.95
+    mode_mfs_shakeout_vol_min: float = 0.6
+    mode_mfs_shakeout_vol_max: float = 2.5
+    mode_mfs_ma60_slope_days: int = 20
+    mode_mfs_reversal_pct_min: float = 8.0
+    mode_mfs_reversal_vol_min: float = 1.5
+    mode_mfs_reversal_low_tol: float = 0.05
+    mode_mfs_breakout_pct_min: float = 15.0
+    mode_mfs_breakout_pct_min_main: float = 9.0
+    mode_mfs_breakout_vol_min: float = 3.0
+    mode_mfs_body_ratio_min: float = 0.55
+    # 周线最后震仓：起量→2~4周缩量洗盘→放量反包/突破（参考688531/001259/300302等）
+    mode_mfs_weekly_shakeout_weeks_min: int = 2
+    mode_mfs_weekly_shakeout_weeks_max: int = 4
+    mode_mfs_weekly_peak_weeks_back: int = 12
+    mode_mfs_weekly_shakeout_drop_min: float = 0.08
+    mode_mfs_weekly_shakeout_drop_max: float = 0.38
+    mode_mfs_weekly_shakeout_vol_max: float = 1.05  # 洗盘周量 <= 周均量×该值
+    mode_mfs_weekly_accum_lookback: int = 16
+    mode_mfs_weekly_accum_vol_mult: float = 1.0
+    mode_mfs_weekly_accum_pct_min: float = 3.0
+    mode_mfs_weekly_signal_pct_min: float = 3.0
+    mode_mfs_weekly_signal_strong_pct: float = 7.0
+    mode_mfs_weekly_signal_vol_mult: float = 1.25
+    mode_mfs_weekly_min_rally_pct: float = 0.08
 
     # mode98：日/周/月 KDJ（9,3,3）三线（K、D、J）均严格小于阈值
     mode98_kdj_threshold: float = 20.0
@@ -1702,6 +1758,968 @@ def _score_mode_bottom_big_yang(
     return score
 
 
+def _is_launch_big_yang_row(
+    r: KlineRow,
+    code: str,
+    name: str,
+    *,
+    big_pct_min: float,
+    body_ratio_min: float,
+) -> bool:
+    """起量锚点大阳：允许涨停起量（不限于未封板）。"""
+    o, c, h, l_ = float(r.open), float(r.close), float(r.high), float(r.low)
+    if c <= o:
+        return False
+    pct = float(getattr(r, "pct_chg", 0.0) or 0.0)
+    if pct < big_pct_min:
+        return False
+    rng = h - l_
+    if rng <= 0:
+        return False
+    return (c - o) / rng >= body_ratio_min
+
+
+def _launch_bottom_big_yang_detail(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    *,
+    low_lookback: int = 60,
+    bottom_pos_max: float = 0.50,
+    big_pct_min: float = 5.0,
+    body_ratio_min: float = 0.55,
+    vol_mult: float = 2.0,
+    vol_ma: int = 20,
+    sudden_days: int = 5,
+    prior_vol_ratio_max: float = 0.65,
+) -> Optional[Dict[str, float]]:
+    """起量锚点：低位放量大阳线，以 min(open,low) 衡量底部位置（允许收盘拉到箱顶）。"""
+    n = len(rows)
+    need = max(low_lookback + 1, vol_ma + 1, sudden_days + 2)
+    if idx < need or idx >= n:
+        return None
+    r = rows[idx]
+    if not _is_launch_big_yang_row(
+        r, code, name, big_pct_min=big_pct_min, body_ratio_min=body_ratio_min
+    ):
+        return None
+    o, c, h, l_ = float(r.open), float(r.close), float(r.high), float(r.low)
+    launch = min(o, l_)
+    high_arr = np.array([float(x.high) for x in rows], dtype=float)
+    low_arr = np.array([float(x.low) for x in rows], dtype=float)
+    vol_arr = np.array([float(x.volume) for x in rows], dtype=float)
+    seg_lo = idx - low_lookback
+    h_max = float(np.max(high_arr[seg_lo : idx + 1]))
+    l_min = float(np.min(low_arr[seg_lo : idx + 1]))
+    rng = h_max - l_min
+    if rng <= 0:
+        return None
+    pos = (launch - l_min) / rng
+    if pos > bottom_pos_max:
+        return None
+    volume = float(r.volume)
+    v_prev = float(vol_arr[idx - 1]) if idx >= 1 else 0.0
+    v_ma = float(np.mean(vol_arr[idx - vol_ma : idx])) if idx >= vol_ma else 0.0
+    v_base = max(v_prev, v_ma)
+    if v_base <= 0 or volume < vol_mult * v_base:
+        return None
+    for j in range(idx - sudden_days, idx):
+        if j < 0:
+            continue
+        if _is_launch_big_yang_row(
+            rows[j], code, name, big_pct_min=big_pct_min, body_ratio_min=body_ratio_min
+        ):
+            return None
+    if sudden_days > 0 and idx >= sudden_days:
+        v_prior = float(np.mean(vol_arr[idx - sudden_days : idx]))
+        if v_prior > prior_vol_ratio_max * volume:
+            return None
+    rng_d = h - l_
+    pct = float(getattr(r, "pct_chg", 0.0) or 0.0)
+    return {
+        "support": launch,
+        "close": c,
+        "low_pos_pct": pos * 100.0,
+        "vol_ratio": volume / v_base,
+        "pct_chg": pct,
+        "body_ratio": (c - o) / rng_d if rng_d > 0 else 0.0,
+    }
+
+
+def _find_mode_bottom_support_anchor(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    *,
+    anchor_days_min: int,
+    anchor_days_max: int,
+    low_lookback: int,
+    bottom_pos_max: float,
+    vol_mult: float,
+    vol_ma: int,
+    big_pct_min: float,
+    body_ratio_min: float,
+    min_rally_pct: float,
+    support_near_max: float,
+    support_break_min: float,
+    test_tol: float,
+    min_support_tests: int,
+    bounce_days: int,
+    weekly_vol_mult: float,
+) -> Optional[int]:
+    """锚点：信号前窗口内，起量支撑位与当前价最接近且历史验证有效的低位放量大阳。"""
+    lo = max(low_lookback + 1, vol_ma + 1, idx - anchor_days_max)
+    hi = idx - anchor_days_min
+    if hi < lo:
+        return None
+    sig_low = float(rows[idx].low)
+    best: Optional[Tuple[float, float, int]] = None
+    for j in range(lo, hi + 1):
+        det = _launch_bottom_big_yang_detail(
+            rows,
+            j,
+            code,
+            name,
+            low_lookback=low_lookback,
+            bottom_pos_max=bottom_pos_max,
+            big_pct_min=big_pct_min,
+            body_ratio_min=body_ratio_min,
+            vol_mult=vol_mult,
+            vol_ma=vol_ma,
+        )
+        if det is None:
+            continue
+        if not _weekly_anchor_vol_ok(rows, j, weekly_vol_mult):
+            continue
+        support = float(det["support"])
+        if support <= 0:
+            continue
+        dist = (sig_low - support) / support
+        if dist > support_near_max or dist < 0 or sig_low < support * support_break_min:
+            continue
+        tests, rally, _ = _count_bottom_support_tests(
+            rows,
+            j,
+            idx,
+            support,
+            min_rally_pct=min_rally_pct,
+            test_tol=test_tol,
+            break_min=support_break_min,
+            bounce_days=bounce_days,
+        )
+        if tests < min_support_tests or rally < min_rally_pct * 100.0:
+            continue
+        key = (dist, -float(det["vol_ratio"]))
+        if best is None or key < (best[0], best[1]):
+            best = (dist, -float(det["vol_ratio"]), j)
+    return best[2] if best else None
+
+
+def _count_bottom_support_tests(
+    rows: List[KlineRow],
+    anchor_idx: int,
+    signal_idx: int,
+    support: float,
+    *,
+    min_rally_pct: float,
+    test_tol: float,
+    break_min: float,
+    bounce_days: int,
+) -> Tuple[int, float, float]:
+    """锚点后、信号前：统计起量位有效回踩并反弹次数；返回 (次数, 最大涨幅%, 最近测试距今天数)。"""
+    if support <= 0 or signal_idx <= anchor_idx + 1:
+        return 0, 0.0, 9999.0
+    high_arr = np.array([float(x.high) for x in rows], dtype=float)
+    low_arr = np.array([float(x.low) for x in rows], dtype=float)
+    close_arr = np.array([float(x.close) for x in rows], dtype=float)
+    seg_high = float(np.max(high_arr[anchor_idx:signal_idx]))
+    max_rally = (seg_high - support) / support * 100.0
+    if max_rally < min_rally_pct * 100.0:
+        return 0, max_rally, 9999.0
+    tests = 0
+    last_test_gap = 9999.0
+    j = anchor_idx + 1
+    while j < signal_idx:
+        lo = float(low_arr[j])
+        if lo > support * (1.0 + test_tol) or lo < support * break_min:
+            j += 1
+            continue
+        base_close = float(close_arr[j])
+        bounced = False
+        for k in range(j + 1, min(signal_idx, j + bounce_days + 1)):
+            if float(close_arr[k]) > base_close:
+                bounced = True
+                break
+        if bounced:
+            tests += 1
+            last_test_gap = min(last_test_gap, float(signal_idx - j))
+            j += bounce_days + 1
+        else:
+            j += 1
+    return tests, max_rally, last_test_gap
+
+
+def _weekly_anchor_vol_ok(
+    rows: List[KlineRow],
+    anchor_idx: int,
+    weekly_vol_mult: float,
+) -> bool:
+    """锚点所在周为起量周：周量 >= weekly_vol_mult × 前20周均量。"""
+    if weekly_vol_mult <= 0:
+        return True
+    wk, widx = daily_to_weekly_with_volume_and_last_index(rows)
+    wi = next((i for i, end_i in enumerate(widx) if end_i >= anchor_idx), None)
+    if wi is None:
+        return False
+    vols = [float(w[5]) for w in wk]
+    if wi < 20:
+        return vols[wi] >= weekly_vol_mult * float(np.mean(vols[: max(1, wi)]))
+    avg = float(np.mean(vols[wi - 20 : wi]))
+    if avg <= 0:
+        return False
+    return vols[wi] >= weekly_vol_mult * avg
+
+
+def _match_mode_bottom_support(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    *,
+    anchor_days_min: int = 30,
+    anchor_days_max: int = 200,
+    low_lookback: int = 60,
+    bottom_pos_max: float = 0.50,
+    anchor_vol_mult: float = 2.0,
+    anchor_vol_ma: int = 20,
+    big_pct_min: float = 5.0,
+    body_ratio_min: float = 0.55,
+    min_rally_pct: float = 0.15,
+    support_near_max: float = 0.15,
+    support_break_min: float = 0.97,
+    test_tol: float = 0.15,
+    min_support_tests: int = 1,
+    bounce_days: int = 5,
+    weekly_vol_mult: float = 1.5,
+) -> Optional[Dict[str, float]]:
+    """mode底部支撑：起量大阳支撑→拉升→回踩验证→当前再次回踩支撑（抄底）。"""
+    n = len(rows)
+    need = max(
+        anchor_days_max + 1,
+        low_lookback + 1,
+        anchor_vol_ma + 1,
+        bounce_days + 2,
+    )
+    if idx < need or idx >= n:
+        return None
+
+    i_anchor = _find_mode_bottom_support_anchor(
+        rows,
+        idx,
+        code,
+        name,
+        anchor_days_min=anchor_days_min,
+        anchor_days_max=anchor_days_max,
+        low_lookback=low_lookback,
+        bottom_pos_max=bottom_pos_max,
+        vol_mult=anchor_vol_mult,
+        vol_ma=anchor_vol_ma,
+        big_pct_min=big_pct_min,
+        body_ratio_min=body_ratio_min,
+        min_rally_pct=min_rally_pct,
+        support_near_max=support_near_max,
+        support_break_min=support_break_min,
+        test_tol=test_tol,
+        min_support_tests=min_support_tests,
+        bounce_days=bounce_days,
+        weekly_vol_mult=weekly_vol_mult,
+    )
+    if i_anchor is None:
+        return None
+
+    r = rows[idx]
+    r_a = rows[i_anchor]
+    launch_det = _launch_bottom_big_yang_detail(
+        rows,
+        i_anchor,
+        code,
+        name,
+        low_lookback=low_lookback,
+        bottom_pos_max=bottom_pos_max,
+        big_pct_min=big_pct_min,
+        body_ratio_min=body_ratio_min,
+        vol_mult=anchor_vol_mult,
+        vol_ma=anchor_vol_ma,
+    )
+    if launch_det is None:
+        return None
+    support = float(launch_det["support"])
+
+    tests, max_rally, last_test_gap = _count_bottom_support_tests(
+        rows,
+        i_anchor,
+        idx,
+        support,
+        min_rally_pct=min_rally_pct,
+        test_tol=test_tol,
+        break_min=support_break_min,
+        bounce_days=bounce_days,
+    )
+    if tests < min_support_tests:
+        return None
+
+    lo = float(r.low)
+    close = float(r.close)
+    if lo > support * (1.0 + support_near_max) or lo < support * support_break_min:
+        return None
+    if close < support * support_break_min:
+        return None
+
+    dist_pct = (lo - support) / support * 100.0
+    close_dist = (close - support) / support * 100.0
+    anchor_vr = float(launch_det["vol_ratio"])
+    pct = float(getattr(r, "pct_chg", 0.0) or 0.0)
+
+    return {
+        "anchor_date_idx": float(i_anchor),
+        "support": support,
+        "anchor_close": float(r_a.close),
+        "anchor_vol_ratio": anchor_vr,
+        "anchor_pct_chg": float(getattr(r_a, "pct_chg", 0.0) or 0.0),
+        "phase_days": float(idx - i_anchor),
+        "support_tests": float(tests),
+        "max_rally_pct": max_rally,
+        "last_test_gap_days": last_test_gap,
+        "low_dist_pct": dist_pct,
+        "close_dist_pct": close_dist,
+        "close": close,
+        "pct_chg": pct,
+    }
+
+
+def _score_mode_bottom_support(
+    rows: List[KlineRow],
+    idx: int,
+    ma10: np.ndarray,
+    ma20: np.ndarray,
+    ma60: np.ndarray,
+    vol20: np.ndarray,
+    code: str = "",
+    name: str = "",
+    breakdown: Optional[List[tuple]] = None,
+    **kwargs,
+) -> int:
+    _ = (ma10, ma20, ma60, vol20, kwargs)
+    det = _match_mode_bottom_support(rows, idx, code, name)
+    if not det:
+        return 0
+    tests = int(det["support_tests"])
+    dist = float(det["low_dist_pct"])
+    rally = float(det["max_rally_pct"])
+    vr = float(det["anchor_vol_ratio"])
+    score = int(
+        min(
+            100,
+            max(
+                0,
+                round(
+                    50
+                    + tests * 8
+                    + max(0.0, 12.0 - abs(dist)) * 1.5
+                    + min(rally, 50) * 0.3
+                    + vr * 3
+                ),
+            ),
+        )
+    )
+    if breakdown is not None:
+        i_a = int(det["anchor_date_idx"])
+        anchor_date = str(rows[i_a].date)[:10]
+        breakdown.append(
+            (
+                f"锚点{anchor_date} 支撑{det['support']:.2f} "
+                f"距支撑+{dist:.1f}% 验证{tests}次 最大拉升+{rally:.1f}%",
+                0,
+            )
+        )
+    return score
+
+
+def _find_final_shakeout_trough(
+    rows: List[KlineRow],
+    idx: int,
+    *,
+    shakeout_days_min: int,
+    shakeout_days_max: int,
+) -> Optional[int]:
+    """震仓低点：信号前 1～shakeout_days_max 日内最低低点（不含信号日）。"""
+    lo = max(1, idx - shakeout_days_max)
+    hi = idx - 1
+    if hi < lo:
+        return None
+    low_arr = np.array([float(x.low) for x in rows], dtype=float)
+    best_i = int(lo + np.argmin(low_arr[lo : hi + 1]))
+    if idx - best_i < 1:
+        return None
+    return best_i
+
+
+def _is_volume_surge_anchor_row(
+    r: KlineRow,
+    *,
+    pct_min: float = 3.0,
+) -> bool:
+    o, c = float(r.open), float(r.close)
+    if c <= o:
+        return False
+    pct = float(getattr(r, "pct_chg", 0.0) or 0.0)
+    return pct >= pct_min
+
+
+_WEEKLY_BUNDLE_CACHE: Dict[int, Tuple[List[tuple], List[int]]] = {}
+
+
+def _get_weekly_bundle(rows: List[KlineRow]) -> Tuple[List[tuple], List[int]]:
+    key = id(rows)
+    cached = _WEEKLY_BUNDLE_CACHE.get(key)
+    if cached is not None and len(cached[0]) > 0:
+        return cached
+    bundle = daily_to_weekly_with_volume_and_last_index(rows)
+    _WEEKLY_BUNDLE_CACHE[key] = bundle
+    if len(_WEEKLY_BUNDLE_CACHE) > 512:
+        _WEEKLY_BUNDLE_CACHE.clear()
+    return bundle
+
+
+def _weekly_bar_partial(rows: List[KlineRow], idx: int) -> Optional[Tuple[int, float, float, float, float, float]]:
+    """返回 (week_i, open, high, low, close, volume) 为 idx 所在周的截至 idx 的聚合 K 线。"""
+    weekly, last_idx = _get_weekly_bundle(rows)
+    if not weekly:
+        return None
+    wi: Optional[int] = None
+    for i, li in enumerate(last_idx):
+        if li >= idx and (i == 0 or last_idx[i - 1] < idx):
+            wi = i
+            break
+    if wi is None:
+        return None
+    start_i = last_idx[wi - 1] + 1 if wi > 0 else 0
+    seg = rows[start_i : idx + 1]
+    if not seg:
+        return None
+    o = float(seg[0].open)
+    h = max(float(r.high) for r in seg)
+    l = min(float(r.low) for r in seg)
+    c = float(seg[-1].close)
+    v = sum(float(getattr(r, "volume", 0) or 0) for r in seg)
+    return wi, o, h, l, c, v
+
+
+def _match_mode_final_shakeout_weekly(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    *,
+    shakeout_weeks_min: int = 2,
+    shakeout_weeks_max: int = 4,
+    peak_weeks_back: int = 12,
+    shakeout_drop_min: float = 0.08,
+    shakeout_drop_max: float = 0.38,
+    shakeout_vol_max: float = 1.05,
+    accum_lookback: int = 16,
+    accum_vol_mult: float = 1.0,
+    accum_pct_min: float = 3.0,
+    signal_pct_min: float = 3.0,
+    signal_strong_pct: float = 7.0,
+    signal_vol_mult: float = 1.25,
+    min_rally_pct: float = 0.08,
+    ma60_slope_days: int = 20,
+    breakout_pct_min: float = 15.0,
+    breakout_pct_min_main: float = 9.0,
+    breakout_vol_min: float = 2.5,
+    vol_ma: int = 20,
+) -> Optional[Dict[str, float]]:
+    """周线最后震仓：前期放量介入→2~4周缩量回落→当周反包/突破。"""
+    n = len(rows)
+    need = max(accum_lookback + 5, ma60_slope_days + 60, vol_ma + 1)
+    if idx < need or idx >= n:
+        return None
+
+    ctx = _weekly_bar_partial(rows, idx)
+    if ctx is None:
+        return None
+    wi, sig_o, sig_h, sig_l, sig_c, sig_v = ctx
+    if sig_c <= sig_o:
+        return None
+
+    weekly, last_idx = _get_weekly_bundle(rows)
+    # 周线买点：默认仅在该周最后一个交易日确认（避免同一周重复触发）
+    if idx != last_idx[wi]:
+        return None
+    if wi < shakeout_weeks_min + 2 or wi >= len(weekly):
+        return None
+
+    vols = np.array([float(w[5]) for w in weekly], dtype=float)
+    vol_ma10 = _rolling_mean(vols, 10)
+
+    sh_start = max(0, wi - shakeout_weeks_max)
+    sh_end = wi - 1
+    if sh_end - sh_start + 1 < shakeout_weeks_min:
+        return None
+
+    highs = np.array([float(w[2]) for w in weekly], dtype=float)
+    lows = np.array([float(w[3]) for w in weekly], dtype=float)
+
+    # 震仓低：信号前若干完成周内最低
+    trough_wi = int(sh_start + np.argmin(lows[sh_start : sh_end + 1]))
+    trough_low = float(lows[trough_wi])
+    if trough_low <= 0:
+        return None
+
+    # 箱顶：震仓低前 1~8 周内最高（近期平台顶，非数月前旧高）
+    peak_back = min(8, max(2, trough_wi - sh_start + 2))
+    peak_lo = max(0, trough_wi - peak_back)
+    peak_hi = max(peak_lo, trough_wi - 1)
+    if peak_hi <= peak_lo:
+        return None
+    peak_wi = int(peak_lo + np.argmax(highs[peak_lo : peak_hi + 1]))
+    peak_high = float(highs[peak_wi])
+    if peak_high <= 0 or peak_wi >= trough_wi:
+        return None
+
+    drop_pct = (peak_high - trough_low) / peak_high
+    if drop_pct < shakeout_drop_min or drop_pct > shakeout_drop_max:
+        return None
+
+    shakeout_vols: List[float] = []
+    low_vol_weeks = 0
+    peak_vol = float(vols[peak_wi])
+    for j in range(peak_wi + 1, wi):
+        vj = float(vols[j])
+        shakeout_vols.append(vj)
+        vma = float(vol_ma10[j]) if j < len(vol_ma10) and not np.isnan(vol_ma10[j]) else 0.0
+        vol_shrink = peak_vol > 0 and vj <= peak_vol * 0.80
+        vol_quiet = vma > 0 and vj <= vma * shakeout_vol_max
+        if vol_quiet or vol_shrink:
+            low_vol_weeks += 1
+    if len(shakeout_vols) < shakeout_weeks_min or low_vol_weeks < shakeout_weeks_min:
+        return None
+
+    accum_lo = max(0, wi - accum_lookback)
+    accum_hi = max(accum_lo, peak_wi - 1)
+    anchor_wi: Optional[int] = None
+    anchor_vr = 0.0
+    for j in range(accum_lo, accum_hi + 1):
+        o, c, v = float(weekly[j][1]), float(weekly[j][4]), float(vols[j])
+        if o <= 0:
+            continue
+        pct_w = (c - o) / o * 100.0
+        vma = float(vol_ma10[j]) if j < len(vol_ma10) and not np.isnan(vol_ma10[j]) else 0.0
+        if vma <= 0:
+            continue
+        vr = v / vma
+        yang = c > o
+        hit = (yang and pct_w >= accum_pct_min and vr >= accum_vol_mult) or vr >= max(
+            accum_vol_mult * 1.2, 1.25
+        )
+        if hit and (anchor_wi is None or vr > anchor_vr):
+            anchor_wi = j
+            anchor_vr = vr
+    if anchor_wi is None:
+        return None
+
+    anchor_support = float(min(weekly[anchor_wi][1], weekly[anchor_wi][3]))
+    if anchor_support <= 0:
+        return None
+    rally_pct = (peak_high - anchor_support) / anchor_support
+    if rally_pct < min_rally_pct:
+        return None
+
+    shakeout_avg_vol = float(np.mean(shakeout_vols)) if shakeout_vols else 0.0
+    sig_pct_w = (sig_c - sig_o) / sig_o * 100.0 if sig_o > 0 else 0.0
+    sig_vol_ok = shakeout_avg_vol > 0 and sig_v >= shakeout_avg_vol * signal_vol_mult
+    prior_high = float(np.max(highs[max(sh_start, wi - 2) : wi])) if wi >= 1 else 0.0
+    price_break = prior_high > 0 and sig_c > prior_high
+    if sig_pct_w < signal_strong_pct and not (
+        sig_pct_w >= signal_pct_min and sig_vol_ok
+    ) and not price_break:
+        return None
+
+    close_arr = np.array([float(x.close) for x in rows], dtype=float)
+    ma20 = _moving_mean(close_arr, 20)
+    ma60 = _moving_mean(close_arr, 60)
+    if np.isnan(ma60[idx]) or np.isnan(ma60[idx - ma60_slope_days]):
+        return None
+    if ma60[idx] < ma60[idx - ma60_slope_days] * 0.95:
+        return None
+
+    daily_vr = _vol_ratio_at(rows, idx, vol_ma)
+    pct_d = float(getattr(rows[idx], "pct_chg", 0.0) or 0.0)
+    brk_pct_min = _modepbs_big_pct_threshold(
+        code, name, big_pct_min=breakout_pct_min, big_pct_min_main=breakout_pct_min_main
+    )
+    breakout_candidate = (
+        (sig_pct_w >= brk_pct_min or pct_d >= brk_pct_min)
+        and daily_vr >= breakout_vol_min
+        and not np.isnan(ma20[idx])
+        and sig_c > ma20[idx]
+        and sig_c > peak_high
+    )
+    reversal_candidate = sig_pct_w >= signal_strong_pct or (
+        sig_pct_w >= signal_pct_min and sig_vol_ok
+    ) or (
+        idx >= 1 and sig_c > float(rows[idx - 1].high) and daily_vr >= 1.2
+    )
+    if breakout_candidate:
+        signal_type = "breakout"
+    elif reversal_candidate:
+        signal_type = "reversal"
+    else:
+        return None
+
+    rng_d = sig_h - sig_l
+    body_ratio = (sig_c - sig_o) / rng_d if rng_d > 0 else 0.0
+    anchor_i = int(last_idx[anchor_wi])
+    trough_i = int(last_idx[trough_wi])
+    peak_i = int(last_idx[peak_wi])
+
+    return {
+        "signal_type": 1.0 if signal_type == "breakout" else 0.0,
+        "weekly_path": 1.0,
+        "anchor_date_idx": float(anchor_i),
+        "trough_date_idx": float(trough_i),
+        "peak_date_idx": float(peak_i),
+        "anchor_support": anchor_support,
+        "anchor_vol_ratio": anchor_vr,
+        "peak_high": peak_high,
+        "trough_low": trough_low,
+        "shakeout_drop_pct": drop_pct * 100.0,
+        "phase_low": trough_low,
+        "rally_from_anchor_pct": rally_pct * 100.0,
+        "phase_days": float(idx - anchor_i),
+        "shakeout_days": float((trough_wi - peak_wi) * 5),
+        "shakeout_weeks": float(trough_wi - peak_wi),
+        "vol_ratio": daily_vr if daily_vr > 0 else (sig_v / shakeout_avg_vol if shakeout_avg_vol > 0 else 0.0),
+        "weekly_vol_ratio": sig_v / shakeout_avg_vol if shakeout_avg_vol > 0 else 0.0,
+        "pct_chg": pct_d if abs(pct_d) > 0.01 else sig_pct_w,
+        "weekly_pct": sig_pct_w,
+        "body_ratio": body_ratio,
+        "close": sig_c,
+        "ma20": float(ma20[idx]) if not np.isnan(ma20[idx]) else 0.0,
+        "ma60": float(ma60[idx]) if not np.isnan(ma60[idx]) else 0.0,
+    }
+
+
+def _match_mode_final_shakeout_daily(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    *,
+    phase_days_min: int = 30,
+    phase_days_max: int = 90,
+    anchor_vol_mult: float = 1.5,
+    min_rally_pct: float = 0.10,
+    consolid_days: int = 20,
+    consolid_amp_max: float = 0.15,
+    peak_lookback: int = 15,
+    shakeout_days_min: int = 3,
+    shakeout_days_max: int = 7,
+    shakeout_drop_min: float = 0.10,
+    shakeout_drop_max: float = 0.22,
+    phase_low_lookback: int = 90,
+    phase_low_break_min: float = 0.95,
+    shakeout_vol_min: float = 0.6,
+    shakeout_vol_max: float = 2.5,
+    ma60_slope_days: int = 20,
+    reversal_pct_min: float = 8.0,
+    reversal_vol_min: float = 1.5,
+    reversal_low_tol: float = 0.05,
+    breakout_pct_min: float = 15.0,
+    breakout_pct_min_main: float = 9.0,
+    breakout_vol_min: float = 3.0,
+    body_ratio_min: float = 0.55,
+    vol_ma: int = 20,
+) -> Optional[Dict[str, float]]:
+    """mode最后震仓：起量→箱体→最后洗盘→反包/突破买点。"""
+    n = len(rows)
+    need = max(
+        phase_low_lookback + 1,
+        phase_days_max + 1,
+        peak_lookback + shakeout_days_max + 5,
+        vol_ma + 1,
+        ma60_slope_days + 60,
+    )
+    if idx < need or idx >= n:
+        return None
+
+    r = rows[idx]
+    if not _is_launch_big_yang_row(
+        r, code, name, big_pct_min=min(reversal_pct_min, breakout_pct_min_main), body_ratio_min=body_ratio_min
+    ):
+        return None
+
+    trough_i = _find_final_shakeout_trough(
+        rows, idx, shakeout_days_min=shakeout_days_min, shakeout_days_max=shakeout_days_max
+    )
+    if trough_i is None:
+        return None
+
+    high_arr = np.array([float(x.high) for x in rows], dtype=float)
+    low_arr = np.array([float(x.low) for x in rows], dtype=float)
+    close_arr = np.array([float(x.close) for x in rows], dtype=float)
+    vol_arr = np.array([float(x.volume) for x in rows], dtype=float)
+
+    trough_low = float(low_arr[trough_i])
+    if trough_low <= 0:
+        return None
+
+    peak_lo = max(0, trough_i - peak_lookback)
+    peak_hi = max(peak_lo, trough_i - 2)
+    if peak_hi <= peak_lo:
+        return None
+    peak_i = int(peak_lo + np.argmax(high_arr[peak_lo : peak_hi + 1]))
+    peak_high = float(high_arr[peak_i])
+    if peak_high <= 0:
+        return None
+
+    drop_pct = (peak_high - trough_low) / peak_high
+    if drop_pct < shakeout_drop_min or drop_pct > shakeout_drop_max:
+        return None
+    if trough_i - peak_i < shakeout_days_min or trough_i - peak_i > shakeout_days_max + 5:
+        return None
+
+    phase_lo_i = max(0, trough_i - phase_low_lookback)
+    phase_low = float(np.min(low_arr[phase_lo_i:trough_i]))
+    if phase_low <= 0 or trough_low < phase_low * phase_low_break_min:
+        return None
+
+    if trough_i >= consolid_days:
+        c_seg = rows[trough_i - consolid_days : trough_i]
+        mean_c = float(np.mean([float(x.close) for x in c_seg]))
+        if mean_c > 0:
+            amp = (
+                max(float(x.high) for x in c_seg) - min(float(x.low) for x in c_seg)
+            ) / mean_c
+            if amp > consolid_amp_max:
+                return None
+
+    # 震仓期：起量后拉升 + 起量锚点
+    search_lo = max(vol_ma + 1, idx - phase_days_max)
+    search_hi = max(search_lo, trough_i - phase_days_min)
+    anchor_i: Optional[int] = None
+    anchor_vr = 0.0
+    for j in range(search_lo, search_hi + 1):
+        det = _launch_bottom_big_yang_detail(
+            rows, j, code, name, vol_mult=anchor_vol_mult, vol_ma=vol_ma
+        )
+        if det is None:
+            vr = _vol_ratio_at(rows, j, vol_ma)
+            if vr >= anchor_vol_mult and _is_volume_surge_anchor_row(rows[j], pct_min=3.0):
+                det = {"vol_ratio": vr}
+            else:
+                continue
+        else:
+            vr = float(det["vol_ratio"])
+        support_j = float(min(rows[j].open, rows[j].low))
+        if support_j <= 0:
+            continue
+        seg_high = float(np.max(high_arr[j : peak_i + 1]))
+        rally_j = (seg_high - support_j) / support_j
+        if rally_j < min_rally_pct:
+            continue
+        if anchor_i is None or vr > anchor_vr:
+            anchor_i = j
+            anchor_vr = vr
+    if anchor_i is None:
+        return None
+
+    anchor_support = float(min(rows[anchor_i].open, rows[anchor_i].low))
+    if anchor_support <= 0:
+        return None
+    seg_high = float(np.max(high_arr[anchor_i : peak_i + 1]))
+    rally_pct = (seg_high - anchor_support) / anchor_support
+    if rally_pct < min_rally_pct:
+        return None
+
+    # 震仓期量能温和
+    for j in range(peak_i + 1, trough_i + 1):
+        if j <= 0 or j >= n:
+            continue
+        vr = _vol_ratio_at(rows, j, vol_ma)
+        if vr > 0 and (vr < shakeout_vol_min or vr > shakeout_vol_max):
+            return None
+
+    # MA60 中期趋势未坏
+    ma60 = _moving_mean(close_arr, 60)
+    if np.isnan(ma60[idx]) or np.isnan(ma60[idx - ma60_slope_days]):
+        return None
+    if ma60[idx] < ma60[idx - ma60_slope_days] * 0.995:
+        return None
+
+    ma5 = _moving_mean(close_arr, 5)
+    ma10 = _moving_mean(close_arr, 10)
+    ma20 = _moving_mean(close_arr, 20)
+    washed = False
+    for j in range(peak_i + 1, idx):
+        if not np.isnan(ma5[j]) and not np.isnan(ma10[j]) and ma5[j] < ma10[j]:
+            washed = True
+            break
+    if not washed:
+        return None
+
+    pct = float(getattr(r, "pct_chg", 0.0) or 0.0)
+    vol_ratio = _vol_ratio_at(rows, idx, vol_ma)
+    sig_low = float(r.low)
+    sig_close = float(r.close)
+
+    brk_pct_min = _modepbs_big_pct_threshold(
+        code, name, big_pct_min=breakout_pct_min, big_pct_min_main=breakout_pct_min_main
+    )
+    breakout_candidate = (
+        pct >= brk_pct_min
+        and vol_ratio >= breakout_vol_min
+        and not np.isnan(ma20[idx])
+        and sig_close > ma20[idx]
+        and sig_close > peak_high
+    )
+    low_tol = 0.15 if breakout_candidate else reversal_low_tol
+    if sig_low > trough_low * (1.0 + low_tol):
+        return None
+
+    signal_type = ""
+    if breakout_candidate:
+        signal_type = "breakout"
+    elif (
+        pct >= reversal_pct_min
+        and vol_ratio >= reversal_vol_min
+        and idx >= 1
+        and sig_close > float(rows[idx - 1].high)
+    ):
+        signal_type = "reversal"
+    else:
+        return None
+
+    o, c, h, l_ = float(r.open), float(r.close), float(r.high), float(r.low)
+    rng_d = h - l_
+    body_ratio = (c - o) / rng_d if rng_d > 0 else 0.0
+
+    return {
+        "signal_type": 1.0 if signal_type == "breakout" else 0.0,
+        "weekly_path": 0.0,
+        "anchor_date_idx": float(anchor_i),
+        "trough_date_idx": float(trough_i),
+        "peak_date_idx": float(peak_i),
+        "anchor_support": anchor_support,
+        "anchor_vol_ratio": anchor_vr,
+        "peak_high": peak_high,
+        "trough_low": trough_low,
+        "shakeout_drop_pct": drop_pct * 100.0,
+        "phase_low": phase_low,
+        "rally_from_anchor_pct": rally_pct * 100.0,
+        "phase_days": float(idx - anchor_i),
+        "shakeout_days": float(trough_i - peak_i),
+        "vol_ratio": vol_ratio,
+        "pct_chg": pct,
+        "body_ratio": body_ratio,
+        "close": sig_close,
+        "ma20": float(ma20[idx]) if not np.isnan(ma20[idx]) else 0.0,
+        "ma60": float(ma60[idx]) if not np.isnan(ma60[idx]) else 0.0,
+    }
+
+
+def _match_mode_final_shakeout(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    **kwargs,
+) -> Optional[Dict[str, float]]:
+    """mode最后震仓：日线快路径 + 周线结构兜底。"""
+    daily = _match_mode_final_shakeout_daily(rows, idx, code, name, **kwargs)
+    if daily is not None:
+        return daily
+    return _match_mode_final_shakeout_weekly(
+        rows,
+        idx,
+        code,
+        name,
+        shakeout_weeks_min=int(kwargs.get("shakeout_weeks_min", 2) or 2),
+        shakeout_weeks_max=int(kwargs.get("shakeout_weeks_max", 4) or 4),
+        peak_weeks_back=int(kwargs.get("peak_weeks_back", 12) or 12),
+        shakeout_drop_min=float(kwargs.get("weekly_shakeout_drop_min", 0.08) or 0.08),
+        shakeout_drop_max=float(kwargs.get("weekly_shakeout_drop_max", 0.38) or 0.38),
+        shakeout_vol_max=float(kwargs.get("weekly_shakeout_vol_max", 1.05) or 1.05),
+        accum_lookback=int(kwargs.get("accum_lookback", 16) or 16),
+        accum_vol_mult=float(kwargs.get("accum_vol_mult", 1.0) or 1.0),
+        accum_pct_min=float(kwargs.get("accum_pct_min", 3.0) or 3.0),
+        signal_pct_min=float(kwargs.get("signal_pct_min", 3.0) or 3.0),
+        signal_strong_pct=float(kwargs.get("signal_strong_pct", 7.0) or 7.0),
+        signal_vol_mult=float(kwargs.get("signal_vol_mult", 1.25) or 1.25),
+        min_rally_pct=float(kwargs.get("weekly_min_rally_pct", 0.08) or 0.08),
+        ma60_slope_days=int(kwargs.get("ma60_slope_days", 20) or 20),
+        breakout_pct_min=float(kwargs.get("breakout_pct_min", 15.0) or 15.0),
+        breakout_pct_min_main=float(kwargs.get("breakout_pct_min_main", 9.0) or 9.0),
+        breakout_vol_min=float(kwargs.get("breakout_vol_min", 2.5) or 2.5),
+        vol_ma=int(kwargs.get("vol_ma", 20) or 20),
+    )
+
+
+def _score_mode_final_shakeout(
+    rows: List[KlineRow],
+    idx: int,
+    ma10: np.ndarray,
+    ma20: np.ndarray,
+    ma60: np.ndarray,
+    vol20: np.ndarray,
+    code: str = "",
+    name: str = "",
+    breakdown: Optional[List[tuple]] = None,
+    **kwargs,
+) -> int:
+    _ = (ma10, ma20, ma60, vol20, kwargs)
+    det = _match_mode_final_shakeout(rows, idx, code, name)
+    if not det:
+        return 0
+    vr = float(det["vol_ratio"])
+    pct = float(det["pct_chg"])
+    drop = float(det["shakeout_drop_pct"])
+    is_brk = int(det["signal_type"]) == 1
+    score = int(
+        min(
+            100,
+            max(
+                0,
+                round(
+                    48
+                    + vr * 4
+                    + pct * 0.8
+                    + drop * 0.5
+                    + (12 if is_brk else 6)
+                ),
+            ),
+        )
+    )
+    if breakdown is not None:
+        i_a = int(det["anchor_date_idx"])
+        i_t = int(det["trough_date_idx"])
+        typ = "突破" if is_brk else "反包"
+        wk = "周线" if int(det.get("weekly_path", 0)) == 1 else "日线"
+        sw = det.get("shakeout_weeks")
+        sh_label = f"震仓{int(sw)}周" if sw else f"震仓{int(det['shakeout_days'])}日"
+        breakdown.append(
+            (
+                f"[{wk}]锚点{str(rows[i_a].date)[:10]} {sh_label} "
+                f"回撤{drop:.1f}% 低{det['trough_low']:.2f} {typ} 量比{vr:.2f} 涨{pct:.1f}%",
+                0,
+            )
+        )
+    return score
+
+
 def _modepbs_big_pct_threshold(
     code: str, name: str, *, big_pct_min: float, big_pct_min_main: float
 ) -> float:
@@ -2072,7 +3090,7 @@ def _find_mode_mid_big_yang_anchor(
     body_ratio_min: float,
     vol_ma: int,
 ) -> Optional[int]:
-    """最早的主力介入大阳（锚点）：锚点前 anchor_days_min～max 日内，放量大阳线。"""
+    """最近的主力介入大阳（锚点）：信号前 anchor_days_min～max 日内，取最近一根放量大阳线。"""
     lo = max(vol_ma + 1, idx - anchor_days_max)
     hi = idx - anchor_days_min
     if hi < lo:
@@ -2091,7 +3109,7 @@ def _find_mode_mid_big_yang_anchor(
             continue
         if _vol_ratio_at(rows, j, vol_ma) < anchor_vol_mult:
             continue
-        if anchor_idx is None or j < anchor_idx:
+        if anchor_idx is None or j > anchor_idx:
             anchor_idx = j
     return anchor_idx
 
@@ -2103,7 +3121,7 @@ def _match_mode_mid_big_yang(
     name: str,
     *,
     anchor_days_min: int = 30,
-    anchor_days_max: int = 90,
+    anchor_days_max: int = 200,
     anchor_vol_mult: float = 1.5,
     rise_from_anchor_min: float = 0.20,
     rise_from_anchor_max: float = 1.20,
@@ -2122,7 +3140,7 @@ def _match_mode_mid_big_yang(
     body_ratio_min: float = 0.55,
     vol_mult: float = 1.25,
     vol_ma: int = 20,
-    vol_ratio_max: float = 4.0,
+    vol_ratio_max: float = 5.0,
     upper_ratio_max: float = 0.40,
     close_break60_min: float = 1.0,
     pre_rise5_min: float = -0.05,
@@ -2202,6 +3220,9 @@ def _match_mode_mid_big_yang(
     eff_high100_min = tight_high100_min if tight_breakout else high100_min
 
     rise_anchor = (close - anchor_close) / anchor_close
+    seg_peak = float(np.max(high_arr[i_anchor : idx + 1]))
+    rise_peak = (seg_peak - anchor_close) / anchor_close if anchor_close > 0 else 0.0
+    rise_anchor = max(rise_anchor, rise_peak)
     if rise_anchor < eff_rise_min or rise_anchor > rise_from_anchor_max:
         return None
 
@@ -3561,6 +4582,8 @@ def scan_with_mode3(
     use_mode_bottom_big_yang: bool = False,
     use_mode_platform_breakout_first_yang: bool = False,
     use_mode_mid_big_yang: bool = False,
+    use_mode_bottom_support: bool = False,
+    use_mode_final_shakeout: bool = False,
     use_mode98: bool = False,
     use_mode32: bool = False,
     sector_ak_cache_dir: Optional[str] = None,
@@ -3687,6 +4710,14 @@ def scan_with_mode3(
         signal_fn = _mode3_signals
         score_fn = _score_mode_mid_big_yang
         mode_label = "mode中位大阳线"
+    elif use_mode_bottom_support:
+        signal_fn = _mode3_signals
+        score_fn = _score_mode_bottom_support
+        mode_label = "mode底部支撑"
+    elif use_mode_final_shakeout:
+        signal_fn = _mode3_signals
+        score_fn = _score_mode_final_shakeout
+        mode_label = "mode最后震仓"
     elif use_mode98:
         thr = float(getattr(config, "mode98_kdj_threshold", 20.0))
         n_k = int(getattr(config, "mode98_kdj_n", 9) or 9)
@@ -3872,12 +4903,30 @@ def scan_with_mode3(
                                     else (
                                         max(
                                             120,
-                                            int(getattr(config, "mode_mby_anchor_days_max", 90))
+                                            int(getattr(config, "mode_mby_anchor_days_max", 200))
                                             + int(getattr(config, "mode_mby_high100_lookback", 100))
                                             + 5,
                                         )
                                         if use_mode_mid_big_yang
-                                        else 80
+                                        else (
+                                            max(
+                                                220,
+                                                int(getattr(config, "mode_mbs_anchor_days_max", 200))
+                                                + int(getattr(config, "mode_mbs_low_lookback", 60))
+                                                + 5,
+                                            )
+                                            if use_mode_bottom_support
+                                            else (
+                                                max(
+                                                    200,
+                                                    int(getattr(config, "mode_mfs_phase_days_max", 90))
+                                                    + int(getattr(config, "mode_mfs_phase_low_lookback", 90))
+                                                    + 5,
+                                                )
+                                                if use_mode_final_shakeout
+                                                else 80
+                                            )
+                                        )
                                     )
                                 )
                             )
@@ -4106,7 +5155,7 @@ def scan_with_mode3(
                     signals.append(i)
         elif use_mode_mid_big_yang:
             mby_amin = int(getattr(config, "mode_mby_anchor_days_min", 30) or 30)
-            mby_amax = int(getattr(config, "mode_mby_anchor_days_max", 90) or 90)
+            mby_amax = int(getattr(config, "mode_mby_anchor_days_max", 200) or 200)
             mby_avm = float(getattr(config, "mode_mby_anchor_vol_mult", 1.5) or 1.5)
             mby_rmin = float(getattr(config, "mode_mby_rise_from_anchor_min", 0.20) or 0.20)
             mby_rmax = float(getattr(config, "mode_mby_rise_from_anchor_max", 1.20) or 1.20)
@@ -4125,7 +5174,7 @@ def scan_with_mode3(
             mby_body = float(getattr(config, "mode_mby_body_ratio_min", 0.55) or 0.55)
             mby_vm = float(getattr(config, "mode_mby_vol_mult", 1.25) or 1.25)
             mby_vma = int(getattr(config, "mode_mby_vol_ma", 20) or 20)
-            mby_vmax = float(getattr(config, "mode_mby_vol_ratio_max", 4.0) or 4.0)
+            mby_vmax = float(getattr(config, "mode_mby_vol_ratio_max", 5.0) or 5.0)
             mby_umax = float(getattr(config, "mode_mby_upper_ratio_max", 0.40) or 0.40)
             mby_cb60 = float(getattr(config, "mode_mby_close_break60_min", 1.0) or 1.0)
             mby_pr5 = float(getattr(config, "mode_mby_pre_rise5_min", -0.05))
@@ -4176,6 +5225,118 @@ def scan_with_mode3(
                     close_break60_min=mby_cb60,
                     pre_rise5_min=mby_pr5,
                     pre_rise5_max=mby_pr5max,
+                ):
+                    signals.append(i)
+        elif use_mode_bottom_support:
+            mbs_amin = int(getattr(config, "mode_mbs_anchor_days_min", 30) or 30)
+            mbs_amax = int(getattr(config, "mode_mbs_anchor_days_max", 200) or 200)
+            mbs_ll = int(getattr(config, "mode_mbs_low_lookback", 60) or 60)
+            mbs_pos = float(getattr(config, "mode_mbs_bottom_pos_max", 0.50) or 0.50)
+            mbs_avm = float(getattr(config, "mode_mbs_anchor_vol_mult", 2.0) or 2.0)
+            mbs_vma = int(getattr(config, "mode_mbs_anchor_vol_ma", 20) or 20)
+            mbs_pct = float(getattr(config, "mode_mbs_big_pct_min", 5.0) or 5.0)
+            mbs_body = float(getattr(config, "mode_mbs_body_ratio_min", 0.55) or 0.55)
+            mbs_rally = float(getattr(config, "mode_mbs_min_rally_pct", 0.15) or 0.15)
+            mbs_near = float(getattr(config, "mode_mbs_support_near_max", 0.15) or 0.15)
+            mbs_brk = float(getattr(config, "mode_mbs_support_break_min", 0.97) or 0.97)
+            mbs_test = float(getattr(config, "mode_mbs_test_tol", 0.15) or 0.15)
+            mbs_mint = int(getattr(config, "mode_mbs_min_support_tests", 1) or 1)
+            mbs_bounce = int(getattr(config, "mode_mbs_bounce_days", 5) or 5)
+            mbs_wvm = float(getattr(config, "mode_mbs_weekly_vol_mult", 1.5) or 1.5)
+            need_i = max(mbs_amax + 1, mbs_ll + 1, mbs_vma + 1, mbs_bounce + 2)
+            st = str(start_date).strip()[:10] if start_date else ""
+            ed = str(end_date).strip()[:10] if end_date else ""
+            signals = []
+            for i in range(need_i, len(rows)):
+                d = str(rows[i].date)[:10]
+                if st and d < st:
+                    continue
+                if ed and d > ed:
+                    continue
+                if _match_mode_bottom_support(
+                    rows,
+                    i,
+                    item.code,
+                    item.name,
+                    anchor_days_min=mbs_amin,
+                    anchor_days_max=mbs_amax,
+                    low_lookback=mbs_ll,
+                    bottom_pos_max=mbs_pos,
+                    anchor_vol_mult=mbs_avm,
+                    anchor_vol_ma=mbs_vma,
+                    big_pct_min=mbs_pct,
+                    body_ratio_min=mbs_body,
+                    min_rally_pct=mbs_rally,
+                    support_near_max=mbs_near,
+                    support_break_min=mbs_brk,
+                    test_tol=mbs_test,
+                    min_support_tests=mbs_mint,
+                    bounce_days=mbs_bounce,
+                    weekly_vol_mult=mbs_wvm,
+                ):
+                    signals.append(i)
+        elif use_mode_final_shakeout:
+            mfs_pmin = int(getattr(config, "mode_mfs_phase_days_min", 30) or 30)
+            mfs_pmax = int(getattr(config, "mode_mfs_phase_days_max", 90) or 90)
+            mfs_avm = float(getattr(config, "mode_mfs_anchor_vol_mult", 1.5) or 1.5)
+            mfs_rally = float(getattr(config, "mode_mfs_min_rally_pct", 0.10) or 0.10)
+            mfs_cd = int(getattr(config, "mode_mfs_consolid_days", 20) or 20)
+            mfs_ca = float(getattr(config, "mode_mfs_consolid_amp_max", 0.15) or 0.15)
+            mfs_pl = int(getattr(config, "mode_mfs_peak_lookback", 15) or 15)
+            mfs_smin = int(getattr(config, "mode_mfs_shakeout_days_min", 3) or 3)
+            mfs_smax = int(getattr(config, "mode_mfs_shakeout_days_max", 7) or 7)
+            mfs_drop_min = float(getattr(config, "mode_mfs_shakeout_drop_min", 0.10) or 0.10)
+            mfs_drop_max = float(getattr(config, "mode_mfs_shakeout_drop_max", 0.22) or 0.22)
+            mfs_pll = int(getattr(config, "mode_mfs_phase_low_lookback", 90) or 90)
+            mfs_plb = float(getattr(config, "mode_mfs_phase_low_break_min", 0.95) or 0.95)
+            mfs_svmn = float(getattr(config, "mode_mfs_shakeout_vol_min", 0.6) or 0.6)
+            mfs_svmx = float(getattr(config, "mode_mfs_shakeout_vol_max", 2.5) or 2.5)
+            mfs_ma60d = int(getattr(config, "mode_mfs_ma60_slope_days", 20) or 20)
+            mfs_rev_pct = float(getattr(config, "mode_mfs_reversal_pct_min", 8.0) or 8.0)
+            mfs_rev_vr = float(getattr(config, "mode_mfs_reversal_vol_min", 1.5) or 1.5)
+            mfs_rev_tol = float(getattr(config, "mode_mfs_reversal_low_tol", 0.05) or 0.05)
+            mfs_brk_pct = float(getattr(config, "mode_mfs_breakout_pct_min", 15.0) or 15.0)
+            mfs_brk_main = float(getattr(config, "mode_mfs_breakout_pct_min_main", 9.0) or 9.0)
+            mfs_brk_vr = float(getattr(config, "mode_mfs_breakout_vol_min", 3.0) or 3.0)
+            mfs_body = float(getattr(config, "mode_mfs_body_ratio_min", 0.55) or 0.55)
+            need_i = max(mfs_pmax + 1, mfs_pll + 1, mfs_pl + mfs_smax + 5, mfs_ma60d + 60)
+            st = str(start_date).strip()[:10] if start_date else ""
+            ed = str(end_date).strip()[:10] if end_date else ""
+            signals = []
+            for i in range(need_i, len(rows)):
+                d = str(rows[i].date)[:10]
+                if st and d < st:
+                    continue
+                if ed and d > ed:
+                    continue
+                if _match_mode_final_shakeout(
+                    rows,
+                    i,
+                    item.code,
+                    item.name,
+                    phase_days_min=mfs_pmin,
+                    phase_days_max=mfs_pmax,
+                    anchor_vol_mult=mfs_avm,
+                    min_rally_pct=mfs_rally,
+                    consolid_days=mfs_cd,
+                    consolid_amp_max=mfs_ca,
+                    peak_lookback=mfs_pl,
+                    shakeout_days_min=mfs_smin,
+                    shakeout_days_max=mfs_smax,
+                    shakeout_drop_min=mfs_drop_min,
+                    shakeout_drop_max=mfs_drop_max,
+                    phase_low_lookback=mfs_pll,
+                    phase_low_break_min=mfs_plb,
+                    shakeout_vol_min=mfs_svmn,
+                    shakeout_vol_max=mfs_svmx,
+                    ma60_slope_days=mfs_ma60d,
+                    reversal_pct_min=mfs_rev_pct,
+                    reversal_vol_min=mfs_rev_vr,
+                    reversal_low_tol=mfs_rev_tol,
+                    breakout_pct_min=mfs_brk_pct,
+                    breakout_pct_min_main=mfs_brk_main,
+                    breakout_vol_min=mfs_brk_vr,
+                    body_ratio_min=mfs_body,
                 ):
                     signals.append(i)
         else:
@@ -4323,6 +5484,8 @@ def scan_with_mode3(
                 or use_mode_bottom_big_yang
                 or use_mode_platform_breakout_first_yang
                 or use_mode_mid_big_yang
+                or use_mode_bottom_support
+                or use_mode_final_shakeout
             ):
                 if use_mode9 and score_fn is _score_mode9:
                     score = score_fn(

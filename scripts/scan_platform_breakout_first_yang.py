@@ -5,7 +5,7 @@ mode平台突破首阳
 约 3 个月（45～95 交易日）吸筹/震仓/整理后，信号日为突破平台的第一根放量大阳线（买点）：
 
 - **阶段低点 L**：在信号日前 45～95 日内寻最低低点，自 L 收盘涨幅 20%～55%
-- **末段整理**：信号前 consolid_days 日振幅/均价 <= consolid_amp_max（默认 21%）
+- **末段整理**：信号前 consolid_days 日振幅/均价 <= consolid_amp_max（默认 30%）
 - **突破**：当日最高价 >= 近 breakout_lookback 日最高 × breakout_near_min（默认 0.93，贴近或突破箱顶）
 - **100日新高**：当日最高价 >= 前 100 日最高 × high100_near_min（默认 0.93，贴近或刚突破）
 - **质量过滤**：量比 ≤ vol_ratio_max（默认 4）；上影/振幅 ≤ upper_ratio_max（默认 0.40）；震仓期大阳线 ≥ wash_close_min_cnt 时，收盘须 ≥ 近60日高 × wash_close60_min（默认 0.98）
@@ -58,7 +58,7 @@ def main() -> None:
     ap.add_argument("--rise-min", type=float, default=0.20, help="自阶段低点最低涨幅(比例)")
     ap.add_argument("--rise-max", type=float, default=0.55, help="自阶段低点最高涨幅(比例)")
     ap.add_argument("--consolid-days", type=int, default=20)
-    ap.add_argument("--consolid-amp-max", type=float, default=0.21)
+    ap.add_argument("--consolid-amp-max", type=float, default=0.30)
     ap.add_argument("--breakout-lookback", type=int, default=60)
     ap.add_argument("--breakout-near-min", type=float, default=0.93, help="信号日最高/近60日最高下限")
     ap.add_argument("--big-pct-min", type=float, default=7.0, help="科创/创业板等大阳涨幅下限")

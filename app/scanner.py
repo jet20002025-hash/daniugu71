@@ -121,7 +121,7 @@ class ScanConfig:
     modepbs_rise_from_low_min: float = 0.20
     modepbs_rise_from_low_max: float = 0.55
     modepbs_consolid_days: int = 20
-    modepbs_consolid_amp_max: float = 0.21
+    modepbs_consolid_amp_max: float = 0.30
     modepbs_breakout_lookback: int = 60
     modepbs_breakout_near_min: float = 0.93  # 信号日最高 >= 近60日最高×该值（贴近或突破箱顶）
     modepbs_big_pct_min: float = 7.0  # 创业板/科创板等大阳涨幅下限
@@ -2777,7 +2777,7 @@ def _match_mode_platform_breakout_first_yang(
     rise_from_low_min: float = 0.20,
     rise_from_low_max: float = 0.55,
     consolid_days: int = 20,
-    consolid_amp_max: float = 0.21,
+    consolid_amp_max: float = 0.30,
     breakout_lookback: int = 60,
     breakout_near_min: float = 0.93,
     big_pct_min: float = 7.0,
@@ -2989,7 +2989,7 @@ def _score_mode_platform_breakout_first_yang(
     rise_from_low_min: float = 0.20,
     rise_from_low_max: float = 0.55,
     consolid_days: int = 20,
-    consolid_amp_max: float = 0.21,
+    consolid_amp_max: float = 0.30,
     breakout_lookback: int = 60,
     breakout_near_min: float = 0.93,
     big_pct_min: float = 7.0,
@@ -5082,7 +5082,7 @@ def scan_with_mode3(
             mpbs_rmin = float(getattr(config, "modepbs_rise_from_low_min", 0.20) or 0.20)
             mpbs_rmax = float(getattr(config, "modepbs_rise_from_low_max", 0.55) or 0.55)
             mpbs_cd = int(getattr(config, "modepbs_consolid_days", 20) or 20)
-            mpbs_ca = float(getattr(config, "modepbs_consolid_amp_max", 0.21) or 0.21)
+            mpbs_ca = float(getattr(config, "modepbs_consolid_amp_max", 0.30) or 0.30)
             mpbs_bl = int(getattr(config, "modepbs_breakout_lookback", 60) or 60)
             mpbs_bn = float(getattr(config, "modepbs_breakout_near_min", 0.93) or 0.93)
             mpbs_pct = float(getattr(config, "modepbs_big_pct_min", 7.0) or 7.0)

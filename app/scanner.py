@@ -136,12 +136,17 @@ class ScanConfig:
     modepbs_vol_ratio_max: float = 4.0  # 量比上限，排除异常放量试探（0=不限）
     modepbs_vol_ratio_extended_max: float = 6.5  # 100日突破且震仓大阳≥3时允许更高量比
     modepbs_vol_high100_wash_min: int = 3
-    modepbs_upper_ratio_max: float = 0.40  # 上影线/振幅上限，排除长上影假突破
+    modepbs_upper_ratio_max: float = 0.35  # 上影线/振幅上限，排除长上影假突破
     modepbs_upper_ratio_extended_max: float = 0.30  # 100日突破且量比≥4时放宽上影
     modepbs_upper_high100_vol_min: float = 4.0
     modepbs_wash_close_min_cnt: int = 2  # 震仓期大阳线≥该值时，要求收盘贴近箱顶
     modepbs_wash_close60_min: float = 0.98  # 上述情况下 close >= 近60日高×该值（100日突破可豁免）
     modepbs_pre_rise5_min: float = -0.05  # 信号前5日涨幅须 > 该值（默认-5%，排除急跌反弹）
+    modepbs_pre_rise5_max: float = 0.10  # 信号前5日涨幅须 <= 该值，排除连涨追高（0=不限）
+    modepbs_high_rise_wash_drop_rise_above: float = 0.38  # 自低点涨幅超该值时须有足够洗盘回撤
+    modepbs_high_rise_wash_drop_min: float = 0.08  # 上述情况下震仓期峰值至低点回撤下限
+    modepbs_weekly_conv_sig_max: float = 12.0  # 信号周5/10/20/30周均线拟合上限(%)，0=不限
+    modepbs_weekly_conv_improve_min: float = -1.5  # 平台前半周拟合均值-后半周均值下限(%)，越大越要求后期收敛
 
     # mode中位大阳线：主力介入大阳(锚点)→吸筹震仓→突破大阳买点（参考埃科光电688610）
     mode_mby_anchor_days_min: int = 30
@@ -2766,6 +2771,62 @@ def _is_big_yang_row_modepbs(
     return True
 
 
+def _modepbs_wash_drop_from_peak_pct(
+    high_arr: np.ndarray, low_arr: np.ndarray, i_low: int, idx: int
+) -> float:
+    """震仓期内自阶段高点至低点最大回撤比例。"""
+    if idx <= i_low:
+        return 0.0
+    peak_i = i_low + int(np.argmax(high_arr[i_low:idx]))
+    peak_h = float(high_arr[peak_i])
+    if peak_h <= 0:
+        return 0.0
+    trough_after = float(np.min(low_arr[peak_i:idx]))
+    return (peak_h - trough_after) / peak_h
+
+
+def _modepbs_weekly_conv_metrics(
+    rows: List[KlineRow], i_low: int, idx: int
+) -> Optional[Tuple[float, float]]:
+    """返回 (信号周拟合%, 平台收敛改善=平台前半周拟合均值-后半周均值)。不足周线返回 None。"""
+    weekly_bars, last_indices = daily_to_weekly_with_last_index(rows)
+    if len(weekly_bars) < 30:
+        return None
+    conv = weekly_convergence_value_series(weekly_bars)
+    if conv.size == 0:
+        return None
+    wi = None
+    for k, li in enumerate(last_indices):
+        if li >= idx:
+            wi = k
+            break
+    if wi is None:
+        wi = len(last_indices) - 1
+    if wi >= len(conv) or np.isnan(conv[wi]):
+        return None
+    w_sig = float(conv[wi])
+
+    wi_low = None
+    for k, li in enumerate(last_indices):
+        if li >= i_low:
+            wi_low = k
+            break
+    if wi_low is None or wi_low > wi:
+        return None
+    wc = [
+        float(conv[k])
+        for k in range(wi_low, wi + 1)
+        if k < len(conv) and not np.isnan(conv[k])
+    ]
+    if len(wc) < 4:
+        return None
+    h = len(wc) // 2
+    if h < 1 or h >= len(wc):
+        return None
+    w_improve = float(np.mean(wc[:h]) - np.mean(wc[h:]))
+    return w_sig, w_improve
+
+
 def _match_mode_platform_breakout_first_yang(
     rows: List[KlineRow],
     idx: int,
@@ -2792,12 +2853,17 @@ def _match_mode_platform_breakout_first_yang(
     vol_ratio_max: float = 4.0,
     vol_ratio_extended_max: float = 6.5,
     vol_high100_wash_min: int = 3,
-    upper_ratio_max: float = 0.40,
+    upper_ratio_max: float = 0.35,
     upper_ratio_extended_max: float = 0.30,
     upper_high100_vol_min: float = 4.0,
     wash_close_min_cnt: int = 2,
     wash_close60_min: float = 0.98,
     pre_rise5_min: float = -0.05,
+    pre_rise5_max: float = 0.10,
+    high_rise_wash_drop_rise_above: float = 0.38,
+    high_rise_wash_drop_min: float = 0.08,
+    weekly_conv_sig_max: float = 12.0,
+    weekly_conv_improve_min: float = -1.5,
 ) -> Optional[Dict[str, float]]:
     """mode平台突破首阳：阶段低点→约3个月震仓整理→贴近/突破平台首根放量大阳线。"""
     n = len(rows)
@@ -2841,6 +2907,15 @@ def _match_mode_platform_breakout_first_yang(
     volume = float(r.volume)
     rise = (close - low_price) / low_price
     if rise < rise_from_low_min or rise > rise_from_low_max:
+        return None
+
+    wash_drop = _modepbs_wash_drop_from_peak_pct(high_arr, low_arr, i_low, idx)
+    if (
+        high_rise_wash_drop_rise_above > 0
+        and high_rise_wash_drop_min > 0
+        and rise > high_rise_wash_drop_rise_above
+        and wash_drop < high_rise_wash_drop_min
+    ):
         return None
 
     if idx < consolid_days:
@@ -2890,12 +2965,15 @@ def _match_mode_platform_breakout_first_yang(
         if float(rows[j].high) / prior_high_j >= gap_breakout_near_min:
             return None
 
+    pre_rise5 = 0.0
     if idx >= 6:
         pre_close = float(close_arr[idx - 1])
         base_close = float(close_arr[idx - 6])
         if base_close > 0:
             pre_rise5 = (pre_close - base_close) / base_close
             if pre_rise5 <= pre_rise5_min:
+                return None
+            if pre_rise5_max > 0 and pre_rise5 > pre_rise5_max:
                 return None
 
     v_prev = float(vol_arr[idx - 1]) if idx >= 1 else 0.0
@@ -2949,6 +3027,18 @@ def _match_mode_platform_breakout_first_yang(
         if close_break60 < wash_close60_min and high100_ratio < 1.0:
             return None
 
+    w_metrics = _modepbs_weekly_conv_metrics(rows, i_low, idx)
+    w_sig_pct = float("nan")
+    w_improve_pct = float("nan")
+    if weekly_conv_sig_max > 0 or weekly_conv_improve_min > -900.0:
+        if w_metrics is None:
+            return None
+        w_sig_pct, w_improve_pct = w_metrics
+        if weekly_conv_sig_max > 0 and w_sig_pct > weekly_conv_sig_max:
+            return None
+        if w_improve_pct < weekly_conv_improve_min:
+            return None
+
     return {
         "close": close,
         "low_date_idx": float(i_low),
@@ -2970,6 +3060,9 @@ def _match_mode_platform_breakout_first_yang(
         "close_break60": close_break60,
         "pre_rise5_pct": pre_rise5_pct,
         "wash_big_yang_cnt": float(wash_cnt),
+        "wash_drop_from_peak_pct": wash_drop * 100.0,
+        "weekly_conv_sig_pct": w_sig_pct,
+        "weekly_conv_improve_pct": w_improve_pct,
     }
 
 
@@ -3004,12 +3097,17 @@ def _score_mode_platform_breakout_first_yang(
     vol_ratio_max: float = 4.0,
     vol_ratio_extended_max: float = 6.5,
     vol_high100_wash_min: int = 3,
-    upper_ratio_max: float = 0.40,
+    upper_ratio_max: float = 0.35,
     upper_ratio_extended_max: float = 0.30,
     upper_high100_vol_min: float = 4.0,
     wash_close_min_cnt: int = 2,
     wash_close60_min: float = 0.98,
     pre_rise5_min: float = -0.05,
+    pre_rise5_max: float = 0.10,
+    high_rise_wash_drop_rise_above: float = 0.38,
+    high_rise_wash_drop_min: float = 0.08,
+    weekly_conv_sig_max: float = 12.0,
+    weekly_conv_improve_min: float = -1.5,
 ) -> int:
     _ = (ma10, ma20, ma60, vol20)
     det = _match_mode_platform_breakout_first_yang(
@@ -3043,6 +3141,11 @@ def _score_mode_platform_breakout_first_yang(
         wash_close_min_cnt=wash_close_min_cnt,
         wash_close60_min=wash_close60_min,
         pre_rise5_min=pre_rise5_min,
+        pre_rise5_max=pre_rise5_max,
+        high_rise_wash_drop_rise_above=high_rise_wash_drop_rise_above,
+        high_rise_wash_drop_min=high_rise_wash_drop_min,
+        weekly_conv_sig_max=weekly_conv_sig_max,
+        weekly_conv_improve_min=weekly_conv_improve_min,
     )
     if not det:
         return 0
@@ -3053,13 +3156,24 @@ def _score_mode_platform_breakout_first_yang(
     br = float(det["breakout_ratio"])
     platform_pts = max(brk * 1.5, 0.0) + max(h100r - high100_near_min, 0.0) * 100.0
     platform_pts += max(br - breakout_near_min, 0.0) * 80.0
+    w_sig = float(det.get("weekly_conv_sig_pct", 0) or 0)
+    w_imp = float(det.get("weekly_conv_improve_pct", 0) or 0)
+    if w_sig == w_sig:
+        platform_pts += max(0.0, (weekly_conv_sig_max - w_sig) if weekly_conv_sig_max > 0 else 0.0) * 0.5
+    if w_imp == w_imp:
+        platform_pts += max(0.0, w_imp) * 2.0
     score = int(min(100, max(0, round(50 + vr * 5 + pct * 1.2 + platform_pts))))
     if breakdown is not None:
         brk_label = f"突破+{brk:.1f}%" if brk >= 0 else f"贴顶{br:.2f}"
+        wk = ""
+        if w_sig == w_sig:
+            wk = f" 周拟合{w_sig:.1f}%"
+            if w_imp == w_imp:
+                wk += f" 收敛+{w_imp:.1f}%"
         breakdown.append(
             (
                 f"震仓{int(det['phase_days'])}日 自低+{det['rise_from_low_pct']:.1f}% "
-                f"100日高比{h100r:.2f} {brk_label} 量比{vr:.2f} 涨{pct:.1f}%",
+                f"100日高比{h100r:.2f} {brk_label} 量比{vr:.2f} 涨{pct:.1f}%{wk}",
                 0,
             )
         )
@@ -5097,12 +5211,19 @@ def scan_with_mode3(
             mpbs_vmax = float(getattr(config, "modepbs_vol_ratio_max", 4.0) or 4.0)
             mpbs_vext = float(getattr(config, "modepbs_vol_ratio_extended_max", 6.5) or 6.5)
             mpbs_vhw = int(getattr(config, "modepbs_vol_high100_wash_min", 3) or 3)
-            mpbs_umax = float(getattr(config, "modepbs_upper_ratio_max", 0.40) or 0.40)
+            mpbs_umax = float(getattr(config, "modepbs_upper_ratio_max", 0.35) or 0.35)
             mpbs_uext = float(getattr(config, "modepbs_upper_ratio_extended_max", 0.30) or 0.30)
             mpbs_uhv = float(getattr(config, "modepbs_upper_high100_vol_min", 4.0) or 4.0)
             mpbs_wcm = int(getattr(config, "modepbs_wash_close_min_cnt", 2) or 2)
             mpbs_wc60 = float(getattr(config, "modepbs_wash_close60_min", 0.98) or 0.98)
             mpbs_pr5 = float(getattr(config, "modepbs_pre_rise5_min", -0.05))
+            mpbs_pr5max = float(getattr(config, "modepbs_pre_rise5_max", 0.10) or 0.10)
+            mpbs_hrda = float(
+                getattr(config, "modepbs_high_rise_wash_drop_rise_above", 0.38) or 0.38
+            )
+            mpbs_hrdm = float(getattr(config, "modepbs_high_rise_wash_drop_min", 0.08) or 0.08)
+            mpbs_wcsmax = float(getattr(config, "modepbs_weekly_conv_sig_max", 12.0) or 12.0)
+            mpbs_wcimin = float(getattr(config, "modepbs_weekly_conv_improve_min", -1.5) or -1.5)
             need_i = max(
                 mpbs_pmax + 1,
                 mpbs_bl + 1,
@@ -5151,6 +5272,11 @@ def scan_with_mode3(
                     wash_close_min_cnt=mpbs_wcm,
                     wash_close60_min=mpbs_wc60,
                     pre_rise5_min=mpbs_pr5,
+                    pre_rise5_max=mpbs_pr5max,
+                    high_rise_wash_drop_rise_above=mpbs_hrda,
+                    high_rise_wash_drop_min=mpbs_hrdm,
+                    weekly_conv_sig_max=mpbs_wcsmax,
+                    weekly_conv_improve_min=mpbs_wcimin,
                 ):
                     signals.append(i)
         elif use_mode_mid_big_yang:

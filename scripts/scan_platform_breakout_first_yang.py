@@ -6,6 +6,11 @@ mode平台突破首阳
 
 - **阶段低点 L**：在信号日前 45～95 日内寻最低低点，自 L 收盘涨幅 20%～55%
 - **末段整理**：信号前 consolid_days 日振幅/均价 <= consolid_amp_max（默认 30%）
+- **追高过滤**：信号前 5 日涨幅 <= pre_rise5_max（默认 10%）
+- **上影过滤**：上影/振幅 <= upper_ratio_max（默认 35%）
+- **高位浅洗过滤**：自低点涨幅 > 38% 时，震仓期峰值回撤须 >= 8%
+- **周线拟合**：信号周 MA5/10/20/30 拟合 <= weekly_conv_sig_max（默认 12%）
+- **平台周线收敛**：平台前半周拟合均值 - 后半周 >= weekly_conv_improve_min（默认 -1.5%，越大越要求后期粘合）
 - **突破**：当日最高价 >= 近 breakout_lookback 日最高 × breakout_near_min（默认 0.93，贴近或突破箱顶）
 - **100日新高**：当日最高价 >= 前 100 日最高 × high100_near_min（默认 0.93，贴近或刚突破）
 - **质量过滤**：量比 ≤ vol_ratio_max（默认 4）；上影/振幅 ≤ upper_ratio_max（默认 0.40）；震仓期大阳线 ≥ wash_close_min_cnt 时，收盘须 ≥ 近60日高 × wash_close60_min（默认 0.98）
@@ -71,10 +76,35 @@ def main() -> None:
     ap.add_argument("--high100-lookback", type=int, default=100)
     ap.add_argument("--high100-near-min", type=float, default=0.93, help="信号日最高/前100日最高下限")
     ap.add_argument("--vol-ratio-max", type=float, default=4.0, help="量比上限，0=不限")
-    ap.add_argument("--upper-ratio-max", type=float, default=0.40, help="上影线/振幅上限，0=不限")
+    ap.add_argument("--upper-ratio-max", type=float, default=0.35, help="上影线/振幅上限，0=不限")
+    ap.add_argument("--pre-rise5-max", type=float, default=0.10, help="信号前5日涨幅上限(<=)，0=不限")
+    ap.add_argument(
+        "--high-rise-wash-drop-rise-above",
+        type=float,
+        default=0.38,
+        help="自低点涨幅超该值(比例)时启用洗盘回撤下限",
+    )
+    ap.add_argument(
+        "--high-rise-wash-drop-min",
+        type=float,
+        default=0.08,
+        help="高位时震仓期峰值至低点最小回撤(比例)",
+    )
     ap.add_argument("--wash-close-min-cnt", type=int, default=2, help="震仓期大阳线≥该值时要求收盘贴近箱顶")
     ap.add_argument("--wash-close60-min", type=float, default=0.98, help="上述情况下收盘/近60日高下限")
     ap.add_argument("--pre-rise5-min", type=float, default=-0.05, help="信号前5日涨幅下限(>)，默认-5%排除急跌反弹")
+    ap.add_argument(
+        "--weekly-conv-sig-max",
+        type=float,
+        default=12.0,
+        help="信号周5/10/20/30周均线拟合上限(%%)，0=不限",
+    )
+    ap.add_argument(
+        "--weekly-conv-improve-min",
+        type=float,
+        default=-1.5,
+        help="平台前半周拟合%%减后半周下限(越大越要求后期收敛)",
+    )
     ap.add_argument("--skip-st", action="store_true")
     ap.add_argument("--allow-refresh", action="store_true")
     ap.add_argument("--out", default="")
@@ -105,6 +135,11 @@ def main() -> None:
         wash_close_min_cnt=int(args.wash_close_min_cnt),
         wash_close60_min=float(args.wash_close60_min),
         pre_rise5_min=float(args.pre_rise5_min),
+        pre_rise5_max=float(args.pre_rise5_max),
+        high_rise_wash_drop_rise_above=float(args.high_rise_wash_drop_rise_above),
+        high_rise_wash_drop_min=float(args.high_rise_wash_drop_min),
+        weekly_conv_sig_max=float(args.weekly_conv_sig_max),
+        weekly_conv_improve_min=float(args.weekly_conv_improve_min),
     )
 
     name_map = load_stock_list_csv(STOCK_LIST_CSV) if os.path.exists(STOCK_LIST_CSV) else {}
@@ -184,6 +219,8 @@ def main() -> None:
                 "high100_ratio",
                 "body_ratio",
                 "wash_big_yang_cnt",
+                "weekly_conv_sig_pct",
+                "weekly_conv_improve_pct",
             ]
         )
         for code, name, m, sig_date, low_date in hits:
@@ -205,6 +242,8 @@ def main() -> None:
                     f"{m['high100_ratio']:.3f}",
                     f"{m['body_ratio']:.3f}",
                     int(m["wash_big_yang_cnt"]),
+                    f"{m.get('weekly_conv_sig_pct', 0):.2f}",
+                    f"{m.get('weekly_conv_improve_pct', 0):.2f}",
                 ]
             )
 

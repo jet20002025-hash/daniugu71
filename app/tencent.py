@@ -44,7 +44,14 @@ def fetch_kline(
     code: str,
     count: int = 120,
     session: Optional[requests.Session] = None,
+    price_mode: str = "qfq",
 ) -> List[KlineRow]:
+    """拉取腾讯日 K。
+
+    price_mode:
+      - \"qfq\"（默认）：优先前复权 qfqday，无则 day（与历史行为一致）
+      - \"raw\"：不复权，仅使用 day（若无则返回空列表）
+    """
     session = session or requests.Session()
     session.trust_env = False
     symbol = f"{_prefix(code)}{code}"
@@ -61,7 +68,10 @@ def fetch_kline(
     data = data_obj.get(symbol, {})
     if not isinstance(data, dict):
         return []
-    rows = data.get("qfqday") or data.get("day") or []
+    if price_mode == "raw":
+        rows = data.get("day") or []
+    else:
+        rows = data.get("qfqday") or data.get("day") or []
     result: List[KlineRow] = []
     prev_close = None
     for item in rows:

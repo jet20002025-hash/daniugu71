@@ -145,7 +145,7 @@ class ScanConfig:
     modepbs_pre_rise5_max: float = 0.10  # 信号前5日涨幅须 <= 该值，排除连涨追高（0=不限）
     modepbs_high_rise_wash_drop_rise_above: float = 0.38  # 自低点涨幅超该值时须有足够洗盘回撤
     modepbs_high_rise_wash_drop_min: float = 0.08  # 上述情况下震仓期峰值至低点回撤下限
-    modepbs_weekly_conv_sig_max: float = 12.0  # 信号周5/10/20/30周均线拟合上限(%)，0=不限
+    modepbs_weekly_conv_sig_max: float = 15.0  # 信号周5/10/20/30周均线拟合上限(%)，0=不限
     modepbs_weekly_conv_improve_min: float = -1.5  # 平台前半周拟合均值-后半周均值下限(%)，越大越要求后期收敛
 
     # mode中位大阳线：主力介入大阳(锚点)→吸筹震仓→突破大阳买点（参考埃科光电688610）
@@ -2743,10 +2743,12 @@ def _is_big_yang_row_modepbs(
     big_pct_min_main: float = 4.5,
     body_ratio_min: float,
     for_signal: bool = True,
+    allow_limit_up: bool = False,
 ) -> bool:
-    """平台突破首阳：允许 10% 板接近涨停的强阳（买点常为板块内最大阳）。
+    """平台突破首阳大阳线判定。
 
     for_signal=True 时主板用 big_pct_min_main(4.5%)；震仓/首阳回溯用 big_pct_min(7%)。
+    allow_limit_up=True 时不排除涨停日（信号日可为涨停突破）。
     """
     o, c, h, l_ = float(r.open), float(r.close), float(r.high), float(r.low)
     if c <= o:
@@ -2760,9 +2762,10 @@ def _is_big_yang_row_modepbs(
         pct_min = big_pct_min
     if pct < pct_min:
         return False
-    limit_pct = _limit_rate(code, name) * 100
-    if pct >= limit_pct - 0.001:
-        return False
+    if not allow_limit_up:
+        limit_pct = _limit_rate(code, name) * 100
+        if pct >= limit_pct - 0.001:
+            return False
     rng = h - l_
     if rng <= 0:
         return False
@@ -2862,7 +2865,7 @@ def _match_mode_platform_breakout_first_yang(
     pre_rise5_max: float = 0.10,
     high_rise_wash_drop_rise_above: float = 0.38,
     high_rise_wash_drop_min: float = 0.08,
-    weekly_conv_sig_max: float = 12.0,
+    weekly_conv_sig_max: float = 15.0,
     weekly_conv_improve_min: float = -1.5,
 ) -> Optional[Dict[str, float]]:
     """mode平台突破首阳：阶段低点→约3个月震仓整理→贴近/突破平台首根放量大阳线。"""
@@ -2880,7 +2883,14 @@ def _match_mode_platform_breakout_first_yang(
 
     r = rows[idx]
     if not _is_big_yang_row_modepbs(
-        r, code, name, big_pct_min=big_pct_min, big_pct_min_main=big_pct_min_main, body_ratio_min=body_ratio_min, for_signal=True
+        r,
+        code,
+        name,
+        big_pct_min=big_pct_min,
+        big_pct_min_main=big_pct_min_main,
+        body_ratio_min=body_ratio_min,
+        for_signal=True,
+        allow_limit_up=True,
     ):
         return None
 
@@ -3106,7 +3116,7 @@ def _score_mode_platform_breakout_first_yang(
     pre_rise5_max: float = 0.10,
     high_rise_wash_drop_rise_above: float = 0.38,
     high_rise_wash_drop_min: float = 0.08,
-    weekly_conv_sig_max: float = 12.0,
+    weekly_conv_sig_max: float = 15.0,
     weekly_conv_improve_min: float = -1.5,
 ) -> int:
     _ = (ma10, ma20, ma60, vol20)
@@ -5222,7 +5232,7 @@ def scan_with_mode3(
                 getattr(config, "modepbs_high_rise_wash_drop_rise_above", 0.38) or 0.38
             )
             mpbs_hrdm = float(getattr(config, "modepbs_high_rise_wash_drop_min", 0.08) or 0.08)
-            mpbs_wcsmax = float(getattr(config, "modepbs_weekly_conv_sig_max", 12.0) or 12.0)
+            mpbs_wcsmax = float(getattr(config, "modepbs_weekly_conv_sig_max", 15.0) or 15.0)
             mpbs_wcimin = float(getattr(config, "modepbs_weekly_conv_improve_min", -1.5) or -1.5)
             need_i = max(
                 mpbs_pmax + 1,

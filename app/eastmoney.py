@@ -9,6 +9,10 @@ import requests
 
 CLIST_URL = "https://push2.eastmoney.com/api/qt/clist/get"
 KLINE_URL = "https://push2his.eastmoney.com/api/qt/stock/kline/get"
+BOARD_CLIST_URL = "https://push2.eastmoney.com/api/qt/clist/get"
+BOARD_CLIST_URL_79 = "https://79.push2.eastmoney.com/api/qt/clist/get"
+BOARD_CLIST_URL_HTTP = "http://push2.eastmoney.com/api/qt/clist/get"
+BOARD_CLIST_URL_HTTP_79 = "http://79.push2.eastmoney.com/api/qt/clist/get"
 
 
 @dataclass
@@ -35,6 +39,43 @@ class KlineRow:
     pct_chg: float
     chg: float
     turnover: float
+
+
+def _get_json_with_retry(
+    session: requests.Session,
+    url: str,
+    *,
+    params: dict,
+    headers: dict,
+    timeout: float,
+    retries: int = 4,
+    backoff_base: float = 0.6,
+) -> dict:
+    import time as _time
+
+    last_err: Exception | None = None
+    urls = [url]
+    if url == BOARD_CLIST_URL:
+        urls = [
+            BOARD_CLIST_URL_79,
+            BOARD_CLIST_URL,
+            BOARD_CLIST_URL_HTTP_79,
+            BOARD_CLIST_URL_HTTP,
+        ]
+    for attempt in range(max(1, int(retries))):
+        for u in urls:
+            try:
+                resp = session.get(u, params=params, headers=headers, timeout=timeout)
+                resp.raise_for_status()
+                data = resp.json()
+                return data if isinstance(data, dict) else {}
+            except Exception as e:
+                last_err = e
+                continue
+        _time.sleep(backoff_base * (attempt + 1))
+    if last_err:
+        raise last_err
+    return {}
 
 
 def _safe_float(value: str) -> float:
@@ -404,3 +445,216 @@ def get_kline_cached(
 
 def fetch_index_kline(session: Optional[requests.Session] = None) -> List[KlineRow]:
     return fetch_kline("1.000001", count=120, session=session)
+
+
+def fetch_board_fund_flow_rank_em(
+    kind: str = "concept",
+    session: Optional[requests.Session] = None,
+    page_size: int = 200,
+    max_pages: int = 10,
+    timeout: float = 18.0,
+) -> List[dict]:
+    """
+    东方财富 push2 板块资金（按主力净流入 f62 排序）：
+    - kind: concept / industry / region
+    返回：[{rank,name,code,pct,net_main}, ...]
+    注：这是“当时点”的快照。历史滚动（5/10天）需自行按日落库后再聚合。
+    """
+    session = session or requests.Session()
+    # 避免受到环境变量 http(s)_proxy 影响导致 ProxyError
+    session.trust_env = False
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        ),
+        "Referer": "https://data.eastmoney.com/",
+    }
+    fs_map = {
+        # 东财板块：m:90；t 口径常用：1=地域，2=行业，3=概念
+        "region": "m:90 t:1",
+        "industry": "m:90 t:2",
+        "concept": "m:90 t:3",
+    }
+    fs = fs_map.get(str(kind).strip().lower())
+    if not fs:
+        raise ValueError(f"unknown kind={kind!r}, expected one of: concept/industry/region")
+
+    out: List[dict] = []
+    for pn in range(1, max_pages + 1):
+        params = {
+            "pn": pn,
+            "pz": page_size,
+            "po": 1,  # desc
+            "np": 1,
+            "ut": "b2884a393a59ad64002292a3e90d46a5",
+            "fltt": 2,
+            "invt": 2,
+            "fid": "f62",  # 主力净流入
+            "fs": fs,
+            # f12=code, f14=name, f3=pct, f62=main net inflow
+            "fields": "f12,f14,f3,f62",
+        }
+        data = _get_json_with_retry(
+            session,
+            BOARD_CLIST_URL,
+            params=params,
+            headers=headers,
+            timeout=timeout,
+            retries=8,
+            backoff_base=1.0,
+        ) or {}
+        block = (data.get("data") or {}) if isinstance(data, dict) else {}
+        rows = (block.get("diff") or []) if isinstance(block, dict) else []
+        if not rows:
+            break
+        for row in rows:
+            name = str(row.get("f14", "")).strip()
+            code = str(row.get("f12", "")).strip()
+            if not name or not code:
+                continue
+            try:
+                pct = float(row.get("f3", 0) or 0.0)
+            except Exception:
+                pct = 0.0
+            try:
+                net_main = float(row.get("f62", 0) or 0.0)
+            except Exception:
+                net_main = 0.0
+            out.append(
+                {
+                    "rank": len(out) + 1,
+                    "name": name,
+                    "code": code,
+                    "pct": pct,
+                    "net_main": net_main,
+                }
+            )
+        if len(out) >= page_size:
+            # 已有足够多的排行，默认不需要翻太多页
+            break
+    return out
+
+
+def fetch_concept_board_list_em(
+    session: Optional[requests.Session] = None,
+    page_size: int = 200,
+    max_pages: int = 20,
+    timeout: float = 18.0,
+) -> List[dict]:
+    """
+    东财 push2：概念板块列表。
+    返回：[{code,name}, ...] 其中 code 形如 BKxxxx。
+    """
+    session = session or requests.Session()
+    session.trust_env = False
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        ),
+        "Referer": "https://data.eastmoney.com/",
+    }
+    out: List[dict] = []
+    for pn in range(1, max_pages + 1):
+        params = {
+            "pn": pn,
+            "pz": page_size,
+            "po": 1,
+            "np": 1,
+            "ut": "bd1d9ddb04089700cf9c27f6f7426281",
+            "fltt": 2,
+            "invt": 2,
+            "fid": "f12",
+            # 概念板块：m:90 t:3；常见会过滤 f:!50（排除某些特殊板块），这里不强依赖过滤
+            "fs": "m:90 t:3",
+            "fields": "f12,f14",
+        }
+        data = _get_json_with_retry(
+            session,
+            BOARD_CLIST_URL,
+            params=params,
+            headers=headers,
+            timeout=timeout,
+            retries=8,
+            backoff_base=1.0,
+        ) or {}
+        block = (data.get("data") or {}) if isinstance(data, dict) else {}
+        rows = (block.get("diff") or []) if isinstance(block, dict) else []
+        if not rows:
+            break
+        for row in rows:
+            code = str(row.get("f12", "")).strip()
+            name = str(row.get("f14", "")).strip()
+            if not code or not name:
+                continue
+            out.append({"code": code, "name": name})
+        if len(rows) < page_size:
+            break
+    return out
+
+
+def fetch_board_constituents_em(
+    board_code: str,
+    session: Optional[requests.Session] = None,
+    page_size: int = 500,
+    max_pages: int = 40,
+    timeout: float = 18.0,
+) -> List[str]:
+    """
+    东财 push2：按板块代码获取成分股代码列表（6位数字）。
+    board_code 形如 BKxxxx。
+    """
+    session = session or requests.Session()
+    session.trust_env = False
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        ),
+        "Referer": "https://quote.eastmoney.com/",
+    }
+    b = str(board_code or "").strip()
+    if not b:
+        return []
+    out: List[str] = []
+    seen = set()
+    for pn in range(1, max_pages + 1):
+        params = {
+            "pn": pn,
+            "pz": page_size,
+            "po": 1,
+            "np": 1,
+            "ut": "bd1d9ddb04089700cf9c27f6f7426281",
+            "fltt": 2,
+            "invt": 2,
+            "fid": "f3",
+            # 成分：fs=b:BKxxxx
+            "fs": f"b:{b}",
+            "fields": "f12",
+        }
+        data = _get_json_with_retry(
+            session,
+            BOARD_CLIST_URL,
+            params=params,
+            headers=headers,
+            timeout=timeout,
+            retries=8,
+            backoff_base=1.0,
+        ) or {}
+        block = (data.get("data") or {}) if isinstance(data, dict) else {}
+        rows = (block.get("diff") or []) if isinstance(block, dict) else []
+        if not rows:
+            break
+        for row in rows:
+            code = str(row.get("f12", "")).strip()
+            if not code or (not code.isdigit()):
+                continue
+            code = code.zfill(6)
+            if code in seen:
+                continue
+            seen.add(code)
+            out.append(code)
+        if len(rows) < page_size:
+            break
+    return out

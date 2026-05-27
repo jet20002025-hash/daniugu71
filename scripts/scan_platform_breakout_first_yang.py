@@ -9,7 +9,8 @@ mode平台突破首阳
 - **追高过滤**：信号前 5 日涨幅 <= pre_rise5_max（默认 10%）
 - **上影过滤**：上影/振幅 <= upper_ratio_max（默认 35%）
 - **高位浅洗过滤**：自低点涨幅 > 38% 时，震仓期峰值回撤须 >= 8%
-- **周线拟合**：信号周 MA5/10/20/30 拟合 <= weekly_conv_sig_max（默认 12%）
+- **周线拟合**：信号周 MA5/10/20/30 拟合 <= weekly_conv_sig_max（默认 15%）
+- **涨停可作信号日**：主板/创业板涨停大阳也可作为突破买点（不排除涨停）
 - **平台周线收敛**：平台前半周拟合均值 - 后半周 >= weekly_conv_improve_min（默认 -1.5%，越大越要求后期粘合）
 - **突破**：当日最高价 >= 近 breakout_lookback 日最高 × breakout_near_min（默认 0.93，贴近或突破箱顶）
 - **100日新高**：当日最高价 >= 前 100 日最高 × high100_near_min（默认 0.93，贴近或刚突破）
@@ -96,7 +97,7 @@ def main() -> None:
     ap.add_argument(
         "--weekly-conv-sig-max",
         type=float,
-        default=12.0,
+        default=15.0,
         help="信号周5/10/20/30周均线拟合上限(%%)，0=不限",
     )
     ap.add_argument(

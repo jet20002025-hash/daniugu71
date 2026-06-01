@@ -542,6 +542,8 @@ def save_results(results: List[ScanResult], model: str = "rule", user_id: Option
 
 
 def load_results(user_id: Optional[int] = None) -> List[Dict[str, object]]:
+    from app.scanner import _flatten_result_metrics
+
     if user_id is not None:
         json_path = os.path.join(USER_RESULTS_DIR, str(user_id), "latest.json")
     else:
@@ -549,7 +551,10 @@ def load_results(user_id: Optional[int] = None) -> List[Dict[str, object]]:
     if not os.path.exists(json_path):
         return []
     with open(json_path, "r", encoding="utf-8") as handle:
-        return json.load(handle)
+        rows = json.load(handle)
+    if not isinstance(rows, list):
+        return []
+    return [_flatten_result_metrics(dict(r)) for r in rows if isinstance(r, dict)]
 
 
 def load_meta(user_id: Optional[int] = None) -> Dict[str, object]:

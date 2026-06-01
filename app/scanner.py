@@ -6878,6 +6878,20 @@ def scan_with_mode3(
     # 先按评分与买点/涨停特征排序
     results.sort(key=_mode3_sort_key)
 
+    # 同一代码、同一信号日只保留排序最优的一条（避免区间扫描重复入表）
+    deduped: List[ScanResult] = []
+    best_by_key: Dict[tuple, ScanResult] = {}
+    key_order: List[tuple] = []
+    for r in results:
+        sig = str((r.metrics or {}).get("signal_date") or "")[:10]
+        key = (r.code, sig) if sig else (r.code,)
+        if key not in best_by_key:
+            key_order.append(key)
+            best_by_key[key] = r
+        elif _mode3_sort_key(r) < _mode3_sort_key(best_by_key[key]):
+            best_by_key[key] = r
+    results = [best_by_key[k] for k in key_order]
+
     # 计算每个代码在本次扫描区间内的最早信号日，用于前端展示「最早出现日期」
     first_dates: Dict[str, str] = {}
     for r in results:
@@ -6914,8 +6928,25 @@ def scan_with_mode3(
     return results[: config.max_results]
 
 
+def _flatten_result_metrics(row: Dict[str, object]) -> Dict[str, object]:
+    """JSON 结果顶层补齐 metrics 字段，兼容旧版 latest.json。"""
+    metrics = row.get("metrics")
+    if not isinstance(metrics, dict):
+        metrics = {}
+    for k in (
+        "signal_date",
+        "first_signal_date",
+        "buy_point_score",
+        "has_limit_up_6d",
+        "event_type",
+    ):
+        if row.get(k) in (None, "") and metrics.get(k) not in (None, ""):
+            row[k] = metrics[k]
+    return row
+
+
 def serialize_results(results: List[ScanResult]) -> List[Dict[str, object]]:
-    return [
+    rows = [
         {
             **asdict(r),
             "reasons": ", ".join(r.reasons),
@@ -6927,3 +6958,4 @@ def serialize_results(results: List[ScanResult]) -> List[Dict[str, object]]:
         }
         for r in results
     ]
+    return [_flatten_result_metrics(row) for row in rows]

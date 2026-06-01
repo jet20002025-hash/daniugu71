@@ -142,23 +142,26 @@
           </thead>
           <tbody id="results-tbody">
             {% for row in results %}
+            {% set m = row.get("metrics") or {} %}
+            {% set sig_date = row.get("signal_date") or m.get("signal_date") %}
+            {% set first_pool = row.get("first_signal_date") or m.get("first_signal_date") %}
             <tr class="stock-row" data-code="{{ row.code }}" data-name="{{ row.name }}">
               <td>{{ row.code }}</td>
               <td>{{ row.name }}</td>
               <td class="score">{{ row.score }}</td>
-              <td class="score">{{ row.get("buy_point_score", "—") }}</td>
+              <td class="score">{{ row.get("buy_point_score") or m.get("buy_point_score") or "—" }}</td>
               <td>{{ "%.2f" % row.latest_close }}</td>
               <td class="pct">{{ "%.2f" % row.change_pct }}</td>
-              <td>{{ row.get("signal_date", "—") }}</td>
+              <td>{{ sig_date or "—" }}</td>
               <td>
-                {% if row.get("first_signal_date") and row.get("first_signal_date") != row.get("signal_date") %}
-                  {{ row.get("first_signal_date") }}
+                {% if first_pool and first_pool != sig_date %}
+                  {{ first_pool }}
                 {% else %}
                   —
                 {% endif %}
               </td>
               <td>
-                {% if row.get("has_limit_up_6d") %}
+                {% if row.get("has_limit_up_6d") or m.get("has_limit_up_6d") %}
                   是
                 {% else %}
                   否

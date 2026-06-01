@@ -239,14 +239,115 @@ class ScanConfig:
 
     # mode32（3+2）：实体首板后 5 日整理，信号日 = 首板后第 6 个交易日（尾盘上车语义）
     mode32_sideways_days: int = 60
-    mode32_sideways_range_pct: float = 0.42  # (区间最高-最低)/区间均价，越小越「横盘」
+    mode32_sideways_range_pct: float = 0.44  # (区间最高-最低)/区间均价；略放宽以覆盖震仓后首板（如000509）
     mode32_day1_body_max: float = 0.50  # 首板次日实体占振幅上限
     mode32_day1_vol_vs_limit_min: float = 1.0  # 次日量 ≥ 首板量 × 该值
     mode32_near_high_pct: float = 0.028  # 第2～3日收盘不低于 首板最高价×(1-该值)
     mode32_days23_low_min_frac: float = 0.97  # 第2～3日最低价不低于 首板最高价×该值
-    mode32_day45_body_max: float = 0.55  # 第4～5日实体占振幅上限
+    mode32_day45_body_max: float = 0.95  # 第4～5日实体占振幅上限（允许末段震荡阴但仍缩量）
+    mode32_vol_day43_vs_day3_max: float = 1.20  # 第4日量 ≤ 第3日量×该值（原1.08过严）
+    mode32_vol_day5_vs_day4_max: float = 1.08  # 第5日量 ≤ 第4日量×该值
     mode32_vol_day45_vs_day1_max: float = 0.72  # 第4、5日量相对次日量的上限比例（低迷）
     mode32_min_close_vs_mid: float = 1.0  # 信号日收盘 ≥ 首板实体中轴×该值（1.0=不破中轴）
+    # 信号日：MA120/MA250 向上但斜率平缓（参考000509@2026-05-15：5日斜率约0.16%/0.50%）
+    mode32_ma_slope_days: int = 5
+    mode32_ma120_slope_min_pct: float = 0.01  # 半年线须略向上（%）
+    mode32_ma120_slope_max_pct: float = 0.55
+    mode32_ma250_slope_min_pct: float = 0.01  # 年线须略向上（%）
+    mode32_ma250_slope_max_pct: float = 1.05
+
+    # mode33（锚试末洗）：锚点大阳吸筹→长震仓→中级反弹→试盘→末次放量震仓买点
+    mode33_anchor_lookback: int = 300
+    mode33_anchor_body_min: float = 0.32
+    mode33_anchor_vol_mult: float = 1.20
+    mode33_break_tol: float = 0.005
+    mode33_shakeout_days_min: int = 55
+    mode33_shakeout_days_max: int = 165
+    mode33_sideways_range_pct: float = 0.62
+    mode33_trial_lookback: int = 30
+    mode33_trial_after_anchor_min: int = 35
+    mode33_trial_box_pct: float = 0.10
+    mode33_require_mid_rebound: bool = True
+    mode33_mid_rebound_min_shake_frac: float = 0.28
+    mode33_mid_rebound_min_rise_pct: float = 0.12
+    mode33_mid_surge_pct_min: float = 5.5
+    mode33_mid_surge_vol_mult: float = 1.25
+    mode33_mid_min_days_before_trial: int = 8
+    mode33_mid_pullback_min_pct: float = 0.06
+    mode33_final_day_min: int = 6
+    mode33_final_day_max: int = 20
+    mode33_final_vol_mult: float = 1.50
+    mode33_box_end_vol_min: float = 0.60
+    mode33_box_end_vol_max: float = 1.40
+    mode33_box_end_day_max: int = 7
+    mode33_final_pct_max: float = 5.0
+    mode33_final_body_max: float = 0.95
+    mode33_ma_slope_days: int = 5
+    mode33_ma120_slope_min_pct: float = 0.01
+    mode33_ma120_slope_max_pct: float = 0.55
+    mode33_ma250_slope_min_pct: float = 0.01
+    mode33_ma250_slope_max_pct: float = 1.05
+    mode33_vol_ma: int = 20
+
+    # mode34（底部突破回踩二波）：阶段底→强阳突破→缩量平台→二波确认（参考600850@5/26）
+    mode34_bottom_lookback: int = 60
+    mode34_bottom_pos_max: float = 0.30
+    mode34_surge_cum_pct_min: float = 12.0
+    mode34_surge_big_pct_min: float = 7.0
+    mode34_surge_big_pct_main: float = 4.5
+    mode34_pullback_days_min: int = 2
+    mode34_pullback_days_max: int = 8
+    mode34_pullback_dd_max: float = 0.20
+    mode34_signal_pct_min: float = 1.5
+    mode34_min_score: int = 62
+
+
+def _mode34_kw_from_config(config: ScanConfig) -> Dict[str, Any]:
+    from app.mode34_bottom_break_pullback import mode34_kw_from_scan_config
+
+    return mode34_kw_from_scan_config(config)
+
+
+def _mode34_signal_at(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    **kwargs: Any,
+) -> bool:
+    from app.mode34_bottom_break_pullback import match_mode34_bottom_break_pullback
+
+    return match_mode34_bottom_break_pullback(rows, idx, code, name, **kwargs) is not None
+
+
+def _score_mode34(
+    rows: List[KlineRow],
+    idx: int,
+    ma10: np.ndarray,
+    ma20: np.ndarray,
+    ma60: np.ndarray,
+    vol20: np.ndarray,
+    code: str = "",
+    name: str = "",
+    breakdown: Optional[List[tuple]] = None,
+    **kwargs: Any,
+) -> int:
+    _ = (ma10, ma20, ma60, vol20, breakdown)
+    from app.mode34_bottom_break_pullback import score_mode34_bottom_break_pullback
+
+    return score_mode34_bottom_break_pullback(rows, idx, code, name, **kwargs)
+
+
+def _mode34_metrics(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    **kwargs: Any,
+) -> Dict[str, Any]:
+    from app.mode34_bottom_break_pullback import mode34_metrics
+
+    return mode34_metrics(rows, idx, code, name, **kwargs)
 
 
 def _normalize_code(code: str) -> str:
@@ -661,6 +762,60 @@ def _mode32_sideways_ok(
     return (mx - mn) / mean_c <= sideways_range_pct
 
 
+def _mode32_ma_slope_pct(
+    closes: np.ndarray,
+    idx: int,
+    ma_window: int,
+    slope_days: int,
+) -> Optional[float]:
+    """MA 在 slope_days 内的涨幅（%），用于「向上但近乎走平」。"""
+    need = ma_window - 1 + slope_days
+    if idx < need:
+        return None
+    ma = _moving_mean(closes, ma_window)
+    if np.isnan(ma[idx]) or np.isnan(ma[idx - slope_days]):
+        return None
+    prev = float(ma[idx - slope_days])
+    if prev <= 0:
+        return None
+    return (float(ma[idx]) - prev) / prev * 100.0
+
+
+def _mode32_long_ma_flat_up_ok(
+    rows: List[KlineRow],
+    idx: int,
+    *,
+    ma120_window: int = 120,
+    ma250_window: int = 250,
+    slope_days: int = 5,
+    ma120_slope_min_pct: float = 0.01,
+    ma120_slope_max_pct: float = 0.55,
+    ma250_slope_min_pct: float = 0.01,
+    ma250_slope_max_pct: float = 1.05,
+) -> bool:
+    closes = np.array([float(r.close) for r in rows], dtype=float)
+    s120 = _mode32_ma_slope_pct(closes, idx, ma120_window, slope_days)
+    s250 = _mode32_ma_slope_pct(closes, idx, ma250_window, slope_days)
+    if s120 is None or s250 is None:
+        return False
+    return (
+        ma120_slope_min_pct <= s120 <= ma120_slope_max_pct
+        and ma250_slope_min_pct <= s250 <= ma250_slope_max_pct
+    )
+
+
+def _mode32_long_ma_slopes(
+    rows: List[KlineRow],
+    idx: int,
+    slope_days: int = 5,
+) -> Tuple[Optional[float], Optional[float]]:
+    closes = np.array([float(r.close) for r in rows], dtype=float)
+    return (
+        _mode32_ma_slope_pct(closes, idx, 120, slope_days),
+        _mode32_ma_slope_pct(closes, idx, 250, slope_days),
+    )
+
+
 def _mode32_signal_at(
     rows: List[KlineRow],
     idx: int,
@@ -672,9 +827,16 @@ def _mode32_signal_at(
     day1_vol_vs_limit_min: float = 1.0,
     near_high_pct: float = 0.028,
     days23_low_min_frac: float = 0.97,
-    day45_body_max: float = 0.55,
+    day45_body_max: float = 0.95,
+    vol_day43_vs_day3_max: float = 1.20,
+    vol_day5_vs_day4_max: float = 1.08,
     vol_day45_vs_day1_max: float = 0.72,
     min_close_vs_mid: float = 1.0,
+    ma_slope_days: int = 5,
+    ma120_slope_min_pct: float = 0.01,
+    ma120_slope_max_pct: float = 0.55,
+    ma250_slope_min_pct: float = 0.01,
+    ma250_slope_max_pct: float = 1.05,
 ) -> bool:
     """
     信号日在 idx = T+6（首板日 T，其后 5 日为整理），且 ST、一字、T 字板已剔除。
@@ -719,7 +881,7 @@ def _mode32_signal_at(
     # Days 4–5：小实体 + 量能低迷
     v4 = float(rows[T + 4].volume)
     v5 = float(rows[T + 5].volume)
-    if not (v4 <= v3 * 1.08 and v5 <= v4 * 1.08):
+    if not (v4 <= v3 * vol_day43_vs_day3_max + 1e-9 and v5 <= v4 * vol_day5_vs_day4_max + 1e-9):
         return False
     if v4 > v1 * vol_day45_vs_day1_max + 1e-9 or v5 > v1 * vol_day45_vs_day1_max + 1e-9:
         return False
@@ -736,6 +898,17 @@ def _mode32_signal_at(
     if min_low_5 + 1e-9 < mid * 0.98:
         return False
 
+    if not _mode32_long_ma_flat_up_ok(
+        rows,
+        idx,
+        slope_days=ma_slope_days,
+        ma120_slope_min_pct=ma120_slope_min_pct,
+        ma120_slope_max_pct=ma120_slope_max_pct,
+        ma250_slope_min_pct=ma250_slope_min_pct,
+        ma250_slope_max_pct=ma250_slope_max_pct,
+    ):
+        return False
+
     return True
 
 
@@ -747,13 +920,19 @@ def _mode32_metrics(
     H0 = float(rows[T].high)
     O0, C0 = float(rows[T].open), float(rows[T].close)
     mid = 0.5 * (O0 + C0)
-    return {
+    s120, s250 = _mode32_long_ma_slopes(rows, idx)
+    out = {
         "mode32_limit_date": rows[T].date,
         "mode32_limit_high": round(H0, 4),
         "mode32_mid_stop": round(mid, 4),
         "mode32_vol_day1_vs_limit": round(float(rows[T + 1].volume) / max(float(rows[T].volume), 1e-9), 4),
         "mode32_vol_day5_vs_day1": round(float(rows[T + 5].volume) / max(float(rows[T + 1].volume), 1e-9), 4),
     }
+    if s120 is not None:
+        out["mode32_ma120_slope5_pct"] = round(s120, 4)
+    if s250 is not None:
+        out["mode32_ma250_slope5_pct"] = round(s250, 4)
+    return out
 
 
 def _score_mode32(
@@ -789,6 +968,548 @@ def _score_mode32(
     bonus_vol = max(0.0, min(18.0, (0.65 - shrink) * 50.0))
     score = 62.0 + bonus_tight + bonus_vol
     return int(max(62, min(92, round(score))))
+
+
+def _mode33_anchor_low(rows: List[KlineRow], t: int) -> float:
+    return min(float(rows[t].open), float(rows[t].low))
+
+
+def _mode33_find_anchor(
+    rows: List[KlineRow],
+    trial_i: int,
+    code: str,
+    name: str,
+    *,
+    anchor_lookback: int,
+    trial_after_anchor_min: int,
+    anchor_body_min: float,
+    shakeout_days_min: int = 55,
+    shakeout_days_max: int = 165,
+    break_tol: float = 0.005,
+    vol_ma: int = 20,
+    anchor_vol_mult: float = 1.20,
+) -> Optional[int]:
+    """锚点大阳：震仓期不破 L0，在候选中取吸筹量更强、铁底更牢的一根（非简单最早）。"""
+    lo = max(1, trial_i - anchor_lookback)
+    hi = trial_i - trial_after_anchor_min
+    if hi < lo:
+        return None
+    best_t: Optional[int] = None
+    best_score = -1e18
+    for t in range(lo, hi + 1):
+        if not _mode32_solid_limit_ok(rows, t, code, name, body_min=anchor_body_min):
+            continue
+        shake = trial_i - t - 1
+        if shake < shakeout_days_min or shake > shakeout_days_max:
+            continue
+        vr = _vol_ratio_at(rows, t, vol_ma)
+        if vr + 1e-9 < anchor_vol_mult:
+            continue
+        L0 = _mode33_anchor_low(rows, t)
+        if L0 <= 0:
+            continue
+        shake_lo, shake_hi = t + 1, trial_i - 1
+        if shake_hi < shake_lo:
+            continue
+        seg_min = min(float(rows[j].low) for j in range(shake_lo, shake_hi + 1))
+        if seg_min + 1e-9 < L0 * (1.0 - break_tol):
+            continue
+        defense = (seg_min - L0) / L0
+        sweet = 1.0 if 85 <= shake <= 145 else 0.6
+        score = vr * 10.0 + sweet * 6.0 - defense * 40.0
+        if score > best_score:
+            best_score = score
+            best_t = t
+    return best_t
+
+
+def _mode33_mid_rebound_detail(
+    rows: List[KlineRow],
+    T0: int,
+    shake_lo: int,
+    shake_hi: int,
+    t_trial: int,
+    L0: float,
+    code: str,
+    name: str,
+    *,
+    mid_rebound_min_shake_frac: float = 0.28,
+    mid_rebound_min_rise_pct: float = 0.12,
+    mid_surge_pct_min: float = 5.5,
+    mid_surge_vol_mult: float = 1.25,
+    mid_min_days_before_trial: int = 8,
+    mid_pullback_min_pct: float = 0.06,
+    anchor_body_min: float = 0.32,
+    vol_ma: int = 20,
+) -> Optional[Dict[str, Any]]:
+    """长震仓后半段须出现中级反弹（放量冲高），试盘前自峰值回落整理。"""
+    if shake_hi <= shake_lo or L0 <= 0:
+        return None
+    shake_days = shake_hi - shake_lo + 1
+    min_peak_i = shake_lo + max(1, int(shake_days * mid_rebound_min_shake_frac))
+
+    t_peak = min_peak_i
+    h_peak = float(rows[t_peak].high)
+    for j in range(min_peak_i + 1, shake_hi + 1):
+        h = float(rows[j].high)
+        if h > h_peak:
+            h_peak = h
+            t_peak = j
+    if h_peak < L0 * (1.0 + mid_rebound_min_rise_pct):
+        return None
+
+    vols = [float(r.volume) for r in rows]
+    surge_i: Optional[int] = None
+    surge_best = -1e18
+    win_lo = max(shake_lo, T0 + 3, t_peak - 20)
+    win_hi = min(shake_hi, t_peak + 3)
+    for j in range(win_lo, win_hi + 1):
+        pct = float(rows[j].pct_chg)
+        is_limit = _mode32_solid_limit_ok(
+            rows, j, code, name, body_min=anchor_body_min * 0.85
+        )
+        if not is_limit and pct + 1e-9 < mid_surge_pct_min:
+            continue
+        if j < vol_ma:
+            continue
+        vma = float(np.mean(vols[j - vol_ma : j]))
+        if not is_limit and vols[j] + 1e-9 < mid_surge_vol_mult * max(vma, 1e-9):
+            continue
+        score = pct + (8.0 if is_limit else 0.0) - abs(j - t_peak) * 0.3
+        if score > surge_best:
+            surge_best = score
+            surge_i = j
+    if surge_i is None:
+        return None
+
+    if t_trial - t_peak < mid_min_days_before_trial:
+        return None
+
+    post_lows = [
+        float(rows[j].low) for j in range(t_peak + 1, t_trial) if t_peak + 1 < t_trial
+    ]
+    if not post_lows:
+        return None
+    trough = min(post_lows)
+    if h_peak <= 0:
+        return None
+    if (h_peak - trough) / h_peak + 1e-9 < mid_pullback_min_pct:
+        return None
+
+    return {
+        "T_mid": t_peak,
+        "H_mid": h_peak,
+        "T_surge": surge_i,
+        "mid_rise_from_L0_pct": round((h_peak - L0) / L0 * 100.0, 2),
+        "mid_pullback_pct": round((h_peak - trough) / h_peak * 100.0, 2),
+    }
+
+
+def _mode33_signal_vol_kind(
+    rows: List[KlineRow],
+    idx: int,
+    t_trial: int,
+    vr_sig: float,
+    *,
+    dt: int,
+    final_vol_mult: float,
+    box_end_vol_min: float,
+    box_end_vol_max: float,
+    box_end_day_max: int,
+    vol_ma: int = 20,
+) -> Optional[str]:
+    """⑤ 末洗：放量最后一洗(final_shake) 或 试盘后缩量整理收官(box_end，000509@5/15)。"""
+    if vr_sig + 1e-9 >= final_vol_mult:
+        return "final_shake"
+    if dt > box_end_day_max:
+        return None
+    if vr_sig + 1e-9 < box_end_vol_min or vr_sig > box_end_vol_max + 1e-9:
+        return None
+    if t_trial + 2 > idx:
+        return None
+    vols = [float(r.volume) for r in rows]
+    v_d1 = max(vols[t_trial + 1], 1e-9)
+    post_mean = float(np.mean(vols[t_trial + 2 : idx + 1]))
+    if post_mean > v_d1 * 1.02:
+        return None
+    if _vol_ratio_at(rows, t_trial, vol_ma) > 0 and vr_sig > _vol_ratio_at(rows, t_trial, vol_ma) * 0.85:
+        return None
+    return "box_end"
+
+
+def _mode33_match_detail(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    *,
+    anchor_lookback: int = 300,
+    anchor_body_min: float = 0.32,
+    anchor_vol_mult: float = 1.20,
+    break_tol: float = 0.005,
+    shakeout_days_min: int = 55,
+    shakeout_days_max: int = 165,
+    sideways_range_pct: float = 0.62,
+    trial_after_anchor_min: int = 35,
+    trial_box_pct: float = 0.10,
+    require_mid_rebound: bool = True,
+    mid_rebound_min_shake_frac: float = 0.28,
+    mid_rebound_min_rise_pct: float = 0.12,
+    mid_surge_pct_min: float = 5.5,
+    mid_surge_vol_mult: float = 1.25,
+    mid_min_days_before_trial: int = 8,
+    mid_pullback_min_pct: float = 0.06,
+    final_day_min: int = 6,
+    final_day_max: int = 20,
+    final_vol_mult: float = 1.50,
+    box_end_vol_min: float = 0.60,
+    box_end_vol_max: float = 1.40,
+    box_end_day_max: int = 12,
+    final_pct_max: float = 5.0,
+    final_body_max: float = 0.95,
+    vol_ma: int = 20,
+    ma_slope_days: int = 5,
+    ma120_slope_min_pct: float = 0.01,
+    ma120_slope_max_pct: float = 0.55,
+    ma250_slope_min_pct: float = 0.01,
+    ma250_slope_max_pct: float = 1.05,
+) -> Optional[Dict[str, Any]]:
+    """mode33：锚点吸筹→长震仓→中级反弹→试盘→末洗信号日。"""
+    if _is_st(name or ""):
+        return None
+    if idx < 250 + ma_slope_days or idx >= len(rows):
+        return None
+
+    sig = rows[idx]
+    if _limit_up_day(rows, idx, code, name):
+        return None
+    if float(sig.pct_chg) > final_pct_max + 1e-9:
+        return None
+    if _mode32_row_body_ratio(sig) > final_body_max:
+        return None
+
+    vr_sig = _vol_ratio_at(rows, idx, vol_ma)
+
+    if not _mode32_long_ma_flat_up_ok(
+        rows,
+        idx,
+        slope_days=ma_slope_days,
+        ma120_slope_min_pct=ma120_slope_min_pct,
+        ma120_slope_max_pct=ma120_slope_max_pct,
+        ma250_slope_min_pct=ma250_slope_min_pct,
+        ma250_slope_max_pct=ma250_slope_max_pct,
+    ):
+        return None
+
+    for dt in range(final_day_min, final_day_max + 1):
+        t_trial = idx - dt
+        if t_trial < 1:
+            continue
+        if not _mode32_solid_limit_ok(rows, t_trial, code, name, body_min=anchor_body_min):
+            continue
+
+        sig_kind = _mode33_signal_vol_kind(
+            rows,
+            idx,
+            t_trial,
+            vr_sig,
+            dt=dt,
+            final_vol_mult=final_vol_mult,
+            box_end_vol_min=box_end_vol_min,
+            box_end_vol_max=box_end_vol_max,
+            box_end_day_max=box_end_day_max,
+            vol_ma=vol_ma,
+        )
+        if sig_kind is None:
+            continue
+
+        T0 = _mode33_find_anchor(
+            rows,
+            t_trial,
+            code,
+            name,
+            anchor_lookback=anchor_lookback,
+            trial_after_anchor_min=trial_after_anchor_min,
+            anchor_body_min=anchor_body_min,
+            shakeout_days_min=shakeout_days_min,
+            shakeout_days_max=shakeout_days_max,
+            break_tol=break_tol,
+            vol_ma=vol_ma,
+            anchor_vol_mult=anchor_vol_mult,
+        )
+        if T0 is None:
+            continue
+
+        L0 = _mode33_anchor_low(rows, T0)
+        if L0 <= 0:
+            continue
+        H0 = float(rows[T0].high)
+        H_trial = float(rows[t_trial].high)
+        trial_mid = 0.5 * (float(rows[t_trial].open) + float(rows[t_trial].close))
+        floor_l0 = L0 * (1.0 - break_tol)
+        box_low = H_trial * (1.0 - trial_box_pct)
+
+        shake_lo = T0 + 1
+        shake_hi = t_trial - 1
+        if shake_hi < shake_lo:
+            continue
+        shake_days = shake_hi - shake_lo + 1
+
+        seg_highs = [float(rows[j].high) for j in range(shake_lo, shake_hi + 1)]
+        seg_lows = [float(rows[j].low) for j in range(shake_lo, shake_hi + 1)]
+        seg_closes = [float(rows[j].close) for j in range(shake_lo, shake_hi + 1)]
+        seg_min_low = min(seg_lows)
+        if seg_min_low + 1e-9 < floor_l0:
+            continue
+        mean_c = sum(seg_closes) / max(1, len(seg_closes))
+        if mean_c <= 0:
+            continue
+        if (max(seg_highs) - min(seg_lows)) / mean_c > sideways_range_pct:
+            continue
+
+        mid_det = _mode33_mid_rebound_detail(
+            rows,
+            T0,
+            shake_lo,
+            shake_hi,
+            t_trial,
+            L0,
+            code,
+            name,
+            mid_rebound_min_shake_frac=mid_rebound_min_shake_frac,
+            mid_rebound_min_rise_pct=mid_rebound_min_rise_pct,
+            mid_surge_pct_min=mid_surge_pct_min,
+            mid_surge_vol_mult=mid_surge_vol_mult,
+            mid_min_days_before_trial=mid_min_days_before_trial,
+            mid_pullback_min_pct=mid_pullback_min_pct,
+            anchor_body_min=anchor_body_min,
+            vol_ma=vol_ma,
+        )
+        if require_mid_rebound and mid_det is None:
+            continue
+
+        post_lows = [float(rows[j].low) for j in range(t_trial + 1, idx + 1)]
+        if post_lows and min(post_lows) + 1e-9 < floor_l0:
+            continue
+
+        sig_low = float(sig.low)
+        sig_close = float(sig.close)
+        if sig_low + 1e-9 < box_low and sig_close + 1e-9 < trial_mid:
+            continue
+
+        s120, s250 = _mode32_long_ma_slopes(rows, idx, ma_slope_days)
+        out: Dict[str, Any] = {
+            "T0": T0,
+            "T_trial": t_trial,
+            "L0": L0,
+            "H0": H0,
+            "H_trial": H_trial,
+            "shake_days": shake_days,
+            "shake_min_low": seg_min_low,
+            "shake_range_pct": (max(seg_highs) - min(seg_lows)) / mean_c,
+            "days_trial_to_signal": dt,
+            "final_vol_ratio20": vr_sig,
+            "signal_kind": sig_kind,
+            "ma120_slope5_pct": s120,
+            "ma250_slope5_pct": s250,
+            "anchor_vol_ratio20": round(_vol_ratio_at(rows, T0, vol_ma), 4),
+        }
+        if mid_det:
+            out["T_mid"] = int(mid_det["T_mid"])
+            out["H_mid"] = float(mid_det["H_mid"])
+            out["T_surge"] = int(mid_det["T_surge"])
+            out["mid_rise_from_L0_pct"] = float(mid_det["mid_rise_from_L0_pct"])
+            out["mid_pullback_pct"] = float(mid_det["mid_pullback_pct"])
+        return out
+
+    return None
+
+
+def _mode33_signal_at(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    **kwargs: Any,
+) -> bool:
+    return _mode33_match_detail(rows, idx, code, name, **kwargs) is not None
+
+
+def _mode33_metrics(rows: List[KlineRow], idx: int, code: str, name: str, **kwargs: Any) -> Dict[str, Any]:
+    det = _mode33_match_detail(rows, idx, code, name, **kwargs)
+    if not det:
+        return {}
+    T0 = int(det["T0"])
+    Tt = int(det["T_trial"])
+    out: Dict[str, Any] = {
+        "mode33_anchor_date": rows[T0].date,
+        "mode33_L0": round(float(det["L0"]), 4),
+        "mode33_H0": round(float(det["H0"]), 4),
+        "mode33_trial_date": rows[Tt].date,
+        "mode33_H_trial": round(float(det["H_trial"]), 4),
+        "mode33_days_anchor_to_trial": int(Tt - T0),
+        "mode33_days_trial_to_signal": int(det["days_trial_to_signal"]),
+        "mode33_shakeout_days": int(det["shake_days"]),
+        "mode33_shakeout_min_low": round(float(det["shake_min_low"]), 4),
+        "mode33_shakeout_range_pct": round(float(det["shake_range_pct"]) * 100.0, 2),
+        "mode33_final_vol_ratio20": round(float(det["final_vol_ratio20"]), 4),
+    }
+    if det.get("signal_kind"):
+        out["mode33_signal_kind"] = str(det["signal_kind"])
+    if det.get("ma120_slope5_pct") is not None:
+        out["mode33_ma120_slope5_pct"] = round(float(det["ma120_slope5_pct"]), 4)
+    if det.get("ma250_slope5_pct") is not None:
+        out["mode33_ma250_slope5_pct"] = round(float(det["ma250_slope5_pct"]), 4)
+    if det.get("T_mid") is not None:
+        out["mode33_mid_rebound_date"] = rows[int(det["T_mid"])].date
+        out["mode33_H_mid"] = round(float(det["H_mid"]), 4)
+        out["mode33_mid_rise_from_L0_pct"] = float(det.get("mid_rise_from_L0_pct", 0))
+        out["mode33_mid_pullback_pct"] = float(det.get("mid_pullback_pct", 0))
+    if det.get("T_surge") is not None:
+        out["mode33_mid_surge_date"] = rows[int(det["T_surge"])].date
+    if det.get("anchor_vol_ratio20") is not None:
+        out["mode33_anchor_vol_ratio20"] = float(det["anchor_vol_ratio20"])
+    return out
+
+
+def _mode33_volume_profile(
+    rows: List[KlineRow],
+    idx: int,
+    det: Dict[str, Any],
+    *,
+    vol_ma: int = 20,
+) -> Dict[str, float]:
+    """量能结构特征（用于相似股匹配与涨幅预估）。"""
+    T0 = int(det["T0"])
+    Tt = int(det["T_trial"])
+    vols = [float(r.volume) for r in rows]
+
+    def _vr(i: int) -> float:
+        if i < vol_ma or i >= len(vols):
+            return 1.0
+        vma = float(np.mean(vols[i - vol_ma : i]))
+        return vols[i] / max(vma, 1e-9)
+
+    v_trial = max(vols[Tt], 1e-9)
+    v_d1 = max(vols[Tt + 1], 1e-9) if Tt + 1 < len(vols) else v_trial
+    post: List[float] = []
+    if Tt + 2 < idx:
+        post = vols[Tt + 2 : idx]
+    post_mean = float(np.mean(post)) if post else v_d1
+
+    shake_vols = vols[T0 + 1 : Tt] if Tt > T0 + 1 else []
+    shake_mean = float(np.mean(shake_vols)) if shake_vols else v_trial
+
+    close_sig = float(rows[idx].close)
+    L0 = float(det["L0"])
+    return {
+        "trial_vol_ratio20": round(_vr(Tt), 4),
+        "day1_vol_vs_trial": round(v_d1 / v_trial, 4),
+        "post_trial_vol_vs_day1": round(post_mean / v_d1, 4),
+        "shake_vol_vs_trial": round(shake_mean / v_trial, 4),
+        "final_vol_ratio20": round(float(det["final_vol_ratio20"]), 4),
+        "rise_from_L0_pct": round((close_sig - L0) / L0 * 100.0, 2) if L0 > 0 else 0.0,
+        "days_trial_to_signal": float(det["days_trial_to_signal"]),
+        "shake_days": float(det["shake_days"]),
+        "shake_range_pct": round(float(det["shake_range_pct"]) * 100.0, 2),
+    }
+
+
+def _mode33_forward_rise(
+    rows: List[KlineRow],
+    idx: int,
+    *,
+    horizons: Tuple[int, ...] = (20, 40, 60, 120),
+    entry: str = "signal_close",
+) -> Dict[str, float]:
+    """信号后涨幅：默认以信号日收盘价为基准，统计各窗口内最高价涨幅。"""
+    if idx >= len(rows):
+        return {}
+    if entry == "signal_close":
+        base = float(rows[idx].close)
+        base_i = idx
+    else:
+        base_i = idx + 1
+        if base_i >= len(rows):
+            return {}
+        base = float(rows[base_i].open)
+    if base <= 0:
+        return {}
+    out: Dict[str, float] = {}
+    for d in horizons:
+        end = min(len(rows) - 1, base_i + d)
+        if end <= base_i:
+            out[f"max_gain_{d}d_pct"] = float("nan")
+            out[f"close_gain_{d}d_pct"] = float("nan")
+            continue
+        seg = rows[base_i + 1 : end + 1]
+        hi = max(float(r.high) for r in seg)
+        close_end = float(rows[end].close)
+        out[f"max_gain_{d}d_pct"] = round((hi / base - 1.0) * 100.0, 2)
+        out[f"close_gain_{d}d_pct"] = round((close_end / base - 1.0) * 100.0, 2)
+    return out
+
+
+def _score_mode33(
+    rows: List[KlineRow],
+    idx: int,
+    ma10: np.ndarray,
+    ma20: np.ndarray,
+    ma60: np.ndarray,
+    vol20: np.ndarray,
+    code: str = "",
+    name: str = "",
+    breakdown: Optional[List[tuple]] = None,
+    **kwargs: Any,
+) -> int:
+    """mode33 评分约 62～95。"""
+    det = _mode33_match_detail(rows, idx, code, name, **kwargs)
+    if not det:
+        return 62
+    score = 62.0
+    tight = float(det["shake_range_pct"])
+    score += max(0.0, min(18.0, (0.55 - tight) * 40.0))
+    L0 = float(det["L0"])
+    shake_min = float(det["shake_min_low"])
+    if L0 > 0:
+        lift = (shake_min - L0) / L0
+        score += max(0.0, min(12.0, lift * 80.0))
+    kind = str(det.get("signal_kind") or "")
+    vr = float(det["final_vol_ratio20"])
+    if kind == "final_shake":
+        if 1.5 <= vr <= 2.5:
+            score += 10.0
+        elif 1.35 <= vr < 1.5:
+            score += 5.0
+        elif vr > 2.8:
+            score -= 5.0
+    elif kind == "box_end":
+        if 0.75 <= vr <= 1.15:
+            score += 10.0
+        elif 0.60 <= vr <= 1.35:
+            score += 6.0
+    dt = int(det["days_trial_to_signal"])
+    if 9 <= dt <= 12:
+        score += 6.0
+    elif 7 <= dt <= 18:
+        score += 3.0
+    mid_rise = det.get("mid_rise_from_L0_pct")
+    if mid_rise is not None:
+        score += max(0.0, min(8.0, (float(mid_rise) - 12.0) * 0.25))
+    mid_pb = det.get("mid_pullback_pct")
+    if mid_pb is not None and 8.0 <= float(mid_pb) <= 35.0:
+        score += 4.0
+    avr = det.get("anchor_vol_ratio20")
+    if avr is not None and float(avr) >= 1.5:
+        score += 3.0
+    s120 = det.get("ma120_slope5_pct")
+    s250 = det.get("ma250_slope5_pct")
+    if s120 is not None and s250 is not None:
+        flatness = abs(float(s120)) + abs(float(s250))
+        score += max(0.0, min(8.0, (1.2 - flatness) * 6.0))
+    if float(rows[idx].close) < float(rows[idx].open):
+        score += 4.0
+    return int(max(62, min(95, round(score))))
 
 
 def _mode88_signals(
@@ -4710,6 +5431,8 @@ def scan_with_mode3(
     use_mode_final_shakeout: bool = False,
     use_mode98: bool = False,
     use_mode32: bool = False,
+    use_mode33: bool = False,
+    use_mode34: bool = False,
     sector_ak_cache_dir: Optional[str] = None,
     sector_fund_flow_max_points: int = 5,
     sector_fund_flow_yi_per_point: float = 3.0,
@@ -4880,6 +5603,14 @@ def scan_with_mode3(
 
         score_fn = _score_mode98_bound
         mode_label = "mode98"
+    elif use_mode34:
+        signal_fn = _mode3_signals
+        score_fn = _score_mode34
+        mode_label = "mode34"
+    elif use_mode33:
+        signal_fn = _mode3_signals
+        score_fn = _score_mode33
+        mode_label = "mode33"
     elif use_mode32:
         signal_fn = _mode3_signals
         score_fn = _score_mode32
@@ -4964,6 +5695,71 @@ def scan_with_mode3(
     em_top_n = int(getattr(config, "em_industry_flow_top_n", 10) or 10)
     em_bonus = int(getattr(config, "em_industry_flow_bonus", 3) or 0)
 
+    mode33_kw: Dict[str, Any] = {}
+    if use_mode33:
+        mode33_kw = dict(
+            anchor_lookback=int(getattr(config, "mode33_anchor_lookback", 300) or 300),
+            anchor_body_min=float(getattr(config, "mode33_anchor_body_min", 0.32) or 0.32),
+            anchor_vol_mult=float(getattr(config, "mode33_anchor_vol_mult", 1.20) or 1.20),
+            break_tol=float(getattr(config, "mode33_break_tol", 0.005) or 0.005),
+            shakeout_days_min=int(getattr(config, "mode33_shakeout_days_min", 55) or 55),
+            shakeout_days_max=int(getattr(config, "mode33_shakeout_days_max", 165) or 165),
+            sideways_range_pct=float(
+                getattr(config, "mode33_sideways_range_pct", 0.62) or 0.62
+            ),
+            trial_after_anchor_min=int(
+                getattr(config, "mode33_trial_after_anchor_min", 35) or 35
+            ),
+            trial_box_pct=float(getattr(config, "mode33_trial_box_pct", 0.10) or 0.10),
+            require_mid_rebound=bool(
+                getattr(config, "mode33_require_mid_rebound", True)
+            ),
+            mid_rebound_min_shake_frac=float(
+                getattr(config, "mode33_mid_rebound_min_shake_frac", 0.28) or 0.28
+            ),
+            mid_rebound_min_rise_pct=float(
+                getattr(config, "mode33_mid_rebound_min_rise_pct", 0.12) or 0.12
+            ),
+            mid_surge_pct_min=float(
+                getattr(config, "mode33_mid_surge_pct_min", 5.5) or 5.5
+            ),
+            mid_surge_vol_mult=float(
+                getattr(config, "mode33_mid_surge_vol_mult", 1.25) or 1.25
+            ),
+            mid_min_days_before_trial=int(
+                getattr(config, "mode33_mid_min_days_before_trial", 8) or 8
+            ),
+            mid_pullback_min_pct=float(
+                getattr(config, "mode33_mid_pullback_min_pct", 0.06) or 0.06
+            ),
+            final_day_min=int(getattr(config, "mode33_final_day_min", 6) or 6),
+            final_day_max=int(getattr(config, "mode33_final_day_max", 20) or 20),
+            final_vol_mult=float(getattr(config, "mode33_final_vol_mult", 1.50) or 1.50),
+            box_end_vol_min=float(getattr(config, "mode33_box_end_vol_min", 0.60) or 0.60),
+            box_end_vol_max=float(getattr(config, "mode33_box_end_vol_max", 1.40) or 1.40),
+            box_end_day_max=int(getattr(config, "mode33_box_end_day_max", 12) or 12),
+            final_pct_max=float(getattr(config, "mode33_final_pct_max", 5.0) or 5.0),
+            final_body_max=float(getattr(config, "mode33_final_body_max", 0.95) or 0.95),
+            vol_ma=int(getattr(config, "mode33_vol_ma", 20) or 20),
+            ma_slope_days=int(getattr(config, "mode33_ma_slope_days", 5) or 5),
+            ma120_slope_min_pct=float(
+                getattr(config, "mode33_ma120_slope_min_pct", 0.01) or 0.01
+            ),
+            ma120_slope_max_pct=float(
+                getattr(config, "mode33_ma120_slope_max_pct", 0.55) or 0.55
+            ),
+            ma250_slope_min_pct=float(
+                getattr(config, "mode33_ma250_slope_min_pct", 0.01) or 0.01
+            ),
+            ma250_slope_max_pct=float(
+                getattr(config, "mode33_ma250_slope_max_pct", 1.05) or 1.05
+            ),
+        )
+
+    mode34_kw: Dict[str, Any] = {}
+    if use_mode34:
+        mode34_kw = _mode34_kw_from_config(config)
+
     for item in stock_list:
         if _is_st(item.name or ""):
             continue
@@ -5001,7 +5797,7 @@ def scan_with_mode3(
                 if use_mode88
                 else (
                     200
-                    if (use_mode18 or use_mode98 or use_mode32)
+                    if (use_mode18 or use_mode98 or use_mode32 or use_mode33 or use_mode34)
                     else (
                         max(130, int(getattr(config, "mode5_half_year_bars", 120)) + 5)
                         if use_mode5
@@ -5098,20 +5894,60 @@ def scan_with_mode3(
                 shrink_max_days=m5_shrink_d,
                 half_year_bars=m5_hb,
             )
+        elif use_mode34:
+            st = str(start_date).strip()[:10] if start_date else ""
+            ed = str(end_date).strip()[:10] if end_date else ""
+            signals = []
+            start_i = 90
+            for i in range(start_i, len(rows)):
+                d = str(rows[i].date)[:10]
+                if st and d < st:
+                    continue
+                if ed and d > ed:
+                    continue
+                if _mode34_signal_at(rows, i, item.code, item.name, **mode34_kw):
+                    signals.append(i)
+        elif use_mode33:
+            msd = int(mode33_kw.get("ma_slope_days", 5) or 5)
+            st = str(start_date).strip()[:10] if start_date else ""
+            ed = str(end_date).strip()[:10] if end_date else ""
+            signals = []
+            start_i = max(
+                int(mode33_kw.get("anchor_lookback", 120))
+                + int(mode33_kw.get("trial_after_anchor_min", 40))
+                + int(mode33_kw.get("final_day_max", 15))
+                + 6,
+                250 + msd,
+            )
+            for i in range(start_i, len(rows)):
+                d = str(rows[i].date)[:10]
+                if st and d < st:
+                    continue
+                if ed and d > ed:
+                    continue
+                if _mode33_signal_at(rows, i, item.code, item.name, **mode33_kw):
+                    signals.append(i)
         elif use_mode32:
             L = int(getattr(config, "mode32_sideways_days", 60) or 60)
-            sr = float(getattr(config, "mode32_sideways_range_pct", 0.42) or 0.42)
+            sr = float(getattr(config, "mode32_sideways_range_pct", 0.44) or 0.44)
             d1b = float(getattr(config, "mode32_day1_body_max", 0.50) or 0.50)
             d1v = float(getattr(config, "mode32_day1_vol_vs_limit_min", 1.0) or 1.0)
             nh = float(getattr(config, "mode32_near_high_pct", 0.028) or 0.028)
             d23 = float(getattr(config, "mode32_days23_low_min_frac", 0.97) or 0.97)
-            d45b = float(getattr(config, "mode32_day45_body_max", 0.55) or 0.55)
+            d45b = float(getattr(config, "mode32_day45_body_max", 0.95) or 0.95)
+            v43 = float(getattr(config, "mode32_vol_day43_vs_day3_max", 1.20) or 1.20)
+            v54 = float(getattr(config, "mode32_vol_day5_vs_day4_max", 1.08) or 1.08)
             v45 = float(getattr(config, "mode32_vol_day45_vs_day1_max", 0.72) or 0.72)
             midm = float(getattr(config, "mode32_min_close_vs_mid", 1.0) or 1.0)
+            msd = int(getattr(config, "mode32_ma_slope_days", 5) or 5)
+            s120min = float(getattr(config, "mode32_ma120_slope_min_pct", 0.01) or 0.01)
+            s120max = float(getattr(config, "mode32_ma120_slope_max_pct", 0.55) or 0.55)
+            s250min = float(getattr(config, "mode32_ma250_slope_min_pct", 0.01) or 0.01)
+            s250max = float(getattr(config, "mode32_ma250_slope_max_pct", 1.05) or 1.05)
             st = str(start_date).strip()[:10] if start_date else ""
             ed = str(end_date).strip()[:10] if end_date else ""
             signals = []
-            start_i = max(L + 6, 7)
+            start_i = max(L + 6, 250 + msd, 7)
             for i in range(start_i, len(rows)):
                 d = str(rows[i].date)[:10]
                 if st and d < st:
@@ -5130,8 +5966,15 @@ def scan_with_mode3(
                     near_high_pct=nh,
                     days23_low_min_frac=d23,
                     day45_body_max=d45b,
+                    vol_day43_vs_day3_max=v43,
+                    vol_day5_vs_day4_max=v54,
                     vol_day45_vs_day1_max=v45,
                     min_close_vs_mid=midm,
+                    ma_slope_days=msd,
+                    ma120_slope_min_pct=s120min,
+                    ma120_slope_max_pct=s120max,
+                    ma250_slope_min_pct=s250min,
+                    ma250_slope_max_pct=s250max,
                 ):
                     signals.append(i)
         elif use_mode93:
@@ -5615,6 +6458,8 @@ def scan_with_mode3(
                 or (use_mode18 and score_fn is _score_mode18)
                 or use_mode98
                 or use_mode32
+                or use_mode33
+                or use_mode34
                 or (use_mode88 and score_fn is _score_mode88)
         or (use_mode93 and score_fn is _score_mode93)
                 or use_mode_bottom_big_yang
@@ -5643,6 +6488,32 @@ def scan_with_mode3(
                         mode9_industry_ndays_penalty=ndays_pen,
                         mode9_industry_ndays_bonus_per_unit=ndays_unit,
                         mode9_industry_ndays_bonus_cap=ndays_cap_cfg,
+                    )
+                elif use_mode33:
+                    score = _score_mode33(
+                        rows,
+                        idx,
+                        ma10,
+                        ma20,
+                        ma60,
+                        vol20,
+                        item.code,
+                        item.name,
+                        None,
+                        **mode33_kw,
+                    )
+                elif use_mode34:
+                    score = _score_mode34(
+                        rows,
+                        idx,
+                        ma10,
+                        ma20,
+                        ma60,
+                        vol20,
+                        item.code,
+                        item.name,
+                        None,
+                        **mode34_kw,
                     )
                 else:
                     score = score_fn(
@@ -5879,6 +6750,14 @@ def scan_with_mode3(
                 m_extra.update(_mode98_kdj_metrics(rows, idx, _nk, _m1k, _m2k))
             if use_mode32:
                 m_extra.update(_mode32_metrics(rows, idx))
+            if use_mode33:
+                m_extra.update(
+                    _mode33_metrics(rows, idx, item.code, item.name, **mode33_kw)
+                )
+            if use_mode34:
+                m_extra.update(
+                    _mode34_metrics(rows, idx, item.code, item.name, **mode34_kw)
+                )
             for k in (
                 "industry",
                 "sub_industry",

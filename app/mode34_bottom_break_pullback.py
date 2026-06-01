@@ -502,18 +502,19 @@ def match_mode34_prebuy_signal(
     name: str,
     **kwargs: Any,
 ) -> Optional[Dict[str, Any]]:
-    """信号日 = 预案买点日（电科 5/25），非二波确认日（5/26）。"""
+    """信号日 = 预案买点日（电科 5/25 尾盘下单），非次日、非二波确认日。"""
     p = mode34_prebuy_advice(rows, idx, code, name, **kwargs)
     if not p or p.get("advice") != "偏多买入":
         return None
-    ni = _next_trade_idx(rows, idx)
+    sig_ymd = str(rows[idx].date)[:10]
     pi = _prev_trade_idx(rows, idx)
+    ni = _next_trade_idx(rows, idx)
     out = {
         **p,
-        "signal_date": str(rows[idx].date)[:10],
+        "signal_date": sig_ymd,
         "signal_type": "prebuy",
         "watch_date": str(rows[pi].date)[:10] if pi is not None else "",
-        "exec_buy_date": str(rows[ni].date)[:10] if ni is not None else "",
+        "exec_buy_date": sig_ymd,
         "mode34_score": int(p.get("advice_score", 0)),
     }
     if ni is not None:
@@ -618,11 +619,7 @@ def match_mode34_watchlist(
         **det,
         "watch_date": str(rows[idx].date)[:10],
         "signal_date": signal_ymd,
-        "exec_buy_date": (
-            str(rows[_next_trade_idx(rows, ni)].date)[:10]
-            if _next_trade_idx(rows, ni) is not None
-            else ""
-        ),
+        "exec_buy_date": signal_ymd,
         "base_date": str(rows[base_i].date)[:10],
         "peak_date": str(rows[peak_i].date)[:10],
         "watch_score": _score_mode34_watchlist(det),
@@ -682,7 +679,7 @@ def mode34_prebuy_advice(
     name: str,
     **kwargs: Any,
 ) -> Optional[Dict[str, Any]]:
-    """预案日：类似 5/25，收盘后/盘中辅助判断次日是否值得买（电科模版）。"""
+    """预案日：类似 5/25，收盘前/尾盘下单（电科模版）。"""
     kw = {**mode34_default_kw(), **kwargs}
     det = _find_mode34_setup(rows, idx, code, name, **kwargs)
     if det is None:
@@ -745,14 +742,14 @@ def mode34_prebuy_advice(
         score += 5.0
         signals.append("收>昨收")
 
-    # 次日若高开突破：盘中参考价
-    buy_trigger = round(h * 1.001, 2)
+    # 尾盘参考：收盘价附近挂单
+    buy_trigger = round(c, 2)
     stop_loss = round(min(float(det["pull_low"]), surge_floor) * 0.99, 2)
     advice_score = int(min(99, max(0, round(score))))
 
     if advice_score >= 72 and c > o and float(det["vol_ratio"]) <= 0.75:
         advice = "偏多买入"
-        action = "次日盘中突破昨高可试仓"
+        action = "信号日尾盘试仓（收盘前）"
     elif advice_score >= 72:
         advice = "轻仓试探"
         action = "未收阳或未缩量，仅观察"

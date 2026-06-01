@@ -55,7 +55,36 @@
 
 ---
 
-## 四、用法
+## 四、盘中买点工作流（观察日 + 预案日）
+
+以德福科技为例：**5/22 入观察 → 5/25 出建议 → 5/26 盘中突破买入**。
+
+| 阶段 | 日期示例 | 脚本 | 含义 |
+|------|----------|------|------|
+| 观察日 | 5/22 | `--watch-date` | 突破后回踩平台、缩量，尚未二波确认 |
+| 预案日 | 5/25 | `--prebuy-date` | 小阳缩量企稳，输出偏多/试探/观察/放弃 + **突破昨高触发价** |
+| 确认日 | 5/26 | `scan_mode34_today` | 完整 mode34 二波阳线（可对照验证） |
+
+```bash
+# 1) 观察日：全市场入池
+python3 scripts/scan_mode34_watch_prebuy.py --watch-date 2026-05-22
+
+# 2) 预案日：仅对观察池给买卖建议
+python3 scripts/scan_mode34_watch_prebuy.py --prebuy-date 2026-05-25 \
+  --from-watch-csv data/gpt/results/mode34_watch_20260522.csv
+
+# 单股
+python3 scripts/scan_mode34_watch_prebuy.py --watch-date 2026-05-22 --prebuy-date 2026-05-25 --code 600850
+```
+
+**预案日输出字段**
+
+- `advice`：偏多买入 / 轻仓试探 / 继续观察 / 放弃
+- `buy_trigger_above`：次日盘中参考触发价（≈ 预案日最高价）
+- `stop_below`：平台铁底下方止损参考
+- `next_day_mode34`：次日是否满足完整 mode34（如是则成功率更高）
+
+## 五、用法（全市场确认日扫描）
 
 ```bash
 # 单日扫描（默认最新交易日）

@@ -78,9 +78,19 @@
 | 预案日 | 5/25 | `--prebuy-date` | 小阳缩量企稳，输出偏多/试探/观察/放弃 + **突破昨高触发价** |
 | 确认日 | 5/26 | `scan_mode34_today` | 完整 mode34 二波阳线（可对照验证） |
 
+**区间扫描（二波确认 / 电科观察池）：**
+
+```bash
+python3 scripts/scan_mode34_period.py --start 2026-05-01 --end 2026-05-31
+python3 scripts/scan_mode34_watch_period.py --start 2026-05-01 --end 2026-05-31
+```
+
 ```bash
 # 1) 观察日：全市场入池
 python3 scripts/scan_mode34_watch_prebuy.py --watch-date 2026-05-22
+
+# 1b) 观察池区间（如整月电科模版）
+python3 scripts/scan_mode34_watch_period.py --start 2026-05-01 --end 2026-05-31
 
 # 2) 预案日：仅对观察池给买卖建议
 python3 scripts/scan_mode34_watch_prebuy.py --prebuy-date 2026-05-25 \

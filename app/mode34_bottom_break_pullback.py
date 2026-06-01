@@ -502,7 +502,7 @@ def match_mode34_prebuy_signal(
     name: str,
     **kwargs: Any,
 ) -> Optional[Dict[str, Any]]:
-    """信号日 = 预案买点日（电科 5/25 尾盘下单），非次日、非二波确认日。"""
+    """信号日 = 预案买点日（电科 5/25 盘中买），非次日、非二波确认日。"""
     p = mode34_prebuy_advice(rows, idx, code, name, **kwargs)
     if not p or p.get("advice") != "偏多买入":
         return None
@@ -515,6 +515,7 @@ def match_mode34_prebuy_signal(
         "signal_type": "prebuy",
         "watch_date": str(rows[pi].date)[:10] if pi is not None else "",
         "exec_buy_date": sig_ymd,
+        "buy_mode": "intraday",
         "mode34_score": int(p.get("advice_score", 0)),
     }
     if ni is not None:
@@ -561,7 +562,7 @@ def match_mode34_watchlist(
     name: str,
     **kwargs: Any,
 ) -> Optional[Dict[str, Any]]:
-    """观察日：预案买点（信号日）的上一交易日（电科 5/22 入池，5/25 出信号）。"""
+    """观察日：预案买点（信号日）的上一交易日（电科 5/22 入池，5/25 盘中买）。"""
     kw = {**mode34_default_kw(), **kwargs}
     if match_mode34_bottom_break_pullback(rows, idx, code, name, **kwargs):
         return None
@@ -623,6 +624,7 @@ def match_mode34_watchlist(
         "base_date": str(rows[base_i].date)[:10],
         "peak_date": str(rows[peak_i].date)[:10],
         "watch_score": _score_mode34_watchlist(det),
+        "buy_mode": "watch",
     }
 
 
@@ -742,14 +744,14 @@ def mode34_prebuy_advice(
         score += 5.0
         signals.append("收>昨收")
 
-    # 尾盘参考：收盘价附近挂单
-    buy_trigger = round(c, 2)
+    prev_high = float(rows[idx - 1].high) if idx >= 1 else h
+    buy_trigger = round(prev_high * 1.001, 2)
     stop_loss = round(min(float(det["pull_low"]), surge_floor) * 0.99, 2)
     advice_score = int(min(99, max(0, round(score))))
 
     if advice_score >= 72 and c > o and float(det["vol_ratio"]) <= 0.75:
         advice = "偏多买入"
-        action = "信号日尾盘试仓（收盘前）"
+        action = "信号日盘中突破昨高可试仓"
     elif advice_score >= 72:
         advice = "轻仓试探"
         action = "未收阳或未缩量，仅观察"
@@ -781,7 +783,8 @@ def mode34_prebuy_advice(
         "signals": ",".join(signals),
         "buy_trigger_above": buy_trigger,
         "stop_below": stop_loss,
-        "yesterday_high": round(h, 2),
+        "yesterday_high": round(prev_high, 2),
+        "buy_mode": "intraday",
         "next_day_mode34": next_hit,
     }
 

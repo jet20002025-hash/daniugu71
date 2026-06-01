@@ -904,74 +904,44 @@ def run_mode3_scan(
                 cap_note = "，市值过滤未启用(缺缓存)"
             else:
                 cap_note = f"，市值≤{config.max_market_cap / 1e8:.0f}亿"
-        mode_label = (
-            "mode98"
-            if use_mode98
-            else (
-            "mode34"
-            if use_mode34
-            else (
-            "mode32"
-            if use_mode32
-            else (
-            "mode93"
-            if use_mode93
-            else (
-            "mode底部大阳线"
-            if use_mode_bottom_big_yang
-            else (
-            "mode平台突破首阳"
-            if use_mode_platform_breakout_first_yang
-            else (
-            "mode中位大阳线"
-            if use_mode_mid_big_yang
-            else (
-            "mode底部支撑"
-            if use_mode_bottom_support
-            else (
-            "mode最后震仓"
-            if use_mode_final_shakeout
-            else (
-                "mode12"
-                if use_mode12
-                else (
-                    "mode11"
-                    if use_mode11
-                    else (
-                        "mode10"
-                        if use_mode10
-                        else (
-                            "mode8"
-                            if (use_mode8 or use_mode88)
-                            else (
-                                "mode90"
-                                if use_mode90
-                                else (
-                                    "mode9"
-                                    if use_mode9
-                                    else (
-                                        "mode4"
-                                        if mode4_filters
-                                        else (
-                                            "mode3ok"
-                                            if model_tag_override == "mode3ok"
-                                            else "mode3"
-                                        )
-                                    )
-                                )
-                            )
-                        )
-                    )
-                )
-            )
-            )
-            )
-            )
-            )
-            )
-            )
-            )
-        )
+        if use_mode98:
+            mode_label = "mode98"
+        elif use_mode34:
+            mode_label = "mode34"
+        elif use_mode33:
+            mode_label = "mode33"
+        elif use_mode32:
+            mode_label = "mode32"
+        elif use_mode93:
+            mode_label = "mode93"
+        elif use_mode_bottom_big_yang:
+            mode_label = "mode底部大阳线"
+        elif use_mode_platform_breakout_first_yang:
+            mode_label = "mode平台突破首阳"
+        elif use_mode_mid_big_yang:
+            mode_label = "mode中位大阳线"
+        elif use_mode_bottom_support:
+            mode_label = "mode底部支撑"
+        elif use_mode_final_shakeout:
+            mode_label = "mode最后震仓"
+        elif use_mode12:
+            mode_label = "mode12"
+        elif use_mode11:
+            mode_label = "mode11"
+        elif use_mode10:
+            mode_label = "mode10"
+        elif use_mode8 or use_mode88:
+            mode_label = "mode8"
+        elif use_mode90:
+            mode_label = "mode90"
+        elif use_mode9:
+            mode_label = "mode9"
+        elif mode4_filters:
+            mode_label = "mode4"
+        elif model_tag_override == "mode3ok":
+            mode_label = "mode3ok"
+        else:
+            mode_label = "mode3"
         _emit({"message": f"加载{mode_label}，开始筛选（{provider_label}）{cap_note}"})
 
         def _progress_cb() -> None:

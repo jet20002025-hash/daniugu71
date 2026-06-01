@@ -315,9 +315,9 @@ def _mode34_signal_at(
     name: str,
     **kwargs: Any,
 ) -> bool:
-    from app.mode34_bottom_break_pullback import match_mode34_bottom_break_pullback
+    from app.mode34_bottom_break_pullback import match_mode34_prebuy_signal
 
-    return match_mode34_bottom_break_pullback(rows, idx, code, name, **kwargs) is not None
+    return match_mode34_prebuy_signal(rows, idx, code, name, **kwargs) is not None
 
 
 def _score_mode34(
@@ -333,9 +333,9 @@ def _score_mode34(
     **kwargs: Any,
 ) -> int:
     _ = (ma10, ma20, ma60, vol20, breakdown)
-    from app.mode34_bottom_break_pullback import score_mode34_bottom_break_pullback
+    from app.mode34_bottom_break_pullback import score_mode34_prebuy_signal
 
-    return score_mode34_bottom_break_pullback(rows, idx, code, name, **kwargs)
+    return score_mode34_prebuy_signal(rows, idx, code, name, **kwargs)
 
 
 def _mode34_metrics(
@@ -345,9 +345,9 @@ def _mode34_metrics(
     name: str,
     **kwargs: Any,
 ) -> Dict[str, Any]:
-    from app.mode34_bottom_break_pullback import mode34_metrics
+    from app.mode34_bottom_break_pullback import mode34_prebuy_signal_metrics
 
-    return mode34_metrics(rows, idx, code, name, **kwargs)
+    return mode34_prebuy_signal_metrics(rows, idx, code, name, **kwargs)
 
 
 def _normalize_code(code: str) -> str:

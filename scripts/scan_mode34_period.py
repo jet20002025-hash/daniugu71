@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""mode34 电科严格模版：二波确认日区间扫描（无宽松版）。
+"""mode34 电科严格模版：预案买点日（信号日）区间扫描。
+
+信号日 = 预案日（如 5/25），观察 = 上一交易日（如 5/22），执行买 = 次日（如 5/26）。
 
 用法:
   python3 scripts/scan_mode34_period.py --start 2026-05-01 --end 2026-05-31
@@ -17,7 +19,10 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 from app.eastmoney import list_cached_stocks_flat, load_stock_list_csv, read_cached_kline_by_code
-from app.mode34_bottom_break_pullback import mode34_metrics, score_mode34_bottom_break_pullback
+from app.mode34_bottom_break_pullback import (
+    mode34_prebuy_signal_metrics,
+    score_mode34_prebuy_signal,
+)
 from app.paths import GPT_DATA_DIR
 from app.scanner import ScanConfig, _is_st
 from app.mode34_bottom_break_pullback import mode34_kw_from_scan_config
@@ -34,10 +39,10 @@ def _trade_days(start_ymd: str, end_ymd: str) -> List[str]:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="mode34 严格模版区间扫描（二波确认日）")
+    ap = argparse.ArgumentParser(description="mode34 严格模版区间扫描（预案买点=信号日）")
     ap.add_argument("--start", required=True)
     ap.add_argument("--end", required=True)
-    ap.add_argument("--min-score", type=int, default=62)
+    ap.add_argument("--min-score", type=int, default=72)
     ap.add_argument("--skip-st", action="store_true", default=True)
     ap.add_argument("--skip-bj", action="store_true", default=True)
     ap.add_argument("--out", default="")
@@ -72,18 +77,22 @@ def main() -> None:
             idx = idx_map.get(sig)
             if idx is None:
                 continue
-            score = score_mode34_bottom_break_pullback(rows, idx, code, name, **kw)
+            score = score_mode34_prebuy_signal(rows, idx, code, name, **kw)
             if score < args.min_score:
                 continue
-            m = mode34_metrics(rows, idx, code, name, **kw)
+            m = mode34_prebuy_signal_metrics(rows, idx, code, name, **kw)
             if not m:
                 continue
             hits.append(
                 {
-                    "signal_date": sig,
+                    "signal_date": m.get("signal_date", sig),
+                    "watch_date": m.get("watch_date", ""),
+                    "exec_buy_date": m.get("exec_buy_date", ""),
+                    "confirm_date": m.get("confirm_date", ""),
                     "code": code,
                     "name": name,
                     "score": score,
+                    "advice": m.get("advice", ""),
                     "close": m.get("close"),
                     "pct_chg": m.get("pct_chg"),
                     "bottom_pos_pct": m.get("bottom_pos_pct"),
@@ -93,6 +102,7 @@ def main() -> None:
                     "pullback_dd_pct": m.get("pullback_dd_pct"),
                     "pullback_days": m.get("pullback_days"),
                     "vol_ratio": m.get("vol_ratio"),
+                    "buy_trigger_above": m.get("buy_trigger_above"),
                 }
             )
         if (n + 1) % 1000 == 0:

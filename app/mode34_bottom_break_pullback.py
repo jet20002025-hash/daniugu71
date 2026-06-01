@@ -90,6 +90,41 @@ def _range_pos(rows: List[KlineRow], i: int, lookback: int) -> Optional[float]:
     return (c - lo) / (hi - lo)
 
 
+def _next_trade_idx(rows: List[KlineRow], idx: int) -> Optional[int]:
+    if idx + 1 < len(rows):
+        return idx + 1
+    return None
+
+
+def _prev_trade_idx(rows: List[KlineRow], idx: int) -> Optional[int]:
+    if idx > 0:
+        return idx - 1
+    return None
+
+
+def _first_prebuy_trade_idx(
+    rows: List[KlineRow],
+    from_idx: int,
+    code: str,
+    name: str,
+    kw: Dict[str, Any],
+    *,
+    max_ahead: int = 8,
+) -> Optional[int]:
+    """from_idx 之后首个「预案买点日」(偏多+收阳+缩量)。"""
+    j = _next_trade_idx(rows, from_idx)
+    steps = 0
+    while j is not None and steps < max_ahead:
+        p = mode34_prebuy_advice(rows, j, code, name, **kw)
+        if p and int(p.get("advice_score", 0)) >= 72 and p.get("advice") == "偏多买入":
+            r = rows[j]
+            if float(r.close) > float(r.open) and float(p.get("vol_ratio", 99)) <= 0.75:
+                return j
+        j = _next_trade_idx(rows, j)
+        steps += 1
+    return None
+
+
 def _date_minus_months(ymd: str, months: int) -> str:
     d = datetime.strptime(ymd.strip()[:10], "%Y-%m-%d")
     m_total = d.year * 12 + d.month - 1 - months
@@ -460,6 +495,64 @@ def _mode34_strict_launch_meta(
     return {**nm, **lu, **vm}
 
 
+def match_mode34_prebuy_signal(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    **kwargs: Any,
+) -> Optional[Dict[str, Any]]:
+    """信号日 = 预案买点日（电科 5/25），非二波确认日（5/26）。"""
+    p = mode34_prebuy_advice(rows, idx, code, name, **kwargs)
+    if not p or p.get("advice") != "偏多买入":
+        return None
+    ni = _next_trade_idx(rows, idx)
+    pi = _prev_trade_idx(rows, idx)
+    out = {
+        **p,
+        "signal_date": str(rows[idx].date)[:10],
+        "signal_type": "prebuy",
+        "watch_date": str(rows[pi].date)[:10] if pi is not None else "",
+        "exec_buy_date": str(rows[ni].date)[:10] if ni is not None else "",
+        "mode34_score": int(p.get("advice_score", 0)),
+    }
+    if ni is not None:
+        cfm = match_mode34_bottom_break_pullback(rows, ni, code, name, **kwargs)
+        out["confirm_date"] = str(rows[ni].date)[:10] if cfm else ""
+    else:
+        out["confirm_date"] = ""
+    return out
+
+
+def score_mode34_prebuy_signal(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    **kwargs: Any,
+) -> int:
+    p = match_mode34_prebuy_signal(rows, idx, code, name, **kwargs)
+    return int(p.get("mode34_score", 0)) if p else 0
+
+
+def mode34_prebuy_signal_metrics(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    **kwargs: Any,
+) -> Dict[str, Any]:
+    p = match_mode34_prebuy_signal(rows, idx, code, name, **kwargs)
+    if not p:
+        return {}
+    return {
+        **p,
+        "mode34_base_date": p.get("base_date", ""),
+        "mode34_peak_date": p.get("peak_date", ""),
+        "mode34_score": p.get("mode34_score", 0),
+    }
+
+
 def match_mode34_watchlist(
     rows: List[KlineRow],
     idx: int,
@@ -467,9 +560,11 @@ def match_mode34_watchlist(
     name: str,
     **kwargs: Any,
 ) -> Optional[Dict[str, Any]]:
-    """观察日：已在回踩平台，次日/后日可能出买点（如电科 5/22～5/24）。"""
+    """观察日：预案买点（信号日）的上一交易日（电科 5/22 入池，5/25 出信号）。"""
     kw = {**mode34_default_kw(), **kwargs}
     if match_mode34_bottom_break_pullback(rows, idx, code, name, **kwargs):
+        return None
+    if match_mode34_prebuy_signal(rows, idx, code, name, **kwargs):
         return None
 
     det = _find_mode34_setup(rows, idx, code, name, **kwargs)
@@ -511,9 +606,23 @@ def match_mode34_watchlist(
         return None
     det = {**det, **strict}
 
+    ni = _next_trade_idx(rows, idx)
+    if ni is None:
+        return None
+    first_pb = _first_prebuy_trade_idx(rows, idx, code, name, kw)
+    if first_pb is None or first_pb != ni:
+        return None
+
+    signal_ymd = str(rows[ni].date)[:10]
     return {
         **det,
         "watch_date": str(rows[idx].date)[:10],
+        "signal_date": signal_ymd,
+        "exec_buy_date": (
+            str(rows[_next_trade_idx(rows, ni)].date)[:10]
+            if _next_trade_idx(rows, ni) is not None
+            else ""
+        ),
         "base_date": str(rows[base_i].date)[:10],
         "peak_date": str(rows[peak_i].date)[:10],
         "watch_score": _score_mode34_watchlist(det),
@@ -641,9 +750,12 @@ def mode34_prebuy_advice(
     stop_loss = round(min(float(det["pull_low"]), surge_floor) * 0.99, 2)
     advice_score = int(min(99, max(0, round(score))))
 
-    if advice_score >= 72:
+    if advice_score >= 72 and c > o and float(det["vol_ratio"]) <= 0.75:
         advice = "偏多买入"
         action = "次日盘中突破昨高可试仓"
+    elif advice_score >= 72:
+        advice = "轻仓试探"
+        action = "未收阳或未缩量，仅观察"
     elif advice_score >= 58:
         advice = "轻仓试探"
         action = "仅突破昨高且放量再跟"

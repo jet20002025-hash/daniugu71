@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""mode34 电科严格模版：扫描指定日期二波确认（无宽松版）。
+"""mode34 电科严格模版：扫描指定日期预案买点（信号日）。
 
 用法:
   python3 scripts/scan_mode34_today.py
@@ -22,8 +22,8 @@ if ROOT not in sys.path:
 from app.eastmoney import list_cached_stocks_flat, load_stock_list_csv, read_cached_kline_by_code
 from app.mode34_bottom_break_pullback import (
     mode34_kw_from_scan_config,
-    mode34_metrics,
-    score_mode34_bottom_break_pullback,
+    mode34_prebuy_signal_metrics,
+    score_mode34_prebuy_signal,
 )
 from app.paths import GPT_DATA_DIR
 from app.scanner import ScanConfig, _is_st
@@ -41,9 +41,9 @@ def _find_date_index(rows, ymd: str) -> Optional[int]:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="mode34 严格模版（二波确认日）")
-    ap.add_argument("--date", default="", help="信号日，默认缓存最新交易日")
-    ap.add_argument("--min-score", type=int, default=62)
+    ap = argparse.ArgumentParser(description="mode34 严格模版（预案买点=信号日）")
+    ap.add_argument("--date", default="", help="信号日（预案日），默认缓存最新交易日")
+    ap.add_argument("--min-score", type=int, default=72)
     ap.add_argument("--code", default="", help="仅测单股")
     ap.add_argument("--skip-st", action="store_true", default=True)
     ap.add_argument("--skip-bj", action="store_true", default=True)
@@ -79,20 +79,24 @@ def main() -> None:
         idx = _find_date_index(rows, signal_date)
         if idx is None:
             continue
-        score = score_mode34_bottom_break_pullback(rows, idx, code, name, **kw)
+        score = score_mode34_prebuy_signal(rows, idx, code, name, **kw)
         if score < args.min_score:
             continue
-        m = mode34_metrics(rows, idx, code, name, **kw)
+        m = mode34_prebuy_signal_metrics(rows, idx, code, name, **kw)
         if not m:
             continue
         hits.append(
             (
                 score,
                 {
-                    "signal_date": signal_date,
+                    "signal_date": m.get("signal_date", signal_date),
+                    "watch_date": m.get("watch_date", ""),
+                    "exec_buy_date": m.get("exec_buy_date", ""),
+                    "confirm_date": m.get("confirm_date", ""),
                     "code": code,
                     "name": name,
                     "score": score,
+                    "advice": m.get("advice", ""),
                     **{k: m[k] for k in m if not str(k).startswith("mode34_")},
                     "base_date": m.get("mode34_base_date"),
                     "peak_date": m.get("mode34_peak_date"),

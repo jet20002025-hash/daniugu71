@@ -135,7 +135,8 @@
               <th title="衡量当日作为买入点的质量，0～100">买点分值</th>
               <th>当天收盘价</th>
               <th title="信号日涨跌幅，T+1 不可当日交易仅供参考">涨跌幅%</th>
-              <th title="本次筛选区间内，该股票最早出现的信号日期">最早出现日期</th>
+              <th title="本条记录对应的信号日或观察入池日">信号日</th>
+              <th title="本次筛选区间内该股最早入池日；可与左侧信号日不同（如先观察后信号）">最早入池</th>
               <th title="信号日前最近6个交易日内是否出现过涨停（仅看有/无）">最近6日有涨停</th>
             </tr>
           </thead>
@@ -148,7 +149,14 @@
               <td class="score">{{ row.get("buy_point_score", "—") }}</td>
               <td>{{ "%.2f" % row.latest_close }}</td>
               <td class="pct">{{ "%.2f" % row.change_pct }}</td>
-              <td>{{ row.get("first_signal_date", row.get("signal_date", "—")) }}</td>
+              <td>{{ row.get("signal_date", "—") }}</td>
+              <td>
+                {% if row.get("first_signal_date") and row.get("first_signal_date") != row.get("signal_date") %}
+                  {{ row.get("first_signal_date") }}
+                {% else %}
+                  —
+                {% endif %}
+              </td>
               <td>
                 {% if row.get("has_limit_up_6d") %}
                   是
@@ -159,7 +167,7 @@
             </tr>
             {% else %}
             <tr>
-              <td colspan="8" class="empty">暂无结果，点击上方按钮开始筛选。</td>
+              <td colspan="9" class="empty">暂无结果，点击上方按钮开始筛选。</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -220,7 +228,7 @@
     const HINT_DEFAULT =
       '选股原则：分数越高越好，买点分值越高越好，最近6日有涨停更优先；买点为信号日的第二天尾盘或分时附近买入；卖点为破10日均线止盈，亏损5个点止损，需严格执行。mode9 默认仅展示 ≥80 分，可按需调低。';
     const HINT_MODE34 =
-      '选股原则（mode34）：分数越高越好；「最早出现日期」含观察入池日（如电科 5/22），预案信号日（如 5/25）为买点日，当日盘中突破昨高×1.001 试仓（非次日）；破10日均线止盈、亏5%止损。最近6日有涨停更优先。';
+      '选股原则（mode34）：分数越高越好；「信号日」为本条记录的入池/买点日（连续两日信号会各显示一天，如南玻 27/28）；「最早入池」仅在与信号日不同时显示（如电科先 5/22 观察、5/25 信号）。买点日盘中突破昨高×1.001 试仓；破10日均线止盈、亏5%止损。';
     function updateModeHint() {
       const el = document.getElementById('scan-hint');
       const modeEl = document.getElementById('mode');

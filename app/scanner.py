@@ -6919,9 +6919,11 @@ def serialize_results(results: List[ScanResult]) -> List[Dict[str, object]]:
         {
             **asdict(r),
             "reasons": ", ".join(r.reasons),
+            "signal_date": (r.metrics or {}).get("signal_date"),
             "buy_point_score": (r.metrics or {}).get("buy_point_score"),
             "first_signal_date": (r.metrics or {}).get("first_signal_date"),
             "has_limit_up_6d": (r.metrics or {}).get("has_limit_up_6d"),
+            "event_type": (r.metrics or {}).get("event_type"),
         }
         for r in results
     ]

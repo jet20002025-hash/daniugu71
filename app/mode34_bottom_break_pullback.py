@@ -4,11 +4,13 @@
 """
 from __future__ import annotations
 
+from calendar import monthrange
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import numpy as np
 
-from app.scanner import KlineRow, _is_big_yang_row_modepbs, _vol_ratio_at
+from app.scanner import KlineRow, _is_big_yang_row_modepbs, _is_st, _limit_up_day, _vol_ratio_at
 
 
 def mode34_kw_from_scan_config(cfg: Any) -> Dict[str, Any]:
@@ -53,6 +55,17 @@ def mode34_default_kw() -> Dict[str, Any]:
         signal_vol_mult=1.10,
         signal_vol_vs_pullback=1.12,
         signal_above_pull_high=True,
+        # 观察池（电科 5/22 模版）：贴近底部启动、涨幅温和、贴近平台上沿
+        watch_bottom_pos_max_pct=12.0,
+        watch_surge_rise_max_pct=35.0,
+        watch_rise_from_base_max_pct=20.0,
+        watch_dist_pull_high_max_pct=8.0,
+        watch_n_month_low_min=12,
+        watch_n_month_low_tol_pct=0.2,
+        # 电科 5/19：涨停 + 量比≈3.06；5/20 量为近 6 个月最大
+        watch_limit_vol_ratio_min=2.0,
+        watch_vol_n_month_max=6,
+        watch_vol_n_month_tol_pct=0.1,
     )
 
 
@@ -75,6 +88,135 @@ def _range_pos(rows: List[KlineRow], i: int, lookback: int) -> Optional[float]:
     if hi <= lo:
         return 0.5
     return (c - lo) / (hi - lo)
+
+
+def _date_minus_months(ymd: str, months: int) -> str:
+    d = datetime.strptime(ymd.strip()[:10], "%Y-%m-%d")
+    m_total = d.year * 12 + d.month - 1 - months
+    y = m_total // 12
+    m = m_total % 12 + 1
+    day = min(d.day, monthrange(y, m)[1])
+    return datetime(y, m, day).strftime("%Y-%m-%d")
+
+
+def _launch_low_in_n_month_window(
+    rows: List[KlineRow],
+    idx: int,
+    base_i: int,
+    n_months: int,
+    tol_pct: float,
+) -> Optional[Dict[str, float]]:
+    """启动段最低价须为观察日前 N 个自然月内最低价（电科 5/15≈17月新低）。"""
+    if n_months < 1 or idx < base_i:
+        return None
+    watch_ymd = str(rows[idx].date)[:10]
+    start_ymd = _date_minus_months(watch_ymd, n_months)
+    launch_low = min(float(rows[j].low) for j in range(base_i, idx + 1))
+    period_min = None
+    period_min_date = ""
+    for j in range(idx + 1):
+        d = str(rows[j].date)[:10]
+        if d < start_ymd or d > watch_ymd:
+            continue
+        lo = float(rows[j].low)
+        if period_min is None or lo < period_min:
+            period_min = lo
+            period_min_date = d
+    if period_min is None or period_min <= 0:
+        return None
+    tol = max(0.0, float(tol_pct)) / 100.0
+    ok = launch_low <= period_min * (1.0 + tol)
+    return {
+        "launch_low": launch_low,
+        "n_month_period_low": period_min,
+        "n_month_period_low_date": period_min_date,
+        "n_month_low_months": float(n_months),
+        "n_month_low_ok": 1.0 if ok else 0.0,
+    }
+
+
+def _board_name_for_limit(code: str, name: str) -> str:
+    """空 name 在 scanner 里会被当成 ST；观察池涨停判定仅对真 ST 用 5%。"""
+    nm = (name or "").strip()
+    if nm and _is_st(nm):
+        return nm
+    return "MODE34_BOARD"
+
+
+def _watch_limit_up_volume_launch(
+    rows: List[KlineRow],
+    base_i: int,
+    peak_i: int,
+    code: str,
+    name: str,
+    kw: Dict[str, Any],
+) -> Optional[Dict[str, float]]:
+    """启动段（铁底后至突破峰）须含至少一日涨停，且该日放量（电科 5/19）。"""
+    vol_ma = int(kw["vol_ma"])
+    vmin = float(kw.get("watch_limit_vol_ratio_min", 2.0))
+    lim_name = _board_name_for_limit(code, name)
+    best_vr = 0.0
+    best_date = ""
+    for j in range(base_i + 1, peak_i + 1):
+        if not _limit_up_day(rows, j, code, lim_name):
+            continue
+        vr = float(_vol_ratio_at(rows, j, vol_ma))
+        if vr >= vmin and vr >= best_vr:
+            best_vr = vr
+            best_date = str(rows[j].date)[:10]
+    if not best_date:
+        return None
+    return {
+        "limit_up_launch_date": best_date,
+        "limit_up_launch_vol_ratio": best_vr,
+    }
+
+
+def _watch_launch_vol_n_month_max(
+    rows: List[KlineRow],
+    idx: int,
+    base_i: int,
+    peak_i: int,
+    n_months: int,
+    tol_pct: float,
+) -> Optional[Dict[str, float]]:
+    """启动段（铁底后至突破峰）须出现观察日前 N 个月内最大成交量（电科 5/20）。"""
+    n_months = max(6, int(n_months))
+    if idx < base_i or peak_i <= base_i:
+        return None
+    watch_ymd = str(rows[idx].date)[:10]
+    start_ymd = _date_minus_months(watch_ymd, n_months)
+    period_max = 0.0
+    period_max_date = ""
+    for j in range(idx + 1):
+        d = str(rows[j].date)[:10]
+        if d < start_ymd or d > watch_ymd:
+            continue
+        v = float(rows[j].volume)
+        if v >= period_max:
+            period_max = v
+            period_max_date = d
+    if period_max <= 0:
+        return None
+
+    launch_max = 0.0
+    launch_max_date = ""
+    for j in range(base_i + 1, peak_i + 1):
+        v = float(rows[j].volume)
+        if v >= launch_max:
+            launch_max = v
+            launch_max_date = str(rows[j].date)[:10]
+
+    tol = max(0.0, float(tol_pct)) / 100.0
+    ok = launch_max >= period_max * (1.0 - tol)
+    return {
+        "launch_max_vol": launch_max,
+        "launch_max_vol_date": launch_max_date,
+        "n_month_vol_period_max": period_max,
+        "n_month_vol_period_max_date": period_max_date,
+        "n_month_vol_max_months": float(n_months),
+        "n_month_vol_max_ok": 1.0 if ok else 0.0,
+    }
 
 
 def _find_mode34_setup(
@@ -295,8 +437,53 @@ def match_mode34_watchlist(
     if float(det["dist_to_pull_high_pct"]) < -1.0:
         return None
 
+    base_close = float(det["base_close"])
+    close_w = float(det["close"])
+    rise_from_base = (
+        (close_w - base_close) / base_close * 100.0 if base_close > 0 else 999.0
+    )
+    det["rise_from_base_pct"] = rise_from_base
+
+    if float(det["bottom_pos_pct"]) > float(kw["watch_bottom_pos_max_pct"]):
+        return None
+    if float(det["surge_rise_pct"]) > float(kw["watch_surge_rise_max_pct"]):
+        return None
+    if rise_from_base > float(kw["watch_rise_from_base_max_pct"]):
+        return None
+    if float(det["dist_to_pull_high_pct"]) > float(kw["watch_dist_pull_high_max_pct"]):
+        return None
+
     peak_i = int(det["peak_date_idx"])
     base_i = int(det["base_date_idx"])
+    n_months = max(12, int(kw.get("watch_n_month_low_min", 12)))
+    nm = _launch_low_in_n_month_window(
+        rows,
+        idx,
+        base_i,
+        n_months,
+        float(kw.get("watch_n_month_low_tol_pct", 0.2)),
+    )
+    if nm is None or float(nm["n_month_low_ok"]) < 1.0:
+        return None
+    det = {**det, **nm}
+
+    lu = _watch_limit_up_volume_launch(rows, base_i, peak_i, code, name, kw)
+    if lu is None:
+        return None
+    det = {**det, **lu}
+
+    vm = _watch_launch_vol_n_month_max(
+        rows,
+        idx,
+        base_i,
+        peak_i,
+        int(kw.get("watch_vol_n_month_max", 6)),
+        float(kw.get("watch_vol_n_month_tol_pct", 0.1)),
+    )
+    if vm is None or float(vm["n_month_vol_max_ok"]) < 1.0:
+        return None
+    det = {**det, **vm}
+
     return {
         **det,
         "watch_date": str(rows[idx].date)[:10],
@@ -307,13 +494,48 @@ def match_mode34_watchlist(
 
 
 def _score_mode34_watchlist(det: Dict[str, float]) -> int:
-    score = 50.0
-    score += min(15.0, float(det["surge_rise_pct"]) * 0.4)
-    score += min(12.0, max(0.0, 15.0 - float(det["pullback_dd_pct"])) * 0.7)
-    score += min(10.0, (1.0 - float(det["pullback_vol_ratio"])) * 10.0)
-    score += min(8.0, float(det["dist_to_pull_high_pct"]) * 1.5)
-    if float(det["vol_ratio"]) <= 0.7:
+    """打分对齐电科观察日：底部位低、启动涨幅适中、价贴近平台上沿、缩量。"""
+    score = 52.0
+    bpos = float(det["bottom_pos_pct"])
+    if bpos <= 6.0:
+        score += 18.0
+    elif bpos <= 10.0:
+        score += 12.0
+    elif bpos <= 12.0:
+        score += 6.0
+
+    surge = float(det["surge_rise_pct"])
+    if 12.0 <= surge <= 28.0:
+        score += 14.0
+    elif 28.0 < surge <= 35.0:
         score += 8.0
+    elif surge < 12.0:
+        score += 4.0
+
+    dist = float(det["dist_to_pull_high_pct"])
+    if dist <= 4.0:
+        score += 12.0
+    elif dist <= 6.0:
+        score += 8.0
+    elif dist <= 8.0:
+        score += 4.0
+
+    rise_b = float(det.get("rise_from_base_pct", 99.0))
+    if rise_b <= 12.0:
+        score += 10.0
+    elif rise_b <= 18.0:
+        score += 6.0
+    elif rise_b <= 20.0:
+        score += 2.0
+
+    score += min(10.0, max(0.0, 14.0 - float(det["pullback_dd_pct"])) * 0.8)
+    score += min(8.0, (1.0 - float(det["pullback_vol_ratio"])) * 10.0)
+    if float(det["vol_ratio"]) <= 0.7:
+        score += 6.0
+    if 2.0 <= float(det["pullback_days"]) <= 5.0:
+        score += 4.0
+    if float(det.get("n_month_low_ok", 0)) >= 1.0:
+        score += 4.0
     return int(min(99, round(score)))
 
 

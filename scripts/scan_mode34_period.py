@@ -83,7 +83,7 @@ def main() -> None:
                     {
                         "event_type": "观察",
                         "list_date": w.get("watch_date", d),
-                        "signal_date": w.get("signal_date", ""),
+                        "signal_date": w.get("planned_signal_date", ""),
                         "watch_date": w.get("watch_date", ""),
                         "exec_buy_date": w.get("exec_buy_date", ""),
                         "confirm_date": "",
@@ -92,7 +92,7 @@ def main() -> None:
                         "name": name,
                         "score": w.get("watch_score", 0),
                         "advice": "列入观察池",
-                        "action": f"待信号日{w.get('signal_date', '')}盘中买",
+                        "action": f"待信号日{w.get('planned_signal_date', '')}盘中买",
                         "close": w.get("close"),
                         "pct_chg": w.get("pct_chg"),
                         "bottom_pos_pct": w.get("bottom_pos_pct"),

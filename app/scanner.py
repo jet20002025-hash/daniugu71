@@ -315,9 +315,15 @@ def _mode34_signal_at(
     name: str,
     **kwargs: Any,
 ) -> bool:
-    from app.mode34_bottom_break_pullback import match_mode34_prebuy_signal
+    from app.mode34_bottom_break_pullback import (
+        match_mode34_prebuy_signal,
+        match_mode34_watchlist,
+    )
 
-    return match_mode34_prebuy_signal(rows, idx, code, name, **kwargs) is not None
+    return (
+        match_mode34_prebuy_signal(rows, idx, code, name, **kwargs) is not None
+        or match_mode34_watchlist(rows, idx, code, name, **kwargs) is not None
+    )
 
 
 def _score_mode34(
@@ -333,9 +339,15 @@ def _score_mode34(
     **kwargs: Any,
 ) -> int:
     _ = (ma10, ma20, ma60, vol20, breakdown)
-    from app.mode34_bottom_break_pullback import score_mode34_prebuy_signal
+    from app.mode34_bottom_break_pullback import (
+        score_mode34_prebuy_signal,
+        score_mode34_watchlist,
+    )
 
-    return score_mode34_prebuy_signal(rows, idx, code, name, **kwargs)
+    pb = score_mode34_prebuy_signal(rows, idx, code, name, **kwargs)
+    if pb > 0:
+        return pb
+    return score_mode34_watchlist(rows, idx, code, name, **kwargs)
 
 
 def _mode34_metrics(
@@ -345,9 +357,15 @@ def _mode34_metrics(
     name: str,
     **kwargs: Any,
 ) -> Dict[str, Any]:
-    from app.mode34_bottom_break_pullback import mode34_prebuy_signal_metrics
+    from app.mode34_bottom_break_pullback import (
+        match_mode34_prebuy_signal,
+        mode34_prebuy_signal_metrics,
+        mode34_watch_signal_metrics,
+    )
 
-    return mode34_prebuy_signal_metrics(rows, idx, code, name, **kwargs)
+    if match_mode34_prebuy_signal(rows, idx, code, name, **kwargs):
+        return mode34_prebuy_signal_metrics(rows, idx, code, name, **kwargs)
+    return mode34_watch_signal_metrics(rows, idx, code, name, **kwargs)
 
 
 def _normalize_code(code: str) -> str:
@@ -6591,10 +6609,39 @@ def scan_with_mode3(
             if score < config.min_score:
                 continue
 
-            buy_point_score = _buy_point_score(rows, idx, ma10, ma20, ma60, vol20)
-            buy_idx = min(idx + 1, len(rows) - 1)
             signal_date = rows[idx].date
-            buy_date = rows[buy_idx].date
+            mode34_prebuy: Optional[Dict[str, Any]] = None
+            mode34_watch: Optional[Dict[str, Any]] = None
+            if use_mode34:
+                from app.mode34_bottom_break_pullback import (
+                    match_mode34_prebuy_signal,
+                    match_mode34_watchlist,
+                )
+
+                mode34_prebuy = match_mode34_prebuy_signal(
+                    rows, idx, item.code, item.name, **mode34_kw
+                )
+                if not mode34_prebuy:
+                    mode34_watch = match_mode34_watchlist(
+                        rows, idx, item.code, item.name, **mode34_kw
+                    )
+
+            if use_mode34 and mode34_prebuy:
+                buy_idx = idx
+                buy_date = str(mode34_prebuy.get("exec_buy_date") or signal_date)[:10]
+                buy_point_score = int(
+                    mode34_prebuy.get("advice_score")
+                    or mode34_prebuy.get("mode34_score")
+                    or 0
+                )
+            elif use_mode34 and mode34_watch:
+                buy_idx = idx
+                buy_date = str(mode34_watch.get("exec_buy_date") or signal_date)[:10]
+                buy_point_score = int(mode34_watch.get("watch_score") or 0)
+            else:
+                buy_point_score = _buy_point_score(rows, idx, ma10, ma20, ma60, vol20)
+                buy_idx = min(idx + 1, len(rows) - 1)
+                buy_date = rows[buy_idx].date
 
             vol_ratio = volume[idx] / vol20[idx] if vol20[idx] > 0 else 0.0
             ma20_now = ma20[idx]
@@ -6626,7 +6673,11 @@ def scan_with_mode3(
             reasons = [
                 f"启动点 {mode_label}",
                 f"信号日 {signal_date}",
-                f"买入日 {buy_date} (T+1 开盘)",
+                (
+                    f"买入日 {buy_date} (T+1 开盘)"
+                    if not use_mode34
+                    else f"买点日 {buy_date}"
+                ),
                 f"放量 {vol_ratio:.2f}x",
                 f"MA10-20 {ma20_gap:.2%}",
                 f"MA20-60 {ma60_gap:.2%}",
@@ -6635,6 +6686,21 @@ def scan_with_mode3(
                 f"5日涨幅 {ret5_val:.2f}%",
                 f"上影占比 {upper_ratio:.2%}",
             ]
+            if use_mode34 and mode34_prebuy:
+                reasons[2] = (
+                    f"买点日 {buy_date} 盘中突破昨高≥{mode34_prebuy.get('buy_trigger_above', '—')}"
+                )
+                reasons.append(f"预案 {mode34_prebuy.get('advice', '')}")
+                if mode34_prebuy.get("watch_date"):
+                    reasons.append(f"观察日 {mode34_prebuy['watch_date']}")
+            elif use_mode34 and mode34_watch:
+                reasons[1] = f"观察入池 {signal_date}"
+                psd = mode34_watch.get("planned_signal_date", "")
+                reasons[2] = (
+                    f"预案信号日 {psd}，买点日 {buy_date} 盘中突破昨高试仓"
+                    if psd
+                    else f"买点日 {buy_date} 盘中突破昨高试仓"
+                )
             if sector_sm.get("sub_industry"):
                 reasons.append(f"细分行业 {sector_sm['sub_industry']}")
             if sector_sm.get("industry"):
@@ -6758,6 +6824,16 @@ def scan_with_mode3(
                 m_extra.update(
                     _mode34_metrics(rows, idx, item.code, item.name, **mode34_kw)
                 )
+                m_extra["signal_date"] = str(signal_date)[:10]
+                if mode34_prebuy:
+                    m_extra["event_type"] = "信号"
+                    m_extra["buy_mode"] = "intraday"
+                elif mode34_watch:
+                    m_extra["event_type"] = "观察"
+                    m_extra["buy_mode"] = "watch"
+                    m_extra["planned_signal_date"] = mode34_watch.get(
+                        "planned_signal_date", ""
+                    )
             for k in (
                 "industry",
                 "sub_industry",

@@ -619,12 +619,41 @@ def match_mode34_watchlist(
     return {
         **det,
         "watch_date": str(rows[idx].date)[:10],
-        "signal_date": signal_ymd,
+        "planned_signal_date": signal_ymd,
         "exec_buy_date": signal_ymd,
         "base_date": str(rows[base_i].date)[:10],
         "peak_date": str(rows[peak_i].date)[:10],
         "watch_score": _score_mode34_watchlist(det),
         "buy_mode": "watch",
+    }
+
+
+def score_mode34_watchlist(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    **kwargs: Any,
+) -> int:
+    w = match_mode34_watchlist(rows, idx, code, name, **kwargs)
+    return int(w.get("watch_score", 0)) if w else 0
+
+
+def mode34_watch_signal_metrics(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    **kwargs: Any,
+) -> Dict[str, Any]:
+    w = match_mode34_watchlist(rows, idx, code, name, **kwargs)
+    if not w:
+        return {}
+    return {
+        **w,
+        "signal_type": "watch",
+        "list_date": w.get("watch_date", ""),
+        "mode34_score": w.get("watch_score", 0),
     }
 
 

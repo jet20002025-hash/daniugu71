@@ -102,7 +102,7 @@
         </label>
         <button type="submit" class="primary">开始筛选</button>
       </form>
-      <p class="hint">
+      <p class="hint" id="scan-hint">
         选股原则：分数越高越好，买点分值越高越好，最近6日有涨停更优先；买点为信号日的第二天尾盘或分时附近买入；卖点为破10日均线止盈，亏损5个点止损，需严格执行。mode9 默认仅展示 ≥80 分，可按需调低。
       </p>
     </section>
@@ -216,6 +216,22 @@
       updateCap();
     }
     loadFilters();
+
+    const HINT_DEFAULT =
+      '选股原则：分数越高越好，买点分值越高越好，最近6日有涨停更优先；买点为信号日的第二天尾盘或分时附近买入；卖点为破10日均线止盈，亏损5个点止损，需严格执行。mode9 默认仅展示 ≥80 分，可按需调低。';
+    const HINT_MODE34 =
+      '选股原则（mode34）：分数越高越好；「最早出现日期」含观察入池日（如电科 5/22），预案信号日（如 5/25）为买点日，当日盘中突破昨高×1.001 试仓（非次日）；破10日均线止盈、亏5%止损。最近6日有涨停更优先。';
+    function updateModeHint() {
+      const el = document.getElementById('scan-hint');
+      const modeEl = document.getElementById('mode');
+      if (!el || !modeEl) return;
+      el.textContent = modeEl.value === 'mode34' ? HINT_MODE34 : HINT_DEFAULT;
+    }
+    const modeSelect = document.getElementById('mode');
+    if (modeSelect) {
+      modeSelect.addEventListener('change', updateModeHint);
+      updateModeHint();
+    }
 
     async function pollStatus() {
       try {

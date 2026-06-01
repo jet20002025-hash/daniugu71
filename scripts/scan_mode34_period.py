@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""mode34 底部突破回踩二波：按信号日区间逐日扫描。
+"""mode34 电科严格模版：二波确认日区间扫描（无宽松版）。
 
 用法:
   python3 scripts/scan_mode34_period.py --start 2026-05-01 --end 2026-05-31
@@ -34,7 +34,7 @@ def _trade_days(start_ymd: str, end_ymd: str) -> List[str]:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="mode34 区间扫描")
+    ap = argparse.ArgumentParser(description="mode34 严格模版区间扫描（二波确认日）")
     ap.add_argument("--start", required=True)
     ap.add_argument("--end", required=True)
     ap.add_argument("--min-score", type=int, default=62)
@@ -101,7 +101,7 @@ def main() -> None:
     hits.sort(key=lambda x: (x["signal_date"], -x["score"], x["code"]))
     ym = start_ymd[:7].replace("-", "_")
     out_path = args.out.strip() or os.path.join(
-        GPT_DATA_DIR, "results", f"mode34_bottom_break_pullback_{ym}.csv"
+        GPT_DATA_DIR, "results", f"mode34_strict_{ym}.csv"
     )
     os.makedirs(os.path.dirname(out_path) or ".", exist_ok=True)
     fields = list(hits[0].keys()) if hits else []

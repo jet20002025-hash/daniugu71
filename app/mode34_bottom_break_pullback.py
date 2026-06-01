@@ -33,7 +33,7 @@ def mode34_kw_from_scan_config(cfg: Any) -> Dict[str, Any]:
 def mode34_default_kw() -> Dict[str, Any]:
     return dict(
         bottom_lookback=60,
-        bottom_pos_max=0.30,
+        bottom_pos_max=0.12,
         base_search_min=3,
         base_search_max=10,
         surge_search_max=18,
@@ -406,7 +406,58 @@ def match_mode34_bottom_break_pullback(
     base_close = float(det["base_close"])
     det["body_ratio"] = (c - o) / rng_d if rng_d > 0 else 0.0
     det["rise_from_base_to_signal_pct"] = (c - base_close) / base_close * 100.0
-    return det
+
+    strict = _mode34_strict_launch_meta(
+        rows, idx, det, int(det["base_date_idx"]), peak_i, code, name, kw
+    )
+    if strict is None:
+        return None
+    return {**det, **strict}
+
+
+def _mode34_strict_launch_meta(
+    rows: List[KlineRow],
+    idx: int,
+    det: Dict[str, float],
+    base_i: int,
+    peak_i: int,
+    code: str,
+    name: str,
+    kw: Dict[str, Any],
+) -> Optional[Dict[str, float]]:
+    """电科模版启动段硬条件（全模式统一，无宽松版）。"""
+    if float(det["bottom_pos_pct"]) > float(kw["watch_bottom_pos_max_pct"]):
+        return None
+    if float(det["surge_rise_pct"]) > float(kw["watch_surge_rise_max_pct"]):
+        return None
+
+    n_months = max(12, int(kw.get("watch_n_month_low_min", 12)))
+    nm = _launch_low_in_n_month_window(
+        rows,
+        idx,
+        base_i,
+        n_months,
+        float(kw.get("watch_n_month_low_tol_pct", 0.2)),
+    )
+    if nm is None or float(nm["n_month_low_ok"]) < 1.0:
+        return None
+
+    lu = _watch_limit_up_volume_launch(rows, base_i, peak_i, code, name, kw)
+    if lu is None:
+        return None
+
+    vm = _watch_launch_vol_n_month_max(
+        rows,
+        idx,
+        base_i,
+        peak_i,
+        int(kw.get("watch_vol_n_month_max", 6)),
+        float(kw.get("watch_vol_n_month_tol_pct", 0.1)),
+    )
+    if vm is None or float(vm["n_month_vol_max_ok"]) < 1.0:
+        return None
+
+    return {**nm, **lu, **vm}
 
 
 def match_mode34_watchlist(
@@ -455,34 +506,10 @@ def match_mode34_watchlist(
 
     peak_i = int(det["peak_date_idx"])
     base_i = int(det["base_date_idx"])
-    n_months = max(12, int(kw.get("watch_n_month_low_min", 12)))
-    nm = _launch_low_in_n_month_window(
-        rows,
-        idx,
-        base_i,
-        n_months,
-        float(kw.get("watch_n_month_low_tol_pct", 0.2)),
-    )
-    if nm is None or float(nm["n_month_low_ok"]) < 1.0:
+    strict = _mode34_strict_launch_meta(rows, idx, det, base_i, peak_i, code, name, kw)
+    if strict is None:
         return None
-    det = {**det, **nm}
-
-    lu = _watch_limit_up_volume_launch(rows, base_i, peak_i, code, name, kw)
-    if lu is None:
-        return None
-    det = {**det, **lu}
-
-    vm = _watch_launch_vol_n_month_max(
-        rows,
-        idx,
-        base_i,
-        peak_i,
-        int(kw.get("watch_vol_n_month_max", 6)),
-        float(kw.get("watch_vol_n_month_tol_pct", 0.1)),
-    )
-    if vm is None or float(vm["n_month_vol_max_ok"]) < 1.0:
-        return None
-    det = {**det, **vm}
+    det = {**det, **strict}
 
     return {
         **det,
@@ -555,6 +582,13 @@ def mode34_prebuy_advice(
     gap = float(det["pullback_days"])
     if gap < int(kw["pullback_days_min"]) or gap > int(kw["pullback_days_max"]):
         return None
+
+    peak_i = int(det["peak_date_idx"])
+    base_i = int(det["base_date_idx"])
+    strict = _mode34_strict_launch_meta(rows, idx, det, base_i, peak_i, code, name, kw)
+    if strict is None:
+        return None
+    det = {**det, **strict}
 
     r = rows[idx]
     o, c, h, l_ = float(r.open), float(r.close), float(r.high), float(r.low)

@@ -291,7 +291,7 @@ class ScanConfig:
 
     # mode34（底部突破回踩二波）：阶段底→强阳突破→缩量平台→二波确认（参考600850@5/26）
     mode34_bottom_lookback: int = 60
-    mode34_bottom_pos_max: float = 0.30
+    mode34_bottom_pos_max: float = 0.12
     mode34_surge_cum_pct_min: float = 12.0
     mode34_surge_big_pct_min: float = 7.0
     mode34_surge_big_pct_main: float = 4.5

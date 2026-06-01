@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""mode34 底部突破回踩二波：扫描指定日期（默认今日）命中个股。
+"""mode34 电科严格模版：扫描指定日期二波确认（无宽松版）。
 
 用法:
   python3 scripts/scan_mode34_today.py
@@ -41,7 +41,7 @@ def _find_date_index(rows, ymd: str) -> Optional[int]:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="mode34 底部突破回踩二波")
+    ap = argparse.ArgumentParser(description="mode34 严格模版（二波确认日）")
     ap.add_argument("--date", default="", help="信号日，默认缓存最新交易日")
     ap.add_argument("--min-score", type=int, default=62)
     ap.add_argument("--code", default="", help="仅测单股")

@@ -301,6 +301,57 @@ class ScanConfig:
     mode34_signal_pct_min: float = 1.5
     mode34_min_score: int = 62
 
+    # mode35（前高压顶洗盘突破）：前高锚点→压顶整理→A类放量突破
+    mode35_min_score: int = 70
+
+
+def _mode35_kw_from_config(config: ScanConfig) -> Dict[str, Any]:
+    from app.mode35_prior_high_breakout import mode35_kw_from_scan_config
+
+    return mode35_kw_from_scan_config(config)
+
+
+def _mode35_signal_at(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    **kwargs: Any,
+) -> bool:
+    from app.mode35_prior_high_breakout import match_mode35_prior_high_breakout
+
+    return match_mode35_prior_high_breakout(rows, idx, code, name, **kwargs) is not None
+
+
+def _score_mode35(
+    rows: List[KlineRow],
+    idx: int,
+    ma10: np.ndarray,
+    ma20: np.ndarray,
+    ma60: np.ndarray,
+    vol20: np.ndarray,
+    code: str = "",
+    name: str = "",
+    breakdown: Optional[List[tuple]] = None,
+    **kwargs: Any,
+) -> int:
+    _ = (ma10, ma20, ma60, vol20, breakdown)
+    from app.mode35_prior_high_breakout import score_mode35_prior_high_breakout
+
+    return score_mode35_prior_high_breakout(rows, idx, code, name, **kwargs)
+
+
+def _mode35_metrics(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    **kwargs: Any,
+) -> Dict[str, Any]:
+    from app.mode35_prior_high_breakout import mode35_signal_metrics
+
+    return mode35_signal_metrics(rows, idx, code, name, **kwargs)
+
 
 def _mode34_kw_from_config(config: ScanConfig) -> Dict[str, Any]:
     from app.mode34_bottom_break_pullback import mode34_kw_from_scan_config
@@ -5451,6 +5502,7 @@ def scan_with_mode3(
     use_mode32: bool = False,
     use_mode33: bool = False,
     use_mode34: bool = False,
+    use_mode35: bool = False,
     sector_ak_cache_dir: Optional[str] = None,
     sector_fund_flow_max_points: int = 5,
     sector_fund_flow_yi_per_point: float = 3.0,
@@ -5621,6 +5673,10 @@ def scan_with_mode3(
 
         score_fn = _score_mode98_bound
         mode_label = "mode98"
+    elif use_mode35:
+        signal_fn = _mode3_signals
+        score_fn = _score_mode35
+        mode_label = "mode35"
     elif use_mode34:
         signal_fn = _mode3_signals
         score_fn = _score_mode34
@@ -5778,6 +5834,10 @@ def scan_with_mode3(
     if use_mode34:
         mode34_kw = _mode34_kw_from_config(config)
 
+    mode35_kw: Dict[str, Any] = {}
+    if use_mode35:
+        mode35_kw = _mode35_kw_from_config(config)
+
     for item in stock_list:
         if _is_st(item.name or ""):
             continue
@@ -5815,7 +5875,14 @@ def scan_with_mode3(
                 if use_mode88
                 else (
                     200
-                    if (use_mode18 or use_mode98 or use_mode32 or use_mode33 or use_mode34)
+                    if (
+                        use_mode18
+                        or use_mode98
+                        or use_mode32
+                        or use_mode33
+                        or use_mode34
+                        or use_mode35
+                    )
                     else (
                         max(130, int(getattr(config, "mode5_half_year_bars", 120)) + 5)
                         if use_mode5
@@ -5912,6 +5979,24 @@ def scan_with_mode3(
                 shrink_max_days=m5_shrink_d,
                 half_year_bars=m5_hb,
             )
+        elif use_mode35:
+            st = str(start_date).strip()[:10] if start_date else ""
+            ed = str(end_date).strip()[:10] if end_date else ""
+            signals = []
+            start_i = max(
+                200,
+                int(mode35_kw.get("anchor_lookback", 180))
+                + int(mode35_kw.get("min_under_days", 40))
+                + 15,
+            )
+            for i in range(start_i, len(rows)):
+                d = str(rows[i].date)[:10]
+                if st and d < st:
+                    continue
+                if ed and d > ed:
+                    continue
+                if _mode35_signal_at(rows, i, item.code, item.name, **mode35_kw):
+                    signals.append(i)
         elif use_mode34:
             st = str(start_date).strip()[:10] if start_date else ""
             ed = str(end_date).strip()[:10] if end_date else ""
@@ -6478,6 +6563,7 @@ def scan_with_mode3(
                 or use_mode32
                 or use_mode33
                 or use_mode34
+                or use_mode35
                 or (use_mode88 and score_fn is _score_mode88)
         or (use_mode93 and score_fn is _score_mode93)
                 or use_mode_bottom_big_yang
@@ -6532,6 +6618,19 @@ def scan_with_mode3(
                         item.name,
                         None,
                         **mode34_kw,
+                    )
+                elif use_mode35:
+                    score = _score_mode35(
+                        rows,
+                        idx,
+                        ma10,
+                        ma20,
+                        ma60,
+                        vol20,
+                        item.code,
+                        item.name,
+                        None,
+                        **mode35_kw,
                     )
                 else:
                     score = score_fn(
@@ -6638,6 +6737,10 @@ def scan_with_mode3(
                 buy_idx = idx
                 buy_date = str(mode34_watch.get("exec_buy_date") or signal_date)[:10]
                 buy_point_score = int(mode34_watch.get("watch_score") or 0)
+            elif use_mode35:
+                buy_idx = idx
+                buy_date = str(signal_date)[:10]
+                buy_point_score = min(100, int(score))
             else:
                 buy_point_score = _buy_point_score(rows, idx, ma10, ma20, ma60, vol20)
                 buy_idx = min(idx + 1, len(rows) - 1)
@@ -6675,7 +6778,7 @@ def scan_with_mode3(
                 f"信号日 {signal_date}",
                 (
                     f"买入日 {buy_date} (T+1 开盘)"
-                    if not use_mode34
+                    if not (use_mode34 or use_mode35)
                     else f"买点日 {buy_date}"
                 ),
                 f"放量 {vol_ratio:.2f}x",
@@ -6701,6 +6804,8 @@ def scan_with_mode3(
                     if psd
                     else f"买点日 {buy_date} 盘中突破昨高试仓"
                 )
+            elif use_mode35:
+                reasons[2] = f"A类突破日 {buy_date} 放量破前高试仓"
             if sector_sm.get("sub_industry"):
                 reasons.append(f"细分行业 {sector_sm['sub_industry']}")
             if sector_sm.get("industry"):
@@ -6834,6 +6939,13 @@ def scan_with_mode3(
                     m_extra["planned_signal_date"] = mode34_watch.get(
                         "planned_signal_date", ""
                     )
+            if use_mode35:
+                m_extra.update(
+                    _mode35_metrics(rows, idx, item.code, item.name, **mode35_kw)
+                )
+                m_extra["signal_date"] = str(signal_date)[:10]
+                m_extra["event_type"] = "突破"
+                m_extra["buy_mode"] = "breakout_a"
             for k in (
                 "industry",
                 "sub_industry",

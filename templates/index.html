@@ -85,6 +85,7 @@
             <option value="mode98">mode98（日周月 KDJ 超卖共振）</option>
             <option value="mode32">mode32（实体首板 3+2 整理）</option>
             <option value="mode34">mode34（底部突破回踩二波）</option>
+            <option value="mode35">mode35（前高压顶洗盘突破）</option>
             <option value="mode3">71倍原版(mode3)</option>
           </select>
         </label>
@@ -232,11 +233,15 @@
       '选股原则：分数越高越好，买点分值越高越好，最近6日有涨停更优先；买点为信号日的第二天尾盘或分时附近买入；卖点为破10日均线止盈，亏损5个点止损，需严格执行。mode9 默认仅展示 ≥80 分，可按需调低。';
     const HINT_MODE34 =
       '选股原则（mode34）：分数越高越好；「信号日」为本条记录的入池/买点日（连续两日信号会各显示一天，如南玻 27/28）；「最早入池」仅在与信号日不同时显示（如电科先 5/22 观察、5/25 信号）。买点日盘中突破昨高×1.001 试仓；破10日均线止盈、亏5%止损。';
+    const HINT_MODE35 =
+      '选股原则（mode35 前高压顶洗盘突破）：仅 A 类突破日；分数越高越好（建议≥70）。信号日=放量突破前高日，买点日为突破当日尾盘或分时破前高试仓；上影试盘未收盘站稳前高可观察后续确认。破10日均线止盈、亏5%止损。';
     function updateModeHint() {
       const el = document.getElementById('scan-hint');
       const modeEl = document.getElementById('mode');
       if (!el || !modeEl) return;
-      el.textContent = modeEl.value === 'mode34' ? HINT_MODE34 : HINT_DEFAULT;
+      if (modeEl.value === 'mode34') el.textContent = HINT_MODE34;
+      else if (modeEl.value === 'mode35') el.textContent = HINT_MODE35;
+      else el.textContent = HINT_DEFAULT;
     }
     const modeSelect = document.getElementById('mode');
     if (modeSelect) {

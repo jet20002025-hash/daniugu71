@@ -225,9 +225,11 @@ def _load_market_caps(path: str) -> Dict[str, float]:
             code = _normalize_code(row.get("code", ""))
             if not code:
                 continue
-            cap_value = row.get("total_cap")
-            if cap_value is None or cap_value == "":
-                cap_value = row.get("market_cap")
+            float_cap = row.get("float_cap")
+            total_cap = row.get("total_cap")
+            if total_cap is None or total_cap == "":
+                total_cap = row.get("market_cap")
+            cap_value = float_cap if float_cap not in (None, "") else total_cap
             try:
                 cap = float(cap_value)
             except Exception:
@@ -801,6 +803,8 @@ def run_mode3_scan(
     use_mode33: bool = False,
     use_mode34: bool = False,
     use_mode35: bool = False,
+    use_mode36: bool = False,
+    use_mode37: bool = False,
     user_id: Optional[int] = None,
     throttle_free_user: bool = False,
 ) -> None:
@@ -912,6 +916,10 @@ def run_mode3_scan(
                 cap_note = f"，市值≤{config.max_market_cap / 1e8:.0f}亿"
         if use_mode98:
             mode_label = "mode98"
+        elif use_mode37:
+            mode_label = "mode37"
+        elif use_mode36:
+            mode_label = "mode36"
         elif use_mode35:
             mode_label = "mode35"
         elif use_mode34:
@@ -997,6 +1005,8 @@ def run_mode3_scan(
             use_mode33=use_mode33,
             use_mode34=use_mode34,
             use_mode35=use_mode35,
+            use_mode36=use_mode36,
+            use_mode37=use_mode37,
         )
         if model_tag_override:
             model_tag = model_tag_override
@@ -1014,6 +1024,10 @@ def run_mode3_scan(
             model_tag = "mode9"
         elif use_mode98:
             model_tag = "mode98"
+        elif use_mode37:
+            model_tag = "mode37"
+        elif use_mode36:
+            model_tag = "mode36"
         elif use_mode35:
             model_tag = "mode35"
         elif use_mode34:
@@ -1344,7 +1358,7 @@ def scan():
         request_cancel(user_id)
         clear_pending_jobs(user_id)
         mode = request.form.get("mode", "mode9")
-        if mode not in ("mode3", "mode3ok", "mode3_avoid", "mode3_upper", "mode3_upper_strict", "mode3_upper_near", "mode4", "mode8", "mode9", "mode10", "mode11", "mode12", "mode90", "mode93", "mode底部大阳线", "mode平台突破首阳", "mode中位大阳线", "mode底部支撑", "mode最后震仓", "mode98", "mode32", "mode34", "mode35"):
+        if mode not in ("mode3", "mode3ok", "mode3_avoid", "mode3_upper", "mode3_upper_strict", "mode3_upper_near", "mode4", "mode8", "mode9", "mode10", "mode11", "mode12", "mode90", "mode93", "mode底部大阳线", "mode平台突破首阳", "mode中位大阳线", "mode底部支撑", "mode最后震仓", "mode98", "mode32", "mode34", "mode35", "mode36", "mode37"):
             mode = "mode9"
         cutoff_date = request.form.get("cutoff_date") or None
         start_date = request.form.get("start_date") or None
@@ -1384,7 +1398,7 @@ def scan():
     # 不排队：点击即在本进程起线程扫描；先发取消标记中断上一轮，再启动新任务
     request_cancel(user_id)
     mode = request.form.get("mode", "mode9")
-    if mode not in ("mode3", "mode3ok", "mode3_avoid", "mode3_upper", "mode3_upper_strict", "mode3_upper_near", "mode4", "mode8", "mode9", "mode10", "mode11", "mode12", "mode90", "mode93", "mode底部大阳线", "mode平台突破首阳", "mode中位大阳线", "mode底部支撑", "mode最后震仓", "mode98", "mode32", "mode34"):
+    if mode not in ("mode3", "mode3ok", "mode3_avoid", "mode3_upper", "mode3_upper_strict", "mode3_upper_near", "mode4", "mode8", "mode9", "mode10", "mode11", "mode12", "mode90", "mode93", "mode底部大阳线", "mode平台突破首阳", "mode中位大阳线", "mode底部支撑", "mode最后震仓", "mode98", "mode32", "mode34", "mode35", "mode36", "mode37"):
         mode = "mode9"
     cutoff_date = request.form.get("cutoff_date") or None
     start_date = request.form.get("start_date") or None
@@ -1411,7 +1425,7 @@ def scan():
         max_market_cap=cap_limit,
     )
     use_startup_data = True
-    use_71x_standard = mode in ("mode3", "mode8", "mode9", "mode10", "mode11", "mode12", "mode90", "mode93", "mode底部大阳线", "mode平台突破首阳", "mode中位大阳线", "mode底部支撑", "mode最后震仓", "mode98", "mode32", "mode34", "mode35")
+    use_71x_standard = mode in ("mode3", "mode8", "mode9", "mode10", "mode11", "mode12", "mode90", "mode93", "mode底部大阳线", "mode平台突破首阳", "mode中位大阳线", "mode底部支撑", "mode最后震仓", "mode98", "mode32", "mode34", "mode35", "mode36", "mode37")
     is_paid = (
         g.current_user.is_activated and not getattr(g.current_user, "subscription_expired", True)
         or getattr(g.current_user, "is_super_admin", False)
@@ -1453,6 +1467,8 @@ def scan():
             mode == "mode33",
             mode == "mode34",
             mode == "mode35",
+            mode == "mode36",
+            mode == "mode37",
             user_id,
             not is_paid,
         ),

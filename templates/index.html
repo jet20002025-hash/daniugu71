@@ -73,22 +73,9 @@
         <label>
           模型
           <select name="mode" id="mode">
-            <option value="mode9" selected>mode9（首选）</option>
-            <option value="mode8">mode8（次选）</option>
-            <option value="mode90">mode90（MACD 贴 0 轴+上升）</option>
-            <option value="mode93">mode93（低位放量涨停回调）</option>
-            <option value="mode底部大阳线">mode底部大阳线（低位倍量大阳）</option>
-            <option value="mode平台突破首阳">mode平台突破首阳（震仓突破买点）</option>
-            <option value="mode中位大阳线">mode中位大阳线（主力大阳→突破买点）</option>
-            <option value="mode底部支撑">mode底部支撑（起量位回踩抄底）</option>
-            <option value="mode最后震仓">mode最后震仓（箱体洗盘→反包/突破）</option>
-            <option value="mode98">mode98（日周月 KDJ 超卖共振）</option>
-            <option value="mode32">mode32（实体首板 3+2 整理）</option>
-            <option value="mode34">mode34（底部突破回踩二波）</option>
-            <option value="mode35">mode35（前高压顶洗盘突破）</option>
-            <option value="mode36">mode36（一阳穿多均线）</option>
-            <option value="mode37">mode37（跳空缺口支撑）</option>
-            <option value="mode3">71倍原版(mode3)</option>
+            {% for value, label in scan_modes %}
+            <option value="{{ value }}"{% if value == 'mode9' %} selected{% endif %}>{{ label }}</option>
+            {% endfor %}
           </select>
         </label>
         <label>

@@ -124,6 +124,43 @@ scan_state = {
     "source": "",
 }
 
+# 网站扫描下拉：与 /scan 合法 mode 列表保持一致
+SCAN_MODE_OPTIONS: List[Tuple[str, str]] = [
+    ("mode9", "mode9（首选）"),
+    ("mode8", "mode8（次选）"),
+    ("mode90", "mode90（MACD 贴 0 轴+上升）"),
+    ("mode93", "mode93（低位放量涨停回调）"),
+    ("mode底部大阳线", "mode底部大阳线（低位倍量大阳）"),
+    ("mode平台突破首阳", "mode平台突破首阳（震仓突破买点）"),
+    ("mode中位大阳线", "mode中位大阳线（主力大阳→突破买点）"),
+    ("mode底部支撑", "mode底部支撑（起量位回踩抄底）"),
+    ("mode最后震仓", "mode最后震仓（箱体洗盘→反包/突破）"),
+    ("mode98", "mode98（日周月 KDJ 超卖共振）"),
+    ("mode32", "mode32（实体首板 3+2 整理）"),
+    ("mode34", "mode34（底部突破回踩二波）"),
+    ("mode35", "mode35（前高压顶洗盘突破）"),
+    ("mode36", "mode36（一阳穿多均线）"),
+    ("mode37", "mode37（跳空缺口支撑）"),
+    ("mode3", "71倍原版(mode3)"),
+]
+SCAN_MODE_VALUES = frozenset(
+    [v for v, _ in SCAN_MODE_OPTIONS]
+    + [
+        "mode3ok",
+        "mode3_avoid",
+        "mode3_upper",
+        "mode3_upper_strict",
+        "mode3_upper_near",
+        "mode4",
+        "mode33",
+    ]
+)
+
+
+def _normalize_scan_mode(mode: str) -> str:
+    m = (mode or "").strip()
+    return m if m in SCAN_MODE_VALUES else "mode9"
+
 # 管理后台「更新 K 线」异步任务状态（与 DEPLOY 中 update_kline_cache.py 一致）
 kline_update_state = {
     "running": False,
@@ -1342,6 +1379,7 @@ def index():
         state=state,
         user=g.current_user,
         scan_busy=scan_busy,
+        scan_modes=SCAN_MODE_OPTIONS,
     )
 
 
@@ -1357,9 +1395,7 @@ def scan():
         # 加入队列，由独立 worker 执行；同一时刻一个任务：先取消上一轮并清空旧任务，再入队新任务
         request_cancel(user_id)
         clear_pending_jobs(user_id)
-        mode = request.form.get("mode", "mode9")
-        if mode not in ("mode3", "mode3ok", "mode3_avoid", "mode3_upper", "mode3_upper_strict", "mode3_upper_near", "mode4", "mode8", "mode9", "mode10", "mode11", "mode12", "mode90", "mode93", "mode底部大阳线", "mode平台突破首阳", "mode中位大阳线", "mode底部支撑", "mode最后震仓", "mode98", "mode32", "mode34", "mode35", "mode36", "mode37"):
-            mode = "mode9"
+        mode = _normalize_scan_mode(request.form.get("mode", "mode9"))
         cutoff_date = request.form.get("cutoff_date") or None
         start_date = request.form.get("start_date") or None
         raw_ds = (request.form.get("data_source") or "gpt").strip() or "gpt"
@@ -1397,9 +1433,7 @@ def scan():
         return redirect(url_for("index"))
     # 不排队：点击即在本进程起线程扫描；先发取消标记中断上一轮，再启动新任务
     request_cancel(user_id)
-    mode = request.form.get("mode", "mode9")
-    if mode not in ("mode3", "mode3ok", "mode3_avoid", "mode3_upper", "mode3_upper_strict", "mode3_upper_near", "mode4", "mode8", "mode9", "mode10", "mode11", "mode12", "mode90", "mode93", "mode底部大阳线", "mode平台突破首阳", "mode中位大阳线", "mode底部支撑", "mode最后震仓", "mode98", "mode32", "mode34", "mode35", "mode36", "mode37"):
-        mode = "mode9"
+    mode = _normalize_scan_mode(request.form.get("mode", "mode9"))
     cutoff_date = request.form.get("cutoff_date") or None
     start_date = request.form.get("start_date") or None
     raw_ds = (request.form.get("data_source") or "gpt").strip() or "gpt"

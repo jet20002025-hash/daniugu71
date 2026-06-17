@@ -228,6 +228,8 @@
       '选股原则（mode36 一阳穿多均线）：放量阳线一次穿越至少6条均线（MA5/10/20/30/60/120）；开盘在均线下、收盘在均线上。建议最低分≥60；信号日次日或尾盘跟进；破10日均线止盈、亏5%止损。';
     const HINT_MODE37 =
       '选股原则（mode37 跳空缺口支撑）：缺口未回补（低点不破下沿）；回踩缺口区且KDJ(8,2,2) J上拐。回补过的缺口支撑弱，不选。建议最低分≥60。';
+    const HINT_MODE38 =
+      '选股原则（mode38 大牛股关键位回踩）：前期大涨（≥80%）后回调，低点踩 MA60/MA120（±5%）；MA60回撤≥22%、MA120回撤≥28%；须为波段最低点且次日低点抬高；近3日无>8%大涨。建议最低分≥60。';
     function updateModeHint() {
       const el = document.getElementById('scan-hint');
       const modeEl = document.getElementById('mode');
@@ -235,6 +237,7 @@
       if (modeEl.value === 'mode34') el.textContent = HINT_MODE34;
       else if (modeEl.value === 'mode35') el.textContent = HINT_MODE35;
       else if (modeEl.value === 'mode36') el.textContent = HINT_MODE36;
+      else if (modeEl.value === 'mode38') el.textContent = HINT_MODE38;
       else if (modeEl.value === 'mode37') el.textContent = HINT_MODE37;
       else el.textContent = HINT_DEFAULT;
     }

@@ -141,6 +141,7 @@ SCAN_MODE_OPTIONS: List[Tuple[str, str]] = [
     ("mode35", "mode35（前高压顶洗盘突破）"),
     ("mode36", "mode36（一阳穿多均线）"),
     ("mode37", "mode37（跳空缺口支撑）"),
+    ("mode38", "mode38（大牛股关键位回踩）"),
     ("mode3", "71倍原版(mode3)"),
 ]
 SCAN_MODE_VALUES = frozenset(
@@ -842,6 +843,7 @@ def run_mode3_scan(
     use_mode35: bool = False,
     use_mode36: bool = False,
     use_mode37: bool = False,
+    use_mode38: bool = False,
     user_id: Optional[int] = None,
     throttle_free_user: bool = False,
 ) -> None:
@@ -953,8 +955,9 @@ def run_mode3_scan(
                 cap_note = f"，市值≤{config.max_market_cap / 1e8:.0f}亿"
         if use_mode98:
             mode_label = "mode98"
+        elif use_mode38:
+            mode_label = "mode38"
         elif use_mode37:
-            mode_label = "mode37"
         elif use_mode36:
             mode_label = "mode36"
         elif use_mode35:
@@ -1044,6 +1047,7 @@ def run_mode3_scan(
             use_mode35=use_mode35,
             use_mode36=use_mode36,
             use_mode37=use_mode37,
+            use_mode38=use_mode38,
         )
         if model_tag_override:
             model_tag = model_tag_override
@@ -1061,8 +1065,9 @@ def run_mode3_scan(
             model_tag = "mode9"
         elif use_mode98:
             model_tag = "mode98"
+        elif use_mode38:
+            model_tag = "mode38"
         elif use_mode37:
-            model_tag = "mode37"
         elif use_mode36:
             model_tag = "mode36"
         elif use_mode35:
@@ -1459,7 +1464,7 @@ def scan():
         max_market_cap=cap_limit,
     )
     use_startup_data = True
-    use_71x_standard = mode in ("mode3", "mode8", "mode9", "mode10", "mode11", "mode12", "mode90", "mode93", "mode底部大阳线", "mode平台突破首阳", "mode中位大阳线", "mode底部支撑", "mode最后震仓", "mode98", "mode32", "mode34", "mode35", "mode36", "mode37")
+    use_71x_standard = mode in ("mode3", "mode8", "mode9", "mode10", "mode11", "mode12", "mode90", "mode93", "mode底部大阳线", "mode平台突破首阳", "mode中位大阳线", "mode底部支撑", "mode最后震仓", "mode98", "mode32", "mode34", "mode35", "mode36", "mode37", "mode38")
     is_paid = (
         g.current_user.is_activated and not getattr(g.current_user, "subscription_expired", True)
         or getattr(g.current_user, "is_super_admin", False)
@@ -1503,6 +1508,7 @@ def scan():
             mode == "mode35",
             mode == "mode36",
             mode == "mode37",
+            mode == "mode38",
             user_id,
             not is_paid,
         ),

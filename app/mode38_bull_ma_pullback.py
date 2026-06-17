@@ -1,4 +1,4 @@
-"""mode38 大牛股关键位回踩：前期大涨后回调，低点踩 MA60/MA120 关键均线。
+"""mode38 大牛股关键位回踩：前期大涨后回调，低点踩 MA20/30/60/120 关键均线。
 
 样本：亚翔集成 603929（仅两买点）
   - 2026-03-12 回踩 MA60（二调低点）
@@ -15,9 +15,10 @@ from app.scanner import KlineRow, _is_st, _vol_ratio_at
 MODE38_ID = "mode38"
 MODE38_FULL_NAME = "大牛股关键位回踩"
 MODE38_DISPLAY_NAME = f"{MODE38_ID}（{MODE38_FULL_NAME}）"
-MODE38_ONE_LINE = "前期大涨后回调，股价站稳 MA120/MA250 之上，低点踩 MA60/MA120"
+MODE38_ONE_LINE = "前期大涨后回调，股价站稳 MA120/MA250 之上，低点踩 MA20/30/60/120"
 
-SUPPORT_MAS: tuple[int, ...] = (60, 120)
+SUPPORT_MAS: tuple[int, ...] = (20, 30, 60, 120)
+MIN_PULLBACK_BY_MA: Dict[int, float] = {20: 12.0, 30: 16.0, 60: 22.0, 120: 28.0}
 
 
 def mode38_default_kw() -> Dict[str, Any]:
@@ -28,6 +29,8 @@ def mode38_default_kw() -> Dict[str, Any]:
         min_rally_pct=80.0,
         pullback_min_pct=12.0,
         pullback_max_pct=38.0,
+        min_pullback_ma20_pct=12.0,
+        min_pullback_ma30_pct=16.0,
         min_pullback_ma60_pct=22.0,
         min_pullback_ma120_pct=28.0,
         max_ma_dist_pct=5.0,
@@ -77,6 +80,13 @@ def _ma_slope_pct(closes: np.ndarray, idx: int, n: int, look: int) -> float:
     return (v1 / v0 - 1.0) * 100.0
 
 
+def _min_pullback_for_ma(sup_period: int, kw: Dict[str, Any]) -> float:
+    key = f"min_pullback_ma{sup_period}_pct"
+    if key in kw:
+        return float(kw[key])
+    return MIN_PULLBACK_BY_MA.get(sup_period, float(kw["pullback_min_pct"]))
+
+
 def _pick_support_ma(
     closes: np.ndarray,
     idx: int,
@@ -101,7 +111,7 @@ def _pick_support_ma(
             candidates.append((abs(dist), period, ma, dist))
     if not candidates:
         return None
-    # 同等距离优先更深均线（120>60>20）
+    # 同等距离优先更深均线（120>60>30>20）
     candidates.sort(key=lambda x: (x[0], -x[1]))
     _, period, ma, dist = candidates[0]
     return {
@@ -202,9 +212,7 @@ def match_mode38_bull_ma_pullback(
         return None
 
     sup_period = int(support["support_ma"])
-    if sup_period == 60 and pullback_pct < float(kw["min_pullback_ma60_pct"]):
-        return None
-    if sup_period == 120 and pullback_pct < float(kw["min_pullback_ma120_pct"]):
+    if pullback_pct < _min_pullback_for_ma(sup_period, kw):
         return None
 
     if kw.get("require_pullback_trough", True):
@@ -285,6 +293,8 @@ def score_mode38_bull_ma_pullback(
         score += 12.0
     elif sup >= 60:
         score += 8.0
+    elif sup >= 30:
+        score += 6.0
     else:
         score += 4.0
     if float(m["support_ma_slope_pct"]) > 3.0:

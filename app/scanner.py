@@ -6175,7 +6175,7 @@ def scan_with_mode3(
         elif use_mode38:
             st = str(start_date).strip()[:10] if start_date else ""
             ed = str(end_date).strip()[:10] if end_date else ""
-            start_i = max(150, int(mode38_kw.get("phase_lookback", 120) or 120) + 10)
+            start_i = max(260, int(mode38_kw.get("phase_lookback", 120) or 120) + 10)
             signals = []
             for i in range(start_i, len(rows)):
                 d = str(rows[i].date)[:10]

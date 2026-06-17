@@ -15,7 +15,7 @@ from app.scanner import KlineRow, _is_st, _vol_ratio_at
 MODE38_ID = "mode38"
 MODE38_FULL_NAME = "大牛股关键位回踩"
 MODE38_DISPLAY_NAME = f"{MODE38_ID}（{MODE38_FULL_NAME}）"
-MODE38_ONE_LINE = "前期大涨后回调，低点踩上升中的 MA60/MA120 关键均线"
+MODE38_ONE_LINE = "前期大涨后回调，股价站稳 MA120/MA250 之上，低点踩 MA60/MA120"
 
 SUPPORT_MAS: tuple[int, ...] = (60, 120)
 
@@ -42,6 +42,7 @@ def mode38_default_kw() -> Dict[str, Any]:
         max_recent_day_pct=8.0,
         require_pullback_trough=True,
         require_trough_confirm=True,
+        require_above_ma120_250=True,
         min_score=60,
     )
 
@@ -126,7 +127,7 @@ def match_mode38_bull_ma_pullback(
     phase_lb = int(kw["phase_lookback"])
     peak_lb = int(kw["peak_lookback"])
     peak_end = int(kw["peak_end_offset"])
-    min_len = max(phase_lb, 120) + 10
+    min_len = max(phase_lb, 250) + 10
     if idx < min_len or idx >= len(rows):
         return None
 
@@ -178,8 +179,12 @@ def match_mode38_bull_ma_pullback(
         return None
 
     ma120 = _ma_at(closes, idx, 120)
-    if np.isnan(ma120) or ma120 <= 0:
+    ma250 = _ma_at(closes, idx, 250)
+    if np.isnan(ma120) or ma120 <= 0 or np.isnan(ma250) or ma250 <= 0:
         return None
+    if kw.get("require_above_ma120_250", True):
+        if cur_close <= ma120 or cur_close <= ma250:
+            return None
     ma120_slope = _ma_slope_pct(closes, idx, 120, int(kw["ma_slope_days"]))
     if ma120_slope < float(kw["min_ma120_slope_pct"]):
         return None
@@ -239,6 +244,8 @@ def match_mode38_bull_ma_pullback(
         "close_dist_ma_pct": close_dist,
         "support_ma_slope_pct": support["support_ma_slope_pct"],
         "ma120_slope_pct": ma120_slope,
+        "ma120": ma120,
+        "ma250": ma250,
         "vol_ratio": vol_ratio,
         "vol_shrink_ratio": vol_shrink,
         "pct_chg": pct,
@@ -317,6 +324,8 @@ def mode38_signal_metrics(
         "close_dist_ma_pct": round(float(m["close_dist_ma_pct"]), 2),
         "support_ma_slope_pct": round(float(m["support_ma_slope_pct"]), 2),
         "ma120_slope_pct": round(float(m["ma120_slope_pct"]), 2),
+        "ma120": round(float(m["ma120"]), 4),
+        "ma250": round(float(m["ma250"]), 4),
         "vol_ratio": round(float(m["vol_ratio"]), 2),
         "vol_shrink_ratio": round(float(m["vol_shrink_ratio"]), 2),
         "pct_chg": round(float(m["pct_chg"]), 2),

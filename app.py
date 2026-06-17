@@ -958,6 +958,7 @@ def run_mode3_scan(
         elif use_mode38:
             mode_label = "mode38"
         elif use_mode37:
+            mode_label = "mode37"
         elif use_mode36:
             mode_label = "mode36"
         elif use_mode35:
@@ -1068,6 +1069,7 @@ def run_mode3_scan(
         elif use_mode38:
             model_tag = "mode38"
         elif use_mode37:
+            model_tag = "mode37"
         elif use_mode36:
             model_tag = "mode36"
         elif use_mode35:

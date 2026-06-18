@@ -311,7 +311,7 @@ class ScanConfig:
     # mode37（跳空缺口支撑）：向上跳空未回补，回踩缺口区
     mode37_min_score: int = 60
 
-    # mode38（大牛股关键位回踩）：大涨后回调踩 MA20/60/120
+    # mode38（大牛股关键位回踩）：大涨后回调踩 MA10/20/30/60/120
     mode38_min_score: int = 60
 
 

@@ -1,4 +1,4 @@
-"""mode38 大牛股关键位回踩：前期大涨后回调，低点踩 MA20/30/60/120 关键均线。
+"""mode38 大牛股关键位回踩：前期大涨后回调，低点踩 MA10/20/30/60/120 关键均线。
 
 样本：亚翔集成 603929（仅两买点）
   - 2026-03-12 回踩 MA60（二调低点）
@@ -15,10 +15,10 @@ from app.scanner import KlineRow, _is_st, _vol_ratio_at
 MODE38_ID = "mode38"
 MODE38_FULL_NAME = "大牛股关键位回踩"
 MODE38_DISPLAY_NAME = f"{MODE38_ID}（{MODE38_FULL_NAME}）"
-MODE38_ONE_LINE = "前期大涨后回调，股价站稳 MA120/MA250 之上，低点踩 MA20/30/60/120"
+MODE38_ONE_LINE = "前期大涨后回调，股价站稳 MA120/MA250 之上，低点踩 MA10/20/30/60/120"
 
-SUPPORT_MAS: tuple[int, ...] = (20, 30, 60, 120)
-MIN_PULLBACK_BY_MA: Dict[int, float] = {20: 12.0, 30: 16.0, 60: 22.0, 120: 28.0}
+SUPPORT_MAS: tuple[int, ...] = (10, 20, 30, 60, 120)
+MIN_PULLBACK_BY_MA: Dict[int, float] = {10: 10.0, 20: 12.0, 30: 16.0, 60: 22.0, 120: 28.0}
 
 
 def mode38_default_kw() -> Dict[str, Any]:
@@ -29,6 +29,7 @@ def mode38_default_kw() -> Dict[str, Any]:
         min_rally_pct=80.0,
         pullback_min_pct=12.0,
         pullback_max_pct=38.0,
+        min_pullback_ma10_pct=10.0,
         min_pullback_ma20_pct=12.0,
         min_pullback_ma30_pct=16.0,
         min_pullback_ma60_pct=22.0,
@@ -111,7 +112,7 @@ def _pick_support_ma(
             candidates.append((abs(dist), period, ma, dist))
     if not candidates:
         return None
-    # 同等距离优先更深均线（120>60>30>20）
+    # 同等距离优先更深均线（120>60>30>20>10）
     candidates.sort(key=lambda x: (x[0], -x[1]))
     _, period, ma, dist = candidates[0]
     return {
@@ -295,8 +296,10 @@ def score_mode38_bull_ma_pullback(
         score += 8.0
     elif sup >= 30:
         score += 6.0
-    else:
+    elif sup >= 20:
         score += 4.0
+    else:
+        score += 3.0
     if float(m["support_ma_slope_pct"]) > 3.0:
         score += 6.0
     if float(m["ma120_slope_pct"]) > 3.0:

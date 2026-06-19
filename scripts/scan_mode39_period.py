@@ -125,6 +125,8 @@ def main() -> None:
         "lower_shadow_ratio",
         "vol_shrink_ratio",
         "low",
+        "ma45",
+        "ma45_slope_pct",
     ]
     with open(out_path, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")

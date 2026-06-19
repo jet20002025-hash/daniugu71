@@ -6248,7 +6248,13 @@ def scan_with_mode3(
         elif use_mode39:
             st = str(start_date).strip()[:10] if start_date else ""
             ed = str(end_date).strip()[:10] if end_date else ""
-            start_i = max(140, int(mode39_kw.get("anchor_lookback_max", 120) or 120) + 5)
+            start_i = max(
+                160,
+                int(mode39_kw.get("anchor_lookback_max", 120) or 120)
+                + int(mode39_kw.get("ma45_period", 45) or 45)
+                + int(mode39_kw.get("ma45_slope_days", 10) or 10)
+                + 5,
+            )
             signals = []
             for i in range(start_i, len(rows) - 1):
                 d = str(rows[i].date)[:10]
@@ -7179,7 +7185,11 @@ def scan_with_mode3(
                 m39 = _mode39_metrics(rows, idx, item.code, item.name, **mode39_kw)
                 style = m39.get("signal_style", "")
                 label = "锚点回踩小阳" if style == "near_anchor" else "长下影探底"
-                reasons.append(f"大阳锚点{label} 买点日{m39.get('exec_buy_date', buy_date)}开盘")
+                slope = m39.get("ma45_slope_pct")
+                slope_s = f"{float(slope):.2f}%" if slope is not None else "—"
+                reasons.append(
+                    f"大阳锚点{label} MA45向上({slope_s}) 买点日{m39.get('exec_buy_date', buy_date)}开盘"
+                )
             elif use_mode37:
                 reasons.append("回踩向上跳空缺口支撑区")
             elif use_mode36:
@@ -7460,6 +7470,7 @@ def _flatten_result_metrics(row: Dict[str, object]) -> Dict[str, object]:
         "buy_point_score",
         "has_limit_up_6d",
         "event_type",
+        "anchor_date",
     ):
         if row.get(k) in (None, "") and metrics.get(k) not in (None, ""):
             row[k] = metrics[k]
@@ -7476,6 +7487,7 @@ def serialize_results(results: List[ScanResult]) -> List[Dict[str, object]]:
             "first_signal_date": (r.metrics or {}).get("first_signal_date"),
             "has_limit_up_6d": (r.metrics or {}).get("has_limit_up_6d"),
             "event_type": (r.metrics or {}).get("event_type"),
+            "anchor_date": (r.metrics or {}).get("anchor_date"),
         }
         for r in results
     ]

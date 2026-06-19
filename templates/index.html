@@ -126,6 +126,7 @@
               <th>当天收盘价</th>
               <th title="信号日涨跌幅，T+1 不可当日交易仅供参考">涨跌幅%</th>
               <th title="本条记录对应的信号日或观察入池日">信号日</th>
+              <th title="放量大阳线锚点日（mode39 等）">锚点日</th>
               <th title="本次筛选区间内该股最早入池日；可与左侧信号日不同（如先观察后信号）">最早入池</th>
               <th title="信号日前最近6个交易日内是否出现过涨停（仅看有/无）">最近6日有涨停</th>
             </tr>
@@ -134,6 +135,7 @@
             {% for row in results %}
             {% set m = row.get("metrics") or {} %}
             {% set sig_date = row.get("signal_date") or m.get("signal_date") %}
+            {% set anchor_date = row.get("anchor_date") or m.get("anchor_date") %}
             {% set first_pool = row.get("first_signal_date") or m.get("first_signal_date") %}
             <tr class="stock-row" data-code="{{ row.code }}" data-name="{{ row.name }}">
               <td>{{ row.code }}</td>
@@ -143,6 +145,7 @@
               <td>{{ "%.2f" % row.latest_close }}</td>
               <td class="pct">{{ "%.2f" % row.change_pct }}</td>
               <td>{{ sig_date or "—" }}</td>
+              <td>{{ anchor_date or "—" }}</td>
               <td>
                 {% if first_pool and first_pool != sig_date %}
                   {{ first_pool }}
@@ -160,7 +163,7 @@
             </tr>
             {% else %}
             <tr>
-              <td colspan="9" class="empty">暂无结果，点击上方按钮开始筛选。</td>
+              <td colspan="10" class="empty">暂无结果，点击上方按钮开始筛选。</td>
             </tr>
             {% endfor %}
           </tbody>
@@ -231,7 +234,7 @@
     const HINT_MODE38 =
       '选股原则（mode38 大牛股关键位回踩）：前期大涨（≥80%）后回调，收盘价须在 MA120、MA250 之上；低点踩 MA10/20/30/60/120（±5%）；MA10回撤≥10%、MA20≥12%、MA30≥16%、MA60≥22%、MA120≥28%；须为波段最低点且次日低点抬高；近3日无>8%大涨。建议最低分≥60。';
     const HINT_MODE39 =
-      '选股原则（mode39 大阳锚点回踩再升）：放量大阳作锚；拉升后回踩锚点收盘±3%小阳/十字企稳，或深调后长下影探底；信号日确认后次日开盘买；激进可盘中突破信号日最高价。破锚点收盘或破10日均线止损。建议最低分≥60。';
+      '选股原则（mode39 大阳锚点回踩再升）：放量大阳作锚；拉升后回踩锚点收盘±3%小阳/十字企稳，或深调后长下影探底；信号日 MA45 须向上（近10日斜率>0）；信号日确认后次日开盘买；激进可盘中突破信号日最高价。破锚点收盘或破10日均线止损。建议最低分≥60。';
     function updateModeHint() {
       const el = document.getElementById('scan-hint');
       const modeEl = document.getElementById('mode');

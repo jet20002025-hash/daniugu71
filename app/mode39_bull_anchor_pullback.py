@@ -21,7 +21,7 @@ MODE39_FULL_NAME = "大阳锚点回踩再升"
 MODE39_DISPLAY_NAME = f"{MODE39_ID}（{MODE39_FULL_NAME}）"
 MODE39_ONE_LINE = (
     "放量大阳作锚；拉升后回踩锚点收盘企稳（小阳/十字）或长下影探底；"
-    "信号日确认后次日开盘买"
+    "MA45 向上；信号日确认后次日开盘买"
 )
 
 
@@ -45,6 +45,10 @@ def mode39_default_kw() -> Dict[str, Any]:
         long_body_ratio_max=0.30,
         require_trough_confirm=True,
         shrink_vol_max=1.15,
+        require_ma45_up=True,
+        ma45_period=45,
+        ma45_slope_days=10,
+        min_ma45_slope_pct=0.0,
         min_score=60,
     )
 
@@ -63,6 +67,33 @@ def mode39_kw_from_scan_config(cfg: Any) -> Dict[str, Any]:
 def _row_volume(rows: List[KlineRow], idx: int) -> float:
     r = rows[idx]
     return float(getattr(r, "volume", 0) or getattr(r, "vol", 0) or 0)
+
+
+def _ma_at(closes: np.ndarray, idx: int, n: int) -> float:
+    if idx < n - 1:
+        return float("nan")
+    return float(np.mean(closes[idx - n + 1 : idx + 1]))
+
+
+def _ma_slope_pct(closes: np.ndarray, idx: int, n: int, look: int) -> float:
+    v0 = _ma_at(closes, idx - look, n) if idx >= look + n - 1 else float("nan")
+    v1 = _ma_at(closes, idx, n)
+    if np.isnan(v0) or v0 <= 0 or np.isnan(v1):
+        return 0.0
+    return (v1 / v0 - 1.0) * 100.0
+
+
+def _ma45_up_ok(closes: np.ndarray, idx: int, kw: Dict[str, Any]) -> tuple[bool, float, float]:
+    period = int(kw.get("ma45_period", 45) or 45)
+    look = int(kw.get("ma45_slope_days", 10) or 10)
+    min_slope = float(kw.get("min_ma45_slope_pct", 0.0) or 0.0)
+    ma_now = _ma_at(closes, idx, period)
+    slope = _ma_slope_pct(closes, idx, period, look)
+    if np.isnan(ma_now) or ma_now <= 0:
+        return False, 0.0, slope
+    if slope <= min_slope:
+        return False, ma_now, slope
+    return True, ma_now, slope
 
 
 def _bar_ratios(r: KlineRow) -> tuple[float, float, float]:
@@ -196,9 +227,20 @@ def match_mode39_bull_anchor_pullback(
     kw.update({k: v for k, v in kwargs.items() if k in kw or k.startswith("mode39")})
 
     vol_ma = int(kw["vol_ma"])
-    min_len = int(kw["anchor_lookback_max"]) + vol_ma + 5
+    ma45_period = int(kw.get("ma45_period", 45) or 45)
+    ma45_look = int(kw.get("ma45_slope_days", 10) or 10)
+    min_len = int(kw["anchor_lookback_max"]) + max(vol_ma, ma45_period + ma45_look) + 5
     if idx < min_len or idx >= len(rows):
         return None
+
+    closes = np.array([float(r.close) for r in rows], dtype=float)
+    if kw.get("require_ma45_up", True):
+        ok_ma45, ma45_val, ma45_slope = _ma45_up_ok(closes, idx, kw)
+        if not ok_ma45:
+            return None
+    else:
+        ma45_val = _ma_at(closes, idx, ma45_period)
+        ma45_slope = _ma_slope_pct(closes, idx, ma45_period, ma45_look)
 
     picked = _pick_anchor(rows, idx, code, name, kw)
     if picked is None:
@@ -220,7 +262,6 @@ def match_mode39_bull_anchor_pullback(
     if pullback_peak_pct < float(kw["min_pullback_from_peak_pct"]):
         return None
 
-    closes = np.array([float(r.close) for r in rows], dtype=float)
     lows = np.array([float(r.low) for r in rows], dtype=float)
     vols = np.array([_row_volume(rows, j) for j in range(len(rows))], dtype=float)
 
@@ -298,6 +339,8 @@ def match_mode39_bull_anchor_pullback(
         "exec_buy_open": exec_open,
         "buy_trigger_above": cur_high,
         "phase_days": float(idx - anchor_i),
+        "ma45": ma45_val,
+        "ma45_slope_pct": ma45_slope,
     }
 
 
@@ -335,6 +378,10 @@ def score_mode39_bull_anchor_pullback(
         score += 6.0
     if float(m["pct_chg"]) > 0:
         score += 4.0
+    if float(m.get("ma45_slope_pct", 0) or 0) > 3.0:
+        score += 6.0
+    elif float(m.get("ma45_slope_pct", 0) or 0) > 0:
+        score += 3.0
     return int(min(100, max(0, round(score))))
 
 
@@ -365,6 +412,8 @@ def mode39_signal_metrics(
         "exec_buy_date": m["exec_buy_date"],
         "exec_buy_open": round(float(m["exec_buy_open"]), 4),
         "buy_trigger_above": round(float(m["buy_trigger_above"]), 4),
+        "ma45": round(float(m.get("ma45", 0) or 0), 4),
+        "ma45_slope_pct": round(float(m.get("ma45_slope_pct", 0) or 0), 2),
     }
 
 

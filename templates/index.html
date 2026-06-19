@@ -230,6 +230,8 @@
       '选股原则（mode37 跳空缺口支撑）：缺口未回补（低点不破下沿）；回踩缺口区且KDJ(8,2,2) J上拐。回补过的缺口支撑弱，不选。建议最低分≥60。';
     const HINT_MODE38 =
       '选股原则（mode38 大牛股关键位回踩）：前期大涨（≥80%）后回调，收盘价须在 MA120、MA250 之上；低点踩 MA10/20/30/60/120（±5%）；MA10回撤≥10%、MA20≥12%、MA30≥16%、MA60≥22%、MA120≥28%；须为波段最低点且次日低点抬高；近3日无>8%大涨。建议最低分≥60。';
+    const HINT_MODE39 =
+      '选股原则（mode39 大阳锚点回踩再升）：放量大阳作锚；拉升后回踩锚点收盘±3%小阳/十字企稳，或深调后长下影探底；信号日确认后次日开盘买；激进可盘中突破信号日最高价。破锚点收盘或破10日均线止损。建议最低分≥60。';
     function updateModeHint() {
       const el = document.getElementById('scan-hint');
       const modeEl = document.getElementById('mode');
@@ -238,6 +240,7 @@
       else if (modeEl.value === 'mode35') el.textContent = HINT_MODE35;
       else if (modeEl.value === 'mode36') el.textContent = HINT_MODE36;
       else if (modeEl.value === 'mode38') el.textContent = HINT_MODE38;
+      else if (modeEl.value === 'mode39') el.textContent = HINT_MODE39;
       else if (modeEl.value === 'mode37') el.textContent = HINT_MODE37;
       else el.textContent = HINT_DEFAULT;
     }

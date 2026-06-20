@@ -1,9 +1,12 @@
-"""mode39 大阳锚点回踩再升：放量大阳线作锚，回踩锚点收盘附近企稳后再攀升。
+"""mode39 大阳锚点回踩再升：放量大阳线作锚，回踩锚点收盘或阳线起点附近企稳后再攀升。
 
 样本：宇瞳光学 300790
   - 2026-04-08 放量大阳锚点（收盘 28.42）
   - 2026-04-29 贴近锚点小十字企稳 → 买点 4/30 开盘
   - 2026-06-10 长下影十字探底 → 买点 6/11 开盘
+样本：世名科技 300522
+  - 2026-04-07 放量大阳锚点（低 10.99 / 开 11.06 / 收 11.94）
+  - 2026-06-08 最低价踩锚点低企稳（低 10.93）→ 买点 6/09 开盘
 
 买点（默认）：信号日收盘确认企稳后，**次日开盘价**买入。
 激进买点：信号日最高价（盘中突破试仓，见 buy_trigger_above）。
@@ -20,7 +23,7 @@ MODE39_ID = "mode39"
 MODE39_FULL_NAME = "大阳锚点回踩再升"
 MODE39_DISPLAY_NAME = f"{MODE39_ID}（{MODE39_FULL_NAME}）"
 MODE39_ONE_LINE = (
-    "放量大阳作锚；拉升后回踩锚点收盘企稳（小阳/十字）或长下影探底；"
+    "放量大阳作锚；拉升后回踩锚点收盘、阳线起点或锚点最低价企稳；"
     "MA45 向上；信号日确认后次日开盘买"
 )
 
@@ -36,12 +39,17 @@ def mode39_default_kw() -> Dict[str, Any]:
         min_rally_pct=8.0,
         min_pullback_from_peak_pct=5.0,
         near_anchor_pct=3.0,
-        anchor_close_floor=0.97,
+        near_anchor_open_pct=5.0,
+        near_anchor_low_pct=3.0,
+        anchor_low_floor=0.97,
+        pullback_open_stabilize_pct_max=5.0,
+        pullback_open_min_shadow=0.20,
         stabilize_body_ratio_max=0.45,
         stabilize_pct_max=3.5,
         deep_pullback_from_peak_pct=15.0,
         deep_close_floor=0.72,
         long_shadow_ratio_min=0.55,
+        long_shadow_max_above_anchor_pct=3.0,
         long_body_ratio_max=0.30,
         require_trough_confirm=True,
         shrink_vol_max=1.15,
@@ -246,8 +254,10 @@ def match_mode39_bull_anchor_pullback(
     if picked is None:
         return None
     anchor_i, anchor_close, post_peak, rally_pct = picked
-    anchor_low = float(rows[anchor_i].low)
-    anchor_date = str(rows[anchor_i].date)[:10]
+    anchor_row = rows[anchor_i]
+    anchor_open = float(anchor_row.open)
+    anchor_low = float(anchor_row.low)
+    anchor_date = str(anchor_row.date)[:10]
 
     cur = rows[idx]
     cur_low = float(cur.low)
@@ -265,30 +275,69 @@ def match_mode39_bull_anchor_pullback(
     lows = np.array([float(r.low) for r in rows], dtype=float)
     vols = np.array([_row_volume(rows, j) for j in range(len(rows))], dtype=float)
 
-    anchor_dist_pct = (cur_close - anchor_close) / anchor_close * 100.0
+    anchor_dist_close_pct = (cur_close - anchor_close) / anchor_close * 100.0
+    anchor_dist_open_pct = (
+        (cur_close - anchor_open) / anchor_open * 100.0 if anchor_open > 0 else 0.0
+    )
+    anchor_low_dist_pct = (
+        (cur_low - anchor_low) / anchor_low * 100.0 if anchor_low > 0 else 0.0
+    )
+    anchor_dist_pct = anchor_dist_close_pct
     signal_style: Optional[str] = None
 
-    near_ok = (
-        abs(anchor_dist_pct) <= float(kw["near_anchor_pct"])
-        and _is_near_anchor_stabilize(
+    near_close = abs(anchor_dist_close_pct) <= float(kw["near_anchor_pct"])
+    near_open = abs(anchor_dist_open_pct) <= float(kw.get("near_anchor_open_pct", 5.0) or 5.0)
+    near_low = abs(anchor_low_dist_pct) <= float(kw.get("near_anchor_low_pct", 3.0) or 3.0)
+    low_floor = float(kw.get("anchor_low_floor", 0.97) or 0.97)
+    seg_lows = lows[anchor_i + 1 : idx + 1]
+    lows_ok = len(seg_lows) == 0 or float(np.min(seg_lows)) >= anchor_low * low_floor
+
+    def _stab_for_pullback() -> bool:
+        ok = _is_near_anchor_stabilize(
             cur,
             stabilize_body_ratio_max=float(kw["stabilize_body_ratio_max"]),
-            stabilize_pct_max=float(kw["stabilize_pct_max"]),
+            stabilize_pct_max=float(kw.get("pullback_open_stabilize_pct_max", 5.0) or 5.0),
         )
+        if ok:
+            return True
+        min_shadow = float(kw.get("pullback_open_min_shadow", 0.20) or 0.20)
+        return (
+            abs(pct) <= float(kw.get("pullback_open_stabilize_pct_max", 5.0) or 5.0)
+            and lower_shadow >= min_shadow
+        )
+
+    stab_close = _is_near_anchor_stabilize(
+        cur,
+        stabilize_body_ratio_max=float(kw["stabilize_body_ratio_max"]),
+        stabilize_pct_max=float(kw["stabilize_pct_max"]),
     )
-    if near_ok:
-        seg = closes[anchor_i + 1 : idx]
-        if len(seg) > 0 and float(np.min(seg)) < anchor_close * float(kw["anchor_close_floor"]):
-            near_ok = False
+    stab_pullback = _stab_for_pullback()
+
+    near_ok = lows_ok and (
+        (near_close and stab_close)
+        or (near_open and not near_close and stab_pullback)
+        or (near_low and not near_close and stab_pullback)
+    )
 
     if near_ok:
-        signal_style = "near_anchor"
+        if near_close:
+            signal_style = "near_anchor_close"
+            anchor_dist_pct = anchor_dist_close_pct
+        elif near_low:
+            signal_style = "near_anchor_low"
+            anchor_dist_pct = anchor_low_dist_pct
+        else:
+            signal_style = "near_anchor_open"
+            anchor_dist_pct = anchor_dist_open_pct
     else:
         deep_pb = float(kw["deep_pullback_from_peak_pct"])
         deep_floor = float(kw["deep_close_floor"])
+        max_above = float(kw.get("long_shadow_max_above_anchor_pct", kw["near_anchor_pct"]))
         if (
             pullback_peak_pct >= deep_pb
-            and cur_close >= anchor_close * deep_floor
+            and cur_close >= anchor_low * deep_floor
+            and anchor_dist_close_pct <= max_above
+            and anchor_dist_open_pct <= max_above
             and _is_long_shadow_stabilize(
                 cur,
                 long_shadow_ratio_min=float(kw["long_shadow_ratio_min"]),
@@ -318,8 +367,12 @@ def match_mode39_bull_anchor_pullback(
 
     return {
         "anchor_date": anchor_date,
+        "anchor_open": anchor_open,
         "anchor_close": anchor_close,
         "anchor_low": anchor_low,
+        "anchor_dist_close_pct": anchor_dist_close_pct,
+        "anchor_dist_open_pct": anchor_dist_open_pct,
+        "anchor_low_dist_pct": anchor_low_dist_pct,
         "post_peak": post_peak,
         "peak_date": str(rows[peak_i].date)[:10],
         "rally_pct": rally_pct,
@@ -361,12 +414,16 @@ def score_mode39_bull_anchor_pullback(
         score += 10.0
     elif 5.0 <= pb <= 35.0:
         score += 6.0
-    dist = abs(float(m["anchor_dist_pct"]))
+    dist = min(
+        abs(float(m.get("anchor_dist_close_pct", m["anchor_dist_pct"]) or 0)),
+        abs(float(m.get("anchor_dist_open_pct", m["anchor_dist_pct"]) or 0)),
+        abs(float(m.get("anchor_low_dist_pct", m["anchor_dist_pct"]) or 0)),
+    )
     if dist <= 1.0:
         score += 16.0
     elif dist <= 2.0:
         score += 12.0
-    elif dist <= float(kwargs.get("near_anchor_pct", 3.0) or 3.0):
+    elif dist <= float(kwargs.get("near_anchor_open_pct", 5.0) or 5.0):
         score += 8.0
     if m["signal_style"] == "long_shadow":
         score += min(12.0, float(m["lower_shadow_ratio"]) * 12.0)
@@ -397,11 +454,15 @@ def mode39_signal_metrics(
         return {}
     return {
         "anchor_date": m["anchor_date"],
+        "anchor_open": round(float(m.get("anchor_open", 0) or 0), 4),
         "anchor_close": round(float(m["anchor_close"]), 4),
         "peak_date": m["peak_date"],
         "rally_pct": round(float(m["rally_pct"]), 2),
         "pullback_peak_pct": round(float(m["pullback_peak_pct"]), 2),
         "anchor_dist_pct": round(float(m["anchor_dist_pct"]), 2),
+        "anchor_dist_close_pct": round(float(m.get("anchor_dist_close_pct", m["anchor_dist_pct"])), 2),
+        "anchor_dist_open_pct": round(float(m.get("anchor_dist_open_pct", 0) or 0), 2),
+        "anchor_low_dist_pct": round(float(m.get("anchor_low_dist_pct", 0) or 0), 2),
         "signal_style": m["signal_style"],
         "pct_chg": round(float(m["pct_chg"]), 2),
         "body_ratio": round(float(m["body_ratio"]), 2),

@@ -2,7 +2,7 @@ import json
 import math
 import os
 from dataclasses import dataclass, asdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 import numpy as np
@@ -6199,13 +6199,17 @@ def scan_with_mode3(
         if end_date:
             filtered = []
             end_dt = _parse_date(end_date)
+            scan_end_dt = end_dt
+            # mode39 等信号日 T+1 企稳确认，截止日当日也需多读几天 K 线
+            if end_dt and (use_mode39 or use_mode38):
+                scan_end_dt = end_dt + timedelta(days=8)
             if end_dt:
                 for row in rows:
                     try:
                         row_dt = datetime.strptime(row.date, "%Y-%m-%d").date()
                     except Exception:
                         continue
-                    if row_dt <= end_dt:
+                    if row_dt <= scan_end_dt:
                         filtered.append(row)
                 rows = filtered
 
@@ -6256,7 +6260,7 @@ def scan_with_mode3(
                 + 5,
             )
             signals = []
-            for i in range(start_i, len(rows) - 1):
+            for i in range(start_i, len(rows)):
                 d = str(rows[i].date)[:10]
                 if st and d < st:
                     continue

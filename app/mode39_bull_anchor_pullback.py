@@ -23,8 +23,8 @@ MODE39_ID = "mode39"
 MODE39_FULL_NAME = "大阳锚点回踩再升"
 MODE39_DISPLAY_NAME = f"{MODE39_ID}（{MODE39_FULL_NAME}）"
 MODE39_ONE_LINE = (
-    "放量大阳作锚；拉升后回踩锚点收盘、阳线起点或锚点最低价企稳；"
-    "MA45 向上；信号日确认后次日开盘买"
+    "放量大阳作锚；锚点至信号日之间最低价不低于锚点日最低价×0.97；"
+    "回踩锚点收盘、阳线起点或锚点最低价企稳；MA45 向上；信号日确认后次日开盘买"
 )
 
 
@@ -44,6 +44,7 @@ def mode39_default_kw() -> Dict[str, Any]:
         anchor_low_floor=0.97,
         pullback_open_stabilize_pct_max=5.0,
         pullback_open_min_shadow=0.20,
+        anchor_pick_max_dist_pct=15.0,
         stabilize_body_ratio_max=0.45,
         stabilize_pct_max=3.5,
         deep_pullback_from_peak_pct=15.0,
@@ -176,6 +177,135 @@ def _is_long_shadow_stabilize(
     return True
 
 
+def _rally_lows_ok(
+    rows: List[KlineRow],
+    anchor_i: int,
+    idx: int,
+    anchor_low: float,
+    kw: Dict[str, Any],
+) -> bool:
+    """锚点日与信号日之间（不含两端）最低价不低于锚点日最低价×anchor_low_floor（默认 0.97，即最多下浮 3%）。"""
+    if anchor_low <= 0 or idx <= anchor_i + 1:
+        return True
+    lows = np.array([float(r.low) for r in rows], dtype=float)
+    seg = lows[anchor_i + 1 : idx]
+    if len(seg) == 0:
+        return True
+    floor_mult = float(kw.get("anchor_low_floor", 0.97) or 0.97)
+    return float(np.min(seg)) >= anchor_low * floor_mult
+
+
+def _anchor_near_dist_pct(rows: List[KlineRow], anchor_i: int, idx: int) -> float:
+    """信号日价格相对锚点收盘/开盘/最低价的最近距离（%，取绝对值最小）。"""
+    ar = rows[anchor_i]
+    cur = rows[idx]
+    ac = float(ar.close)
+    ao = float(ar.open)
+    al = float(ar.low)
+    cc = float(cur.close)
+    cl = float(cur.low)
+    if ac <= 0 or ao <= 0 or al <= 0:
+        return 999.0
+    return min(
+        abs((cc - ac) / ac * 100.0),
+        abs((cc - ao) / ao * 100.0),
+        abs((cl - al) / al * 100.0),
+    )
+
+
+def _anchor_signal_style_at(
+    rows: List[KlineRow],
+    anchor_i: int,
+    idx: int,
+    kw: Dict[str, Any],
+) -> Optional[str]:
+    """判断信号日相对指定锚点是否满足回踩企稳或长下影探底形态。"""
+    if anchor_i >= idx:
+        return None
+    anchor_row = rows[anchor_i]
+    anchor_open = float(anchor_row.open)
+    anchor_close = float(anchor_row.close)
+    anchor_low = float(anchor_row.low)
+    if anchor_close <= 0 or anchor_open <= 0 or anchor_low <= 0:
+        return None
+
+    highs = np.array([float(r.high) for r in rows], dtype=float)
+    lows = np.array([float(r.low) for r in rows], dtype=float)
+    post_peak = float(np.max(highs[anchor_i : idx + 1]))
+    if post_peak <= 0:
+        return None
+
+    cur = rows[idx]
+    cur_low = float(cur.low)
+    cur_close = float(cur.close)
+    pct = float(getattr(cur, "pct_chg", 0.0) or 0.0)
+    body, lower_shadow, _ = _bar_ratios(cur)
+
+    pullback_peak_pct = (post_peak - cur_low) / post_peak * 100.0
+    if pullback_peak_pct < float(kw["min_pullback_from_peak_pct"]):
+        return None
+
+    anchor_dist_close_pct = (cur_close - anchor_close) / anchor_close * 100.0
+    anchor_dist_open_pct = (cur_close - anchor_open) / anchor_open * 100.0
+    anchor_low_dist_pct = (cur_low - anchor_low) / anchor_low * 100.0
+
+    if not _rally_lows_ok(rows, anchor_i, idx, anchor_low, kw):
+        return None
+
+    near_close = abs(anchor_dist_close_pct) <= float(kw["near_anchor_pct"])
+    near_open = abs(anchor_dist_open_pct) <= float(kw.get("near_anchor_open_pct", 5.0) or 5.0)
+    near_low = abs(anchor_low_dist_pct) <= float(kw.get("near_anchor_low_pct", 3.0) or 3.0)
+
+    def _stab_for_pullback() -> bool:
+        ok = _is_near_anchor_stabilize(
+            cur,
+            stabilize_body_ratio_max=float(kw["stabilize_body_ratio_max"]),
+            stabilize_pct_max=float(kw.get("pullback_open_stabilize_pct_max", 5.0) or 5.0),
+        )
+        if ok:
+            return True
+        min_shadow = float(kw.get("pullback_open_min_shadow", 0.20) or 0.20)
+        return (
+            abs(pct) <= float(kw.get("pullback_open_stabilize_pct_max", 5.0) or 5.0)
+            and lower_shadow >= min_shadow
+        )
+
+    stab_close = _is_near_anchor_stabilize(
+        cur,
+        stabilize_body_ratio_max=float(kw["stabilize_body_ratio_max"]),
+        stabilize_pct_max=float(kw["stabilize_pct_max"]),
+    )
+    stab_pullback = _stab_for_pullback()
+
+    if (
+        (near_close and stab_close)
+        or (near_open and not near_close and stab_pullback)
+        or (near_low and not near_close and stab_pullback)
+    ):
+        if near_close:
+            return "near_anchor_close"
+        if near_low:
+            return "near_anchor_low"
+        return "near_anchor_open"
+
+    deep_pb = float(kw["deep_pullback_from_peak_pct"])
+    deep_floor = float(kw["deep_close_floor"])
+    max_above = float(kw.get("long_shadow_max_above_anchor_pct", kw["near_anchor_pct"]))
+    if (
+        pullback_peak_pct >= deep_pb
+        and cur_close >= anchor_low * deep_floor
+        and anchor_dist_close_pct <= max_above
+        and anchor_dist_open_pct <= max_above
+        and _is_long_shadow_stabilize(
+            cur,
+            long_shadow_ratio_min=float(kw["long_shadow_ratio_min"]),
+            long_body_ratio_max=float(kw["long_body_ratio_max"]),
+        )
+    ):
+        return "long_shadow"
+    return None
+
+
 def _pick_anchor(
     rows: List[KlineRow],
     idx: int,
@@ -190,8 +320,8 @@ def _pick_anchor(
         return None
     highs = np.array([float(r.high) for r in rows], dtype=float)
     closes = np.array([float(r.close) for r in rows], dtype=float)
-    best: Optional[tuple[float, float, int, float, float, float]] = None
     min_rally = float(kw["min_rally_pct"])
+    candidates: list[tuple[float, int, float, float, float]] = []
     for j in range(hi, lo - 1, -1):
         if not _is_big_yang_anchor(
             rows,
@@ -211,14 +341,43 @@ def _pick_anchor(
         rally_pct = (post_peak - anchor_close) / anchor_close * 100.0
         if rally_pct < min_rally:
             continue
-        anchor_pct = float(getattr(rows[j], "pct_chg", 0.0) or 0.0)
-        dist = abs(float(closes[idx]) - anchor_close) / anchor_close
-        key = (-anchor_pct, dist, -j)
-        if best is None or key < best[:3]:
-            best = (key[0], key[1], j, anchor_close, post_peak, rally_pct)
-    if best is None:
+        near_dist = _anchor_near_dist_pct(rows, j, idx)
+        candidates.append((near_dist, j, anchor_close, post_peak, rally_pct))
+
+    if not candidates:
         return None
-    _, _, j, ac, peak, rally = best
+    max_pick_dist = float(kw.get("anchor_pick_max_dist_pct", 15.0) or 15.0)
+    in_zone = [c for c in candidates if c[0] <= max_pick_dist]
+    if not in_zone:
+        return None
+
+    recent_j = max(c[1] for c in in_zone)
+    style_recent = _anchor_signal_style_at(rows, recent_j, idx, kw)
+    styled: list[tuple[str, tuple[float, int, float, float, float]]] = []
+    for c in in_zone:
+        st = _anchor_signal_style_at(rows, c[1], idx, kw)
+        if st:
+            styled.append((st, c))
+
+    if style_recent:
+        pool = [x for x in styled if x[1][1] == recent_j]
+        if not pool:
+            pool = styled
+    else:
+        near_thr = float(kw["near_anchor_pct"])
+        pool = [x for x in styled if x[0].startswith("near_anchor") and x[1][0] <= near_thr]
+        if not pool:
+            return None
+
+    near_pool = [x for x in pool if x[0].startswith("near_anchor")]
+    if near_pool:
+        _, c = min(near_pool, key=lambda x: (x[1][0], -x[1][1]))
+    else:
+        long_pool = [x for x in pool if x[0] == "long_shadow"]
+        if not long_pool:
+            return None
+        _, c = max(long_pool, key=lambda x: x[1][1])
+    _, j, ac, peak, rally = c
     return j, ac, peak, rally
 
 
@@ -288,9 +447,9 @@ def match_mode39_bull_anchor_pullback(
     near_close = abs(anchor_dist_close_pct) <= float(kw["near_anchor_pct"])
     near_open = abs(anchor_dist_open_pct) <= float(kw.get("near_anchor_open_pct", 5.0) or 5.0)
     near_low = abs(anchor_low_dist_pct) <= float(kw.get("near_anchor_low_pct", 3.0) or 3.0)
-    low_floor = float(kw.get("anchor_low_floor", 0.97) or 0.97)
-    seg_lows = lows[anchor_i + 1 : idx + 1]
-    lows_ok = len(seg_lows) == 0 or float(np.min(seg_lows)) >= anchor_low * low_floor
+
+    if not _rally_lows_ok(rows, anchor_i, idx, anchor_low, kw):
+        return None
 
     def _stab_for_pullback() -> bool:
         ok = _is_near_anchor_stabilize(
@@ -313,7 +472,7 @@ def match_mode39_bull_anchor_pullback(
     )
     stab_pullback = _stab_for_pullback()
 
-    near_ok = lows_ok and (
+    near_ok = (
         (near_close and stab_close)
         or (near_open and not near_close and stab_pullback)
         or (near_low and not near_close and stab_pullback)

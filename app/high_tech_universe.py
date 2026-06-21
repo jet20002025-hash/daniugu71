@@ -80,16 +80,31 @@ def load_high_tech_universe(path: str = HIGH_TECH_UNIVERSE_JSON) -> Optional[Dic
     return data if isinstance(data, dict) else None
 
 
+def _load_high_tech_codes_from_csv(path: str = HIGH_TECH_STOCK_LIST_CSV) -> Set[str]:
+    """从 high_tech_stock_list.csv 读取代码（JSON 缺失时的回退）。"""
+    if not os.path.isfile(path):
+        return set()
+    codes: Set[str] = set()
+    with open(path, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            code = str(row.get("code", "")).strip().zfill(6)
+            if code.isdigit() and len(code) == 6:
+                codes.add(code)
+    return codes
+
+
 def high_tech_code_set(path: str = HIGH_TECH_UNIVERSE_JSON) -> Set[str]:
     data = load_high_tech_universe(path)
-    if not data:
-        return set()
     out: Set[str] = set()
-    for row in data.get("stocks", []) or []:
-        code = str(row.get("code", "")).strip().zfill(6)
-        if code.isdigit() and len(code) == 6:
-            out.add(code)
-    return out
+    if data:
+        for row in data.get("stocks", []) or []:
+            code = str(row.get("code", "")).strip().zfill(6)
+            if code.isdigit() and len(code) == 6:
+                out.add(code)
+    if out:
+        return out
+    return _load_high_tech_codes_from_csv()
 
 
 def filter_codes(codes: List[str], path: str = HIGH_TECH_UNIVERSE_JSON) -> List[str]:
@@ -105,12 +120,27 @@ def in_high_tech_universe(code: str, path: str = HIGH_TECH_UNIVERSE_JSON) -> boo
 
 def high_tech_universe_count(path: str = HIGH_TECH_UNIVERSE_JSON) -> int:
     data = load_high_tech_universe(path)
-    if not data:
-        return 0
-    try:
-        return int(data.get("total", 0) or 0)
-    except (TypeError, ValueError):
-        return 0
+    if data:
+        try:
+            n = int(data.get("total", 0) or 0)
+            if n > 0:
+                return n
+        except (TypeError, ValueError):
+            pass
+        stocks = data.get("stocks") or []
+        if isinstance(stocks, list) and stocks:
+            return len(stocks)
+    return len(_load_high_tech_codes_from_csv())
+
+
+def high_tech_data_paths() -> Dict[str, str]:
+    """当前生效的高科技池文件路径（便于排错）。"""
+    return {
+        "GPT_DATA_DIR": GPT_DATA_DIR,
+        "universe_json": HIGH_TECH_UNIVERSE_JSON,
+        "stock_list_csv": HIGH_TECH_STOCK_LIST_CSV,
+        "blocks_json": HIGH_TECH_BLOCKS_JSON,
+    }
 
 
 def filter_stock_items(items: List[Any], path: str = HIGH_TECH_UNIVERSE_JSON) -> List[Any]:

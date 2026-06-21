@@ -382,8 +382,12 @@ python -m scripts.prefetch_kline_tencent --count 1200 --max-age-days 0
 ```bash
 cd /var/www/stock-app
 git pull
+export GPT_DATA_DIR=/data/gpt   # 与 systemd 一致
+bash scripts/install_high_tech_pool.sh
 sudo systemctl restart stock-app
 ```
+
+**高科技股票池**：K 线与列表在 `GPT_DATA_DIR`（如 `/data/gpt`），`git pull` 不会自动更新该目录。启用网站「仅高科技板块」前，每次拉取含池子更新的代码后执行 `bash scripts/install_high_tech_pool.sh`（或手动复制 `data/gpt/high_tech_*` 到 `/data/gpt`）。
 
 - 若要做简单 CI/CD，可在 GitHub Actions 里对 main 分支执行 ssh 到 ECS、git pull、restart service 的步骤（需在 repo 中配置 SSH key 或 token）。
 
@@ -395,6 +399,7 @@ sudo systemctl restart stock-app
 - [ ] 域名 A 记录指向 ECS 公网 IP
 - [ ] `SECRET_KEY`、`GPT_DATA_DIR`、`ADMIN_USERNAMES` 已配置
 - [ ] `/data/gpt` 下已有 stock_list、K 线缓存等（或已跑过全量 prefetch）
+- [ ] 已执行 `install_high_tech_pool.sh`（若使用高科技板块筛选）
 - [ ] Gunicorn（systemd）与 Nginx 正常，HTTPS 已配置
 - [ ] 每日 K 线 cron 已添加并测试一次
 - [ ] 管理员账号已注册并配置为 `ADMIN_USERNAMES`，能登录并打开管理后台

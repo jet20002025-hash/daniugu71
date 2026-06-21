@@ -953,8 +953,13 @@ def run_mode3_scan(
         if high_tech_only:
             ht_pool = high_tech_universe_count()
             if ht_pool <= 0:
+                from app.high_tech_universe import high_tech_data_paths
+
+                paths = high_tech_data_paths()
                 raise RuntimeError(
-                    "高科技股票池为空，请先运行: python3 scripts/build_high_tech_universe.py"
+                    "高科技股票池为空。生产环境请将仓库 data/gpt/high_tech_* 复制到 GPT_DATA_DIR，"
+                    "或运行: bash scripts/install_high_tech_pool.sh\n"
+                    f"当前 GPT_DATA_DIR={paths['GPT_DATA_DIR']}"
                 )
             stock_list = filter_stock_items(stock_list)
             if not stock_list:

@@ -90,6 +90,10 @@
           输出数量
           <input type="number" name="max_results" id="max_results" value="200" min="10" max="2000" />
         </label>
+        <div class="toggle-row">
+          <input type="checkbox" name="high_tech_only" id="high_tech_only" value="on" />
+          <span>仅高科技板块（{{ high_tech_total }} 只）</span>
+        </div>
         <button type="submit" class="primary">开始筛选</button>
       </form>
       <p class="hint" id="scan-hint">
@@ -187,6 +191,7 @@
         if (data.min_score) document.getElementById('min_score').value = data.min_score;
         if (data.max_market_cap !== undefined) document.getElementById('max_market_cap').value = data.max_market_cap;
         if (data.max_results) document.getElementById('max_results').value = data.max_results;
+        if (data.high_tech_only) document.getElementById('high_tech_only').checked = true;
       } catch (err) {
         // ignore
       }
@@ -199,7 +204,8 @@
         mode: document.getElementById('mode').value,
         min_score: document.getElementById('min_score').value,
         max_market_cap: document.getElementById('max_market_cap').value,
-        max_results: document.getElementById('max_results').value
+        max_results: document.getElementById('max_results').value,
+        high_tech_only: document.getElementById('high_tech_only').checked
       };
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));

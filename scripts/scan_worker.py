@@ -67,7 +67,8 @@ def run_one():
             workers=int(cfg.get("workers", 6)),
             max_market_cap=cap,
         )
-        mode = payload.get("mode", "mode3")
+        mode = cfg.get("mode", "mode3")
+        high_tech_only = bool(cfg.get("high_tech_only"))
         run_mode3_scan(
             config,
             cutoff_date=payload.get("cutoff_date"),
@@ -108,6 +109,7 @@ def run_one():
             use_mode39=(mode == "mode39"),
             user_id=user_id,
             throttle_free_user=payload.get("throttle_free_user", True),
+            high_tech_only=high_tech_only,
         )
     finally:
         try:

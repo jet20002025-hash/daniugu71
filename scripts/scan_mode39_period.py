@@ -4,6 +4,7 @@
 用法:
   python3 scripts/scan_mode39_period.py --start 2026-04-01 --end 2026-06-18
   python3 scripts/scan_mode39_period.py --code 300790 --start 2026-04-01 --end 2026-06-18
+  python3 scripts/scan_mode39_period.py --high-tech --start 2026-06-01 --end 2026-06-18
 """
 from __future__ import annotations
 
@@ -26,6 +27,7 @@ from app.mode39_bull_anchor_pullback import (
     score_mode39_bull_anchor_pullback,
 )
 from app.paths import GPT_DATA_DIR
+from app.high_tech_universe import HIGH_TECH_STOCK_LIST_CSV, high_tech_code_set
 from app.scanner import ScanConfig, _is_st
 
 CACHE_DIR = os.path.join(GPT_DATA_DIR, "kline_cache_tencent")
@@ -44,6 +46,11 @@ def main() -> None:
     ap.add_argument("--start", required=True)
     ap.add_argument("--end", required=True)
     ap.add_argument("--code", default="", help="仅扫单股")
+    ap.add_argument(
+        "--high-tech",
+        action="store_true",
+        help="仅在高科技板块股票池内扫描（data/gpt/high_tech_stock_list.csv）",
+    )
     ap.add_argument("--min-score", type=int, default=60)
     ap.add_argument("--skip-st", action="store_true", default=True)
     ap.add_argument("--skip-bj", action="store_true", default=True)
@@ -58,8 +65,17 @@ def main() -> None:
         sys.exit(1)
 
     kw = mode39_kw_from_scan_config(ScanConfig(min_score=args.min_score))
-    name_map = load_stock_list_csv(STOCK_LIST) if os.path.exists(STOCK_LIST) else {}
+    stock_list_path = HIGH_TECH_STOCK_LIST_CSV if args.high_tech else STOCK_LIST
+    name_map = load_stock_list_csv(stock_list_path) if os.path.exists(stock_list_path) else {}
+    if args.high_tech:
+        ht = high_tech_code_set()
+        if not ht:
+            print("高科技池为空，请先运行: python3 scripts/build_high_tech_universe.py")
+            sys.exit(1)
+        print(f"高科技板块扫描: {len(ht)} 只")
     stock_list = list_cached_stocks_flat(CACHE_DIR, name_map=name_map)
+    if args.high_tech:
+        stock_list = [s for s in stock_list if s.code.zfill(6) in ht]
     if args.code.strip():
         oc = args.code.strip().zfill(6)
         stock_list = [s for s in stock_list if s.code.zfill(6) == oc]

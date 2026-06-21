@@ -45,6 +45,7 @@ from app.eastmoney import (
     read_cached_kline_by_market_code,
     stock_items_from_list_csv,
 )
+from app.high_tech_universe import filter_stock_items, high_tech_universe_count
 from app.ml_model import MLConfig, load_model_bundle, scan_with_model
 from app.paths import GPT_DATA_DIR, LOCAL_STOCK_LIST, MARKET_CAP_PATH
 from app.scanner import (
@@ -848,6 +849,7 @@ def run_mode3_scan(
     use_mode39: bool = False,
     user_id: Optional[int] = None,
     throttle_free_user: bool = False,
+    high_tech_only: bool = False,
 ) -> None:
     _state = {} if user_id is not None else scan_state
 
@@ -947,6 +949,18 @@ def run_mode3_scan(
                 kline_loader = None
             local_only = False
 
+        ht_note = ""
+        if high_tech_only:
+            ht_pool = high_tech_universe_count()
+            if ht_pool <= 0:
+                raise RuntimeError(
+                    "高科技股票池为空，请先运行: python3 scripts/build_high_tech_universe.py"
+                )
+            stock_list = filter_stock_items(stock_list)
+            if not stock_list:
+                raise RuntimeError("高科技池内无可用股票，请检查 K 线缓存是否覆盖高科技成分股")
+            ht_note = f"，高科技池 {len(stock_list)}/{ht_pool} 只"
+
         _emit({"total": len(stock_list), "progress": 0})
         provider_label = remote_provider if data_source == "remote" else ("本地股票库" if data_source == "gpt" else data_source)
         cap_note = ""
@@ -1003,7 +1017,7 @@ def run_mode3_scan(
             mode_label = "mode3ok"
         else:
             mode_label = "mode3"
-        _emit({"message": f"加载{mode_label}，开始筛选（{provider_label}）{cap_note}"})
+        _emit({"message": f"加载{mode_label}，开始筛选（{provider_label}）{cap_note}{ht_note}"})
 
         def _progress_cb() -> None:
             if user_id is not None and is_cancelled(user_id):
@@ -1394,6 +1408,7 @@ def index():
         user=g.current_user,
         scan_busy=scan_busy,
         scan_modes=SCAN_MODE_OPTIONS,
+        high_tech_total=high_tech_universe_count(),
     )
 
 
@@ -1416,6 +1431,7 @@ def scan():
         data_source = "remote" if raw_ds == "remote" else "gpt"
         remote_provider = request.form.get("remote_provider", "eastmoney")
         prefer_local = request.form.get("prefer_local") == "on"
+        high_tech_only = request.form.get("high_tech_only") == "on"
         min_score = int(request.form.get("min_score", 70))
         raw_cap = str(request.form.get("max_market_cap", "")).strip()
         try:
@@ -1441,6 +1457,7 @@ def scan():
             "data_source": data_source,
             "remote_provider": remote_provider,
             "prefer_local": prefer_local,
+            "high_tech_only": high_tech_only,
             "throttle_free_user": not is_paid,
         }
         push_job(user_id, job_config)
@@ -1454,6 +1471,7 @@ def scan():
     data_source = "remote" if raw_ds == "remote" else "gpt"
     remote_provider = request.form.get("remote_provider", "eastmoney")
     prefer_local = request.form.get("prefer_local") == "on"
+    high_tech_only = request.form.get("high_tech_only") == "on"
     min_score = int(request.form.get("min_score", 70))
     raw_cap = str(request.form.get("max_market_cap", "")).strip()
     if raw_cap == "":
@@ -1521,6 +1539,7 @@ def scan():
             mode == "mode39",
             user_id,
             not is_paid,
+            high_tech_only,
         ),
         daemon=True,
     )

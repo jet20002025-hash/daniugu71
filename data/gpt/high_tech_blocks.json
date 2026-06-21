@@ -1,0 +1,127 @@
+{
+  "title": "高科技板块",
+  "description": "由用户指定的同花顺概念等板块合并；寻股默认在此池内检索。新增: python3 scripts/build_high_tech_universe.py --add-block 板块名",
+  "blocks": [
+    {
+      "id": "national_big_fund",
+      "name": "国家大基金持股",
+      "source": "ths_concept"
+    },
+    {
+      "id": "pcb",
+      "name": "PCB概念",
+      "source": "manual_csv",
+      "file": "manual_blocks/PCB概念.csv"
+    },
+    {
+      "id": "storage_chip",
+      "name": "存储芯片",
+      "source": "manual_csv",
+      "file": "manual_blocks/存储芯片.csv"
+    },
+    {
+      "id": "photoresist",
+      "name": "光刻胶",
+      "source": "ths_concept"
+    },
+    {
+      "id": "lithography",
+      "name": "光刻机",
+      "source": "ths_concept"
+    },
+    {
+      "id": "cpo",
+      "name": "共封装光学(CPO)",
+      "source": "ths_concept"
+    },
+    {
+      "id": "smic",
+      "name": "中芯国际概念",
+      "source": "ths_concept"
+    },
+    {
+      "id": "pet_copper",
+      "name": "PET铜箔",
+      "source": "ths_concept"
+    },
+    {
+      "id": "fiber",
+      "name": "光纤概念",
+      "source": "ths_concept"
+    },
+    {
+      "id": "fluorochemical",
+      "name": "氟化工概念",
+      "source": "ths_concept"
+    },
+    {
+      "id": "lab_diamond",
+      "name": "培育钻石",
+      "source": "ths_concept"
+    },
+    {
+      "id": "compute_lease",
+      "name": "算力租赁",
+      "source": "ths_concept"
+    },
+    {
+      "id": "reducer",
+      "name": "减速器",
+      "source": "ths_concept"
+    },
+    {
+      "id": "third_gen_semi",
+      "name": "第三代半导体",
+      "source": "ths_concept"
+    },
+    {
+      "id": "copper_cable",
+      "name": "铜缆高速连接",
+      "source": "ths_concept"
+    },
+    {
+      "id": "ai_pc",
+      "name": "AI PC",
+      "source": "ths_concept"
+    },
+    {
+      "id": "e_paper",
+      "name": "电子纸",
+      "source": "ths_concept"
+    },
+    {
+      "id": "f5g",
+      "name": "F5G概念",
+      "source": "ths_concept"
+    },
+    {
+      "id": "propylene_oxide",
+      "name": "环氧丙烷",
+      "source": "ths_concept"
+    },
+    {
+      "id": "nvidia",
+      "name": "英伟达概念",
+      "source": "manual_csv",
+      "file": "manual_blocks/英伟达概念.csv"
+    },
+    {
+      "id": "electronic_cloth",
+      "name": "电子布概念",
+      "source": "manual_csv",
+      "file": "manual_blocks/电子布概念.csv"
+    },
+    {
+      "id": "rare_earth_magnet",
+      "name": "稀土永磁",
+      "source": "manual_csv",
+      "file": "manual_blocks/稀土永磁.csv"
+    },
+    {
+      "id": "high_tech_master",
+      "name": "高科技汇总",
+      "source": "manual_csv",
+      "file": "manual_blocks/高科技汇总.csv"
+    }
+  ]
+}

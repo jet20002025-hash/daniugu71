@@ -122,6 +122,12 @@
       "name": "高科技汇总",
       "source": "manual_csv",
       "file": "manual_blocks/高科技汇总.csv"
+    },
+    {
+      "id": "chain_picks",
+      "name": "产业链精选",
+      "source": "manual_csv",
+      "file": "manual_blocks/产业链精选.csv"
     }
   ]
 }

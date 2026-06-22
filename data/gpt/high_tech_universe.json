@@ -1,7 +1,7 @@
 {
   "title": "高科技板块",
-  "updated_at": "2026-06-21 16:15:33",
-  "total": 1347,
+  "updated_at": "2026-06-22 15:07:41",
+  "total": 1364,
   "blocks": [
     {
       "name": "国家大基金持股",
@@ -60,8 +60,9 @@
     {
       "name": "光纤概念",
       "source": "ths_concept",
-      "error": "未找到同花顺概念板块: 光纤概念",
-      "count": 0
+      "concept_code": "309151",
+      "index_clid": "886084",
+      "count": 50
     },
     {
       "name": "氟化工概念",
@@ -156,14 +157,20 @@
       "source": "manual_csv",
       "file": "manual_blocks/高科技汇总.csv",
       "count": 1276
+    },
+    {
+      "name": "产业链精选",
+      "source": "manual_csv",
+      "file": "manual_blocks/产业链精选.csv",
+      "count": 88
     }
   ],
   "stocks": [
     {
       "code": "000009",
       "name": "中国宝安",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "减速器;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "000016",
@@ -174,20 +181,20 @@
     {
       "code": "000021",
       "name": "深科技",
-      "from_blocks": "存储芯片;高科技汇总",
-      "block_count": 2
+      "from_blocks": "共封装光学(CPO);存储芯片;第三代半导体;高科技汇总",
+      "block_count": 4
     },
     {
       "code": "000026",
       "name": "飞亚达",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "减速器;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "000032",
       "name": "深桑达Ａ",
-      "from_blocks": "中芯国际概念;算力租赁;高科技汇总",
-      "block_count": 3
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "000034",
@@ -222,8 +229,8 @@
     {
       "code": "000063",
       "name": "中兴通讯",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "光纤概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "000066",
@@ -234,8 +241,14 @@
     {
       "code": "000070",
       "name": "特发信息",
-      "from_blocks": "F5G概念;高科技汇总",
-      "block_count": 2
+      "from_blocks": "F5G概念;光纤概念;共封装光学(CPO);算力租赁;高科技汇总",
+      "block_count": 5
+    },
+    {
+      "code": "000100",
+      "name": "TCL科技",
+      "from_blocks": "AI PC",
+      "block_count": 1
     },
     {
       "code": "000155",
@@ -288,8 +301,8 @@
     {
       "code": "000533",
       "name": "顺钠股份",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "中芯国际概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "000541",
@@ -306,8 +319,8 @@
     {
       "code": "000551",
       "name": "创元科技",
-      "from_blocks": "中芯国际概念;减速器;高科技汇总",
-      "block_count": 3
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "000576",
@@ -330,8 +343,8 @@
     {
       "code": "000601",
       "name": "韶能股份",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "减速器;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "000603",
@@ -366,8 +379,8 @@
     {
       "code": "000636",
       "name": "风华高科",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "产业链精选;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "000651",
@@ -384,8 +397,8 @@
     {
       "code": "000657",
       "name": "中钨高新",
-      "from_blocks": "PCB概念;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 4
+      "from_blocks": "PCB概念;产业链精选;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 5
     },
     {
       "code": "000670",
@@ -424,6 +437,12 @@
       "block_count": 1
     },
     {
+      "code": "000712",
+      "name": "锦龙股份",
+      "from_blocks": "算力租赁",
+      "block_count": 1
+    },
+    {
       "code": "000723",
       "name": "美锦能源",
       "from_blocks": "高科技汇总",
@@ -432,20 +451,20 @@
     {
       "code": "000725",
       "name": "京东方Ａ",
-      "from_blocks": "AI PC;电子纸;高科技汇总",
-      "block_count": 3
+      "from_blocks": "AI PC;产业链精选;光纤概念;共封装光学(CPO);电子纸;高科技汇总",
+      "block_count": 6
     },
     {
       "code": "000727",
       "name": "冠捷科技",
-      "from_blocks": "PCB概念;存储芯片;电子纸;英伟达概念;高科技汇总",
-      "block_count": 5
+      "from_blocks": "AI PC;PCB概念;存储芯片;电子纸;英伟达概念;高科技汇总",
+      "block_count": 6
     },
     {
       "code": "000733",
       "name": "振华科技",
-      "from_blocks": "第三代半导体;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "000737",
@@ -480,8 +499,8 @@
     {
       "code": "000790",
       "name": "华神科技",
-      "from_blocks": "氟化工概念;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "000792",
@@ -514,10 +533,16 @@
       "block_count": 2
     },
     {
+      "code": "000815",
+      "name": "美利云",
+      "from_blocks": "算力租赁",
+      "block_count": 1
+    },
+    {
       "code": "000816",
       "name": "智慧农业",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "减速器;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "000818",
@@ -534,8 +559,8 @@
     {
       "code": "000823",
       "name": "超声电子",
-      "from_blocks": "PCB概念;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 4
+      "from_blocks": "PCB概念;共封装光学(CPO);存储芯片;英伟达概念;高科技汇总",
+      "block_count": 5
     },
     {
       "code": "000829",
@@ -546,8 +571,8 @@
     {
       "code": "000830",
       "name": "鲁西化工",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "氟化工概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "000831",
@@ -564,8 +589,8 @@
     {
       "code": "000837",
       "name": "秦川机床",
-      "from_blocks": "减速器;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "000850",
@@ -624,8 +649,8 @@
     {
       "code": "000925",
       "name": "众合科技",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "算力租赁;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "000938",
@@ -636,8 +661,8 @@
     {
       "code": "000951",
       "name": "中国重汽",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "减速器;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "000960",
@@ -654,8 +679,8 @@
     {
       "code": "000969",
       "name": "安泰科技",
-      "from_blocks": "中芯国际概念;高科技汇总",
-      "block_count": 2
+      "from_blocks": "中芯国际概念;产业链精选;第三代半导体;高科技汇总",
+      "block_count": 4
     },
     {
       "code": "000970",
@@ -678,8 +703,8 @@
     {
       "code": "000981",
       "name": "山子高科",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "减速器;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "000983",
@@ -690,7 +715,7 @@
     {
       "code": "000988",
       "name": "华工科技",
-      "from_blocks": "F5G概念;PCB概念;存储芯片;第三代半导体;英伟达概念;铜缆高速连接;高科技汇总",
+      "from_blocks": "F5G概念;PCB概念;产业链精选;存储芯片;英伟达概念;铜缆高速连接;高科技汇总",
       "block_count": 7
     },
     {
@@ -720,8 +745,8 @@
     {
       "code": "001257",
       "name": "",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "产业链精选;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "001266",
@@ -732,14 +757,14 @@
     {
       "code": "001267",
       "name": "汇绿生态",
-      "from_blocks": "共封装光学(CPO);铜缆高速连接;高科技汇总",
-      "block_count": 3
+      "from_blocks": "铜缆高速连接;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "001270",
       "name": "*ST铖昌",
-      "from_blocks": "第三代半导体;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "001280",
@@ -780,14 +805,14 @@
     {
       "code": "001306",
       "name": "夏厦精密",
-      "from_blocks": "减速器;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "001309",
       "name": "德明利",
-      "from_blocks": "AI PC;存储芯片;高科技汇总",
-      "block_count": 3
+      "from_blocks": "AI PC;中芯国际概念;产业链精选;共封装光学(CPO);存储芯片;高科技汇总",
+      "block_count": 6
     },
     {
       "code": "001311",
@@ -840,8 +865,8 @@
     {
       "code": "001389",
       "name": "广合科技",
-      "from_blocks": "AI PC;PCB概念;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 5
+      "from_blocks": "PCB概念;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 4
     },
     {
       "code": "002001",
@@ -876,8 +901,8 @@
     {
       "code": "002023",
       "name": "海特高新",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "共封装光学(CPO);第三代半导体;高科技汇总",
+      "block_count": 3
     },
     {
       "code": "002025",
@@ -902,6 +927,12 @@
       "name": "联创电子",
       "from_blocks": "英伟达概念;高科技汇总",
       "block_count": 2
+    },
+    {
+      "code": "002042",
+      "name": "华孚时尚",
+      "from_blocks": "算力租赁",
+      "block_count": 1
     },
     {
       "code": "002044",
@@ -972,8 +1003,8 @@
     {
       "code": "002080",
       "name": "中材科技",
-      "from_blocks": "PCB概念;存储芯片;电子布概念;英伟达概念;高科技汇总",
-      "block_count": 5
+      "from_blocks": "PCB概念;产业链精选;存储芯片;电子布概念;英伟达概念;高科技汇总",
+      "block_count": 6
     },
     {
       "code": "002081",
@@ -1020,8 +1051,8 @@
     {
       "code": "002129",
       "name": "TCL中环",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "中芯国际概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "002130",
@@ -1050,8 +1081,8 @@
     {
       "code": "002138",
       "name": "顺络电子",
-      "from_blocks": "PCB概念;共封装光学(CPO);存储芯片;英伟达概念;高科技汇总",
-      "block_count": 5
+      "from_blocks": "PCB概念;产业链精选;共封装光学(CPO);存储芯片;英伟达概念;高科技汇总",
+      "block_count": 6
     },
     {
       "code": "002141",
@@ -1080,20 +1111,20 @@
     {
       "code": "002156",
       "name": "通富微电",
-      "from_blocks": "AI PC;国家大基金持股;存储芯片;高科技汇总",
-      "block_count": 4
+      "from_blocks": "AI PC;产业链精选;共封装光学(CPO);国家大基金持股;存储芯片;高科技汇总",
+      "block_count": 6
     },
     {
       "code": "002158",
       "name": "汉钟精机",
-      "from_blocks": "第三代半导体;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "002164",
       "name": "宁波东力",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "减速器;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "002165",
@@ -1110,8 +1141,8 @@
     {
       "code": "002171",
       "name": "楚江新材",
-      "from_blocks": "PCB概念;培育钻石;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 5
+      "from_blocks": "PCB概念;培育钻石;存储芯片;第三代半导体;英伟达概念;高科技汇总",
+      "block_count": 6
     },
     {
       "code": "002176",
@@ -1122,8 +1153,8 @@
     {
       "code": "002179",
       "name": "中航光电",
-      "from_blocks": "共封装光学(CPO);铜缆高速连接;高科技汇总",
-      "block_count": 3
+      "from_blocks": "光纤概念;共封装光学(CPO);铜缆高速连接;高科技汇总",
+      "block_count": 4
     },
     {
       "code": "002182",
@@ -1146,8 +1177,8 @@
     {
       "code": "002185",
       "name": "华天科技",
-      "from_blocks": "国家大基金持股;存储芯片;第三代半导体;高科技汇总",
-      "block_count": 4
+      "from_blocks": "产业链精选;共封装光学(CPO);国家大基金持股;存储芯片;高科技汇总",
+      "block_count": 5
     },
     {
       "code": "002191",
@@ -1198,16 +1229,10 @@
       "block_count": 1
     },
     {
-      "code": "002229",
-      "name": "鸿博股份",
-      "from_blocks": "算力租赁",
-      "block_count": 1
-    },
-    {
       "code": "002230",
       "name": "科大讯飞",
-      "from_blocks": "算力租赁;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "002236",
@@ -1278,20 +1303,14 @@
     {
       "code": "002281",
       "name": "光迅科技",
-      "from_blocks": "F5G概念;共封装光学(CPO);高科技汇总",
-      "block_count": 3
+      "from_blocks": "F5G概念;产业链精选;光纤概念;共封装光学(CPO);高科技汇总",
+      "block_count": 5
     },
     {
       "code": "002283",
       "name": "天润工业",
       "from_blocks": "减速器;高科技汇总",
       "block_count": 2
-    },
-    {
-      "code": "002289",
-      "name": "*ST宇顺",
-      "from_blocks": "算力租赁",
-      "block_count": 1
     },
     {
       "code": "002295",
@@ -1308,8 +1327,8 @@
     {
       "code": "002298",
       "name": "中电鑫龙",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "光纤概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "002312",
@@ -1374,8 +1393,8 @@
     {
       "code": "002371",
       "name": "北方华创",
-      "from_blocks": "中芯国际概念;国家大基金持股;存储芯片;高科技汇总",
-      "block_count": 4
+      "from_blocks": "中芯国际概念;产业链精选;国家大基金持股;存储芯片;高科技汇总",
+      "block_count": 5
     },
     {
       "code": "002376",
@@ -1386,20 +1405,20 @@
     {
       "code": "002378",
       "name": "章源钨业",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "产业链精选;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "002384",
       "name": "东山精密",
-      "from_blocks": "PCB概念;共封装光学(CPO);存储芯片;英伟达概念;高科技汇总",
-      "block_count": 5
+      "from_blocks": "PCB概念;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 4
     },
     {
       "code": "002388",
       "name": "新亚制程",
-      "from_blocks": "氟化工概念;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "002392",
@@ -1428,8 +1447,8 @@
     {
       "code": "002407",
       "name": "多氟多",
-      "from_blocks": "中芯国际概念;存储芯片;氟化工概念;高科技汇总",
-      "block_count": 4
+      "from_blocks": "中芯国际概念;存储芯片;氟化工概念;第三代半导体;高科技汇总",
+      "block_count": 5
     },
     {
       "code": "002408",
@@ -1440,8 +1459,8 @@
     {
       "code": "002409",
       "name": "雅克科技",
-      "from_blocks": "中芯国际概念;光刻胶;国家大基金持股;存储芯片;氟化工概念;高科技汇总",
-      "block_count": 6
+      "from_blocks": "中芯国际概念;产业链精选;光刻胶;国家大基金持股;存储芯片;氟化工概念;高科技汇总",
+      "block_count": 7
     },
     {
       "code": "002413",
@@ -1458,14 +1477,14 @@
     {
       "code": "002415",
       "name": "海康威视",
-      "from_blocks": "存储芯片;高科技汇总",
-      "block_count": 2
+      "from_blocks": "光纤概念;存储芯片;高科技汇总",
+      "block_count": 3
     },
     {
       "code": "002418",
       "name": "康盛股份",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "算力租赁;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "002426",
@@ -1476,8 +1495,8 @@
     {
       "code": "002428",
       "name": "云南锗业",
-      "from_blocks": "氟化工概念;高科技汇总",
-      "block_count": 2
+      "from_blocks": "光纤概念;氟化工概念;第三代半导体;高科技汇总",
+      "block_count": 4
     },
     {
       "code": "002429",
@@ -1500,8 +1519,8 @@
     {
       "code": "002436",
       "name": "兴森科技",
-      "from_blocks": "PCB概念;共封装光学(CPO);存储芯片;英伟达概念;高科技汇总",
-      "block_count": 5
+      "from_blocks": "PCB概念;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 4
     },
     {
       "code": "002440",
@@ -1524,14 +1543,14 @@
     {
       "code": "002453",
       "name": "华软科技",
-      "from_blocks": "光刻胶;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "002455",
       "name": "百川股份",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "光刻胶;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "002460",
@@ -1542,8 +1561,8 @@
     {
       "code": "002463",
       "name": "沪电股份",
-      "from_blocks": "PCB概念;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 4
+      "from_blocks": "PCB概念;产业链精选;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 5
     },
     {
       "code": "002465",
@@ -1560,8 +1579,8 @@
     {
       "code": "002472",
       "name": "双环传动",
-      "from_blocks": "减速器;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "002475",
@@ -1584,14 +1603,14 @@
     {
       "code": "002484",
       "name": "江海股份",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "产业链精选;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "002491",
       "name": "通鼎互联",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "产业链精选;光纤概念;高科技汇总",
+      "block_count": 3
     },
     {
       "code": "002510",
@@ -1602,8 +1621,8 @@
     {
       "code": "002515",
       "name": "金字火腿",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "共封装光学(CPO);高科技汇总",
+      "block_count": 2
     },
     {
       "code": "002516",
@@ -1614,8 +1633,8 @@
     {
       "code": "002520",
       "name": "日发精机",
-      "from_blocks": "减速器;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "002522",
@@ -1626,14 +1645,14 @@
     {
       "code": "002526",
       "name": "山东矿机",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "减速器;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "002527",
       "name": "新时达",
-      "from_blocks": "减速器;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "002538",
@@ -1656,8 +1675,8 @@
     {
       "code": "002549",
       "name": "凯美特气",
-      "from_blocks": "光刻机;高科技汇总",
-      "block_count": 2
+      "from_blocks": "光刻机;氟化工概念;高科技汇总",
+      "block_count": 3
     },
     {
       "code": "002552",
@@ -1674,8 +1693,8 @@
     {
       "code": "002559",
       "name": "亚威股份",
-      "from_blocks": "光刻胶;存储芯片;高科技汇总",
-      "block_count": 3
+      "from_blocks": "存储芯片;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "002562",
@@ -1722,8 +1741,8 @@
     {
       "code": "002600",
       "name": "领益智造",
-      "from_blocks": "AI PC;共封装光学(CPO);减速器;稀土永磁;高科技汇总",
-      "block_count": 5
+      "from_blocks": "AI PC;稀土永磁;高科技汇总",
+      "block_count": 3
     },
     {
       "code": "002601",
@@ -1732,22 +1751,28 @@
       "block_count": 1
     },
     {
+      "code": "002602",
+      "name": "世纪华通",
+      "from_blocks": "算力租赁",
+      "block_count": 1
+    },
+    {
       "code": "002617",
       "name": "露笑科技",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "第三代半导体;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "002628",
       "name": "成都路桥",
-      "from_blocks": "氟化工概念;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "002636",
       "name": "金安国纪",
-      "from_blocks": "PCB概念;存储芯片;电子布概念;英伟达概念;高科技汇总",
-      "block_count": 5
+      "from_blocks": "PCB概念;产业链精选;存储芯片;电子布概念;英伟达概念;高科技汇总",
+      "block_count": 6
     },
     {
       "code": "002643",
@@ -1780,6 +1805,12 @@
       "block_count": 2
     },
     {
+      "code": "002657",
+      "name": "中科金财",
+      "from_blocks": "算力租赁",
+      "block_count": 1
+    },
+    {
       "code": "002658",
       "name": "雪迪龙",
       "from_blocks": "高科技汇总",
@@ -1806,32 +1837,26 @@
     {
       "code": "002672",
       "name": "东江环保",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "氟化工概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "002681",
       "name": "奋达科技",
-      "from_blocks": "减速器;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "002708",
       "name": "光洋股份",
-      "from_blocks": "PCB概念;减速器;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 5
+      "from_blocks": "PCB概念;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 4
     },
     {
       "code": "002709",
       "name": "天赐材料",
       "from_blocks": "氟化工概念;高科技汇总",
       "block_count": 2
-    },
-    {
-      "code": "002713",
-      "name": "*ST东易",
-      "from_blocks": "算力租赁",
-      "block_count": 1
     },
     {
       "code": "002716",
@@ -1846,6 +1871,12 @@
       "block_count": 1
     },
     {
+      "code": "002730",
+      "name": "电光科技",
+      "from_blocks": "算力租赁",
+      "block_count": 1
+    },
+    {
       "code": "002738",
       "name": "中矿资源",
       "from_blocks": "高科技汇总",
@@ -1854,8 +1885,8 @@
     {
       "code": "002741",
       "name": "光华科技",
-      "from_blocks": "PCB概念;PET铜箔;共封装光学(CPO);存储芯片;氟化工概念;英伟达概念;高科技汇总",
-      "block_count": 7
+      "from_blocks": "PCB概念;PET铜箔;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 5
     },
     {
       "code": "002745",
@@ -1878,8 +1909,14 @@
     {
       "code": "002768",
       "name": "国恩股份",
-      "from_blocks": "光刻胶;环氧丙烷;高科技汇总",
-      "block_count": 3
+      "from_blocks": "环氧丙烷;高科技汇总",
+      "block_count": 2
+    },
+    {
+      "code": "002782",
+      "name": "可立克",
+      "from_blocks": "产业链精选",
+      "block_count": 1
     },
     {
       "code": "002785",
@@ -1938,26 +1975,20 @@
     {
       "code": "002833",
       "name": "弘亚数控",
-      "from_blocks": "减速器;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "002837",
       "name": "英维克",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "产业链精选;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "002842",
       "name": "翔鹭钨业",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
-    },
-    {
-      "code": "002843",
-      "name": "泰嘉股份",
-      "from_blocks": "AI PC",
-      "block_count": 1
+      "from_blocks": "产业链精选;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "002845",
@@ -1986,8 +2017,8 @@
     {
       "code": "002851",
       "name": "麦格米特",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "第三代半导体;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "002859",
@@ -2004,8 +2035,8 @@
     {
       "code": "002885",
       "name": "京泉华",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "第三代半导体;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "002886",
@@ -2022,26 +2053,26 @@
     {
       "code": "002896",
       "name": "中大力德",
-      "from_blocks": "减速器;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "002897",
       "name": "意华股份",
-      "from_blocks": "F5G概念;共封装光学(CPO);铜缆高速连接;高科技汇总",
-      "block_count": 4
+      "from_blocks": "F5G概念;铜缆高速连接;高科技汇总",
+      "block_count": 3
     },
     {
       "code": "002902",
       "name": "铭普光磁",
-      "from_blocks": "F5G概念;共封装光学(CPO);第三代半导体;铜缆高速连接;高科技汇总",
-      "block_count": 5
+      "from_blocks": "F5G概念;铜缆高速连接;高科技汇总",
+      "block_count": 3
     },
     {
       "code": "002903",
       "name": "宇环数控",
-      "from_blocks": "减速器;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "002906",
@@ -2052,20 +2083,20 @@
     {
       "code": "002913",
       "name": "奥士康",
-      "from_blocks": "AI PC;PCB概念;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 5
+      "from_blocks": "PCB概念;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 4
     },
     {
       "code": "002915",
       "name": "中欣氟材",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "氟化工概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "002916",
       "name": "深南电路",
-      "from_blocks": "PCB概念;国家大基金持股;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 5
+      "from_blocks": "PCB概念;产业链精选;国家大基金持股;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 6
     },
     {
       "code": "002920",
@@ -2094,7 +2125,7 @@
     {
       "code": "002938",
       "name": "鹏鼎控股",
-      "from_blocks": "AI PC;PCB概念;存储芯片;英伟达概念;高科技汇总",
+      "from_blocks": "PCB概念;产业链精选;存储芯片;英伟达概念;高科技汇总",
       "block_count": 5
     },
     {
@@ -2106,8 +2137,8 @@
     {
       "code": "002947",
       "name": "恒铭达",
-      "from_blocks": "AI PC;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "002951",
@@ -2124,26 +2155,26 @@
     {
       "code": "002957",
       "name": "科瑞技术",
-      "from_blocks": "共封装光学(CPO);高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "002967",
       "name": "广电计量",
-      "from_blocks": "中芯国际概念;共封装光学(CPO);高科技汇总",
-      "block_count": 3
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "002971",
       "name": "和远气体",
-      "from_blocks": "氟化工概念;高科技汇总",
-      "block_count": 2
+      "from_blocks": "产业链精选;氟化工概念;高科技汇总",
+      "block_count": 3
     },
     {
       "code": "002975",
       "name": "博杰股份",
-      "from_blocks": "存储芯片;高科技汇总",
-      "block_count": 2
+      "from_blocks": "减速器;存储芯片;高科技汇总",
+      "block_count": 3
     },
     {
       "code": "002977",
@@ -2160,8 +2191,8 @@
     {
       "code": "002980",
       "name": "华盛昌",
-      "from_blocks": "共封装光学(CPO);高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "002990",
@@ -2196,8 +2227,8 @@
     {
       "code": "003021",
       "name": "兆威机电",
-      "from_blocks": "减速器;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "003022",
@@ -2222,6 +2253,12 @@
       "name": "华亚智能",
       "from_blocks": "光刻机;高科技汇总",
       "block_count": 2
+    },
+    {
+      "code": "300002",
+      "name": "神州泰岳",
+      "from_blocks": "算力租赁",
+      "block_count": 1
     },
     {
       "code": "300008",
@@ -2256,8 +2293,8 @@
     {
       "code": "300037",
       "name": "新宙邦",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "氟化工概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "300041",
@@ -2278,6 +2315,12 @@
       "block_count": 1
     },
     {
+      "code": "300052",
+      "name": "ST中青宝",
+      "from_blocks": "算力租赁",
+      "block_count": 1
+    },
+    {
       "code": "300053",
       "name": "航宇微",
       "from_blocks": "存储芯片;英伟达概念;高科技汇总",
@@ -2286,14 +2329,14 @@
     {
       "code": "300054",
       "name": "鼎龙股份",
-      "from_blocks": "中芯国际概念;光刻胶;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 5
+      "from_blocks": "存储芯片;英伟达概念;高科技汇总",
+      "block_count": 3
     },
     {
       "code": "300056",
       "name": "中创环保",
-      "from_blocks": "算力租赁;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "300057",
@@ -2358,8 +2401,8 @@
     {
       "code": "300095",
       "name": "华伍股份",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "减速器;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "300101",
@@ -2380,10 +2423,16 @@
       "block_count": 1
     },
     {
+      "code": "300113",
+      "name": "顺网科技",
+      "from_blocks": "算力租赁",
+      "block_count": 1
+    },
+    {
       "code": "300115",
       "name": "长盈精密",
-      "from_blocks": "AI PC;减速器;铜缆高速连接;高科技汇总",
-      "block_count": 4
+      "from_blocks": "AI PC;铜缆高速连接;高科技汇总",
+      "block_count": 3
     },
     {
       "code": "300120",
@@ -2394,8 +2443,8 @@
     {
       "code": "300121",
       "name": "阳谷华泰",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "第三代半导体;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "300123",
@@ -2406,8 +2455,14 @@
     {
       "code": "300131",
       "name": "英唐智控",
-      "from_blocks": "存储芯片;英伟达概念;高科技汇总",
-      "block_count": 3
+      "from_blocks": "共封装光学(CPO);存储芯片;第三代半导体;英伟达概念;高科技汇总",
+      "block_count": 5
+    },
+    {
+      "code": "300133",
+      "name": "华策影视",
+      "from_blocks": "算力租赁",
+      "block_count": 1
     },
     {
       "code": "300145",
@@ -2478,13 +2533,19 @@
     {
       "code": "300200",
       "name": "高盟新材",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "光刻胶;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "300203",
       "name": "聚光科技",
-      "from_blocks": "高科技汇总",
+      "from_blocks": "光刻胶;高科技汇总",
+      "block_count": 2
+    },
+    {
+      "code": "300209",
+      "name": "有棵树",
+      "from_blocks": "算力租赁",
       "block_count": 1
     },
     {
@@ -2508,8 +2569,8 @@
     {
       "code": "300222",
       "name": "科大智能",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "第三代半导体;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "300223",
@@ -2526,8 +2587,14 @@
     {
       "code": "300227",
       "name": "光韵达",
-      "from_blocks": "PCB概念;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 4
+      "from_blocks": "PCB概念;光纤概念;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 5
+    },
+    {
+      "code": "300231",
+      "name": "银信科技",
+      "from_blocks": "算力租赁",
+      "block_count": 1
     },
     {
       "code": "300232",
@@ -2538,8 +2605,8 @@
     {
       "code": "300236",
       "name": "上海新阳",
-      "from_blocks": "光刻胶;高科技汇总",
-      "block_count": 2
+      "from_blocks": "中芯国际概念;光刻胶;高科技汇总",
+      "block_count": 3
     },
     {
       "code": "300241",
@@ -2562,8 +2629,8 @@
     {
       "code": "300252",
       "name": "金信诺",
-      "from_blocks": "F5G概念;PCB概念;存储芯片;英伟达概念;铜缆高速连接;高科技汇总",
-      "block_count": 6
+      "from_blocks": "F5G概念;PCB概念;光纤概念;共封装光学(CPO);存储芯片;英伟达概念;铜缆高速连接;高科技汇总",
+      "block_count": 8
     },
     {
       "code": "300253",
@@ -2580,14 +2647,14 @@
     {
       "code": "300260",
       "name": "新莱应材",
-      "from_blocks": "中芯国际概念;光刻机;高科技汇总",
-      "block_count": 3
+      "from_blocks": "光刻机;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "300265",
       "name": "通光线缆",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "光纤概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "300267",
@@ -2610,14 +2677,14 @@
     {
       "code": "300283",
       "name": "温州宏丰",
-      "from_blocks": "PCB概念;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 4
+      "from_blocks": "PCB概念;存储芯片;第三代半导体;英伟达概念;高科技汇总",
+      "block_count": 5
     },
     {
       "code": "300285",
       "name": "国瓷材料",
-      "from_blocks": "共封装光学(CPO);高科技汇总",
-      "block_count": 2
+      "from_blocks": "产业链精选;共封装光学(CPO);高科技汇总",
+      "block_count": 3
     },
     {
       "code": "300287",
@@ -2664,7 +2731,7 @@
     {
       "code": "300308",
       "name": "中际旭创",
-      "from_blocks": "F5G概念;共封装光学(CPO);高科技汇总",
+      "from_blocks": "F5G概念;产业链精选;高科技汇总",
       "block_count": 3
     },
     {
@@ -2682,8 +2749,8 @@
     {
       "code": "300319",
       "name": "麦捷科技",
-      "from_blocks": "共封装光学(CPO);存储芯片;英伟达概念;高科技汇总",
-      "block_count": 4
+      "from_blocks": "产业链精选;共封装光学(CPO);存储芯片;英伟达概念;高科技汇总",
+      "block_count": 5
     },
     {
       "code": "300322",
@@ -2700,8 +2767,8 @@
     {
       "code": "300331",
       "name": "苏大维格",
-      "from_blocks": "光刻机;电子纸;高科技汇总",
-      "block_count": 3
+      "from_blocks": "AI PC;光刻机;电子纸;高科技汇总",
+      "block_count": 4
     },
     {
       "code": "300340",
@@ -2718,14 +2785,14 @@
     {
       "code": "300343",
       "name": "ST联创",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "氟化工概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "300346",
       "name": "南大光电",
-      "from_blocks": "光刻胶;国家大基金持股;氟化工概念;高科技汇总",
-      "block_count": 4
+      "from_blocks": "中芯国际概念;产业链精选;光刻胶;国家大基金持股;氟化工概念;高科技汇总",
+      "block_count": 6
     },
     {
       "code": "300351",
@@ -2740,10 +2807,16 @@
       "block_count": 1
     },
     {
+      "code": "300368",
+      "name": "汇金股份",
+      "from_blocks": "算力租赁",
+      "block_count": 1
+    },
+    {
       "code": "300373",
       "name": "扬杰科技",
-      "from_blocks": "中芯国际概念;第三代半导体;英伟达概念;高科技汇总",
-      "block_count": 4
+      "from_blocks": "中芯国际概念;英伟达概念;高科技汇总",
+      "block_count": 3
     },
     {
       "code": "300376",
@@ -2758,28 +2831,22 @@
       "block_count": 2
     },
     {
-      "code": "300383",
-      "name": "光环新网",
-      "from_blocks": "算力租赁",
-      "block_count": 1
-    },
-    {
       "code": "300390",
       "name": "天华新能",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "中芯国际概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "300394",
       "name": "天孚通信",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "产业链精选;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "300395",
       "name": "菲利华",
-      "from_blocks": "PCB概念;存储芯片;电子布概念;英伟达概念;高科技汇总",
-      "block_count": 5
+      "from_blocks": "PCB概念;光纤概念;存储芯片;电子布概念;英伟达概念;高科技汇总",
+      "block_count": 6
     },
     {
       "code": "300397",
@@ -2790,8 +2857,8 @@
     {
       "code": "300398",
       "name": "飞凯材料",
-      "from_blocks": "光刻胶;电子纸;高科技汇总",
-      "block_count": 3
+      "from_blocks": "中芯国际概念;光刻胶;光纤概念;电子纸;第三代半导体;高科技汇总",
+      "block_count": 6
     },
     {
       "code": "300400",
@@ -2808,14 +2875,14 @@
     {
       "code": "300403",
       "name": "汉宇集团",
-      "from_blocks": "减速器;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "300408",
       "name": "三环集团",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "产业链精选;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "300409",
@@ -2844,8 +2911,8 @@
     {
       "code": "300416",
       "name": "苏试试验",
-      "from_blocks": "PCB概念;中芯国际概念;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 5
+      "from_blocks": "PCB概念;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 4
     },
     {
       "code": "300418",
@@ -2862,44 +2929,44 @@
     {
       "code": "300428",
       "name": "立中集团",
-      "from_blocks": "氟化工概念;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "300429",
       "name": "强力新材",
-      "from_blocks": "PCB概念;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 4
+      "from_blocks": "PCB概念;光刻胶;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 5
     },
     {
       "code": "300432",
       "name": "富临精工",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
-    },
-    {
-      "code": "300433",
-      "name": "蓝思科技",
       "from_blocks": "减速器;高科技汇总",
       "block_count": 2
     },
     {
-      "code": "300442",
-      "name": "润泽科技",
-      "from_blocks": "算力租赁;高科技汇总",
-      "block_count": 2
-    },
-    {
-      "code": "300443",
-      "name": "金雷股份",
+      "code": "300433",
+      "name": "蓝思科技",
       "from_blocks": "高科技汇总",
       "block_count": 1
     },
     {
+      "code": "300442",
+      "name": "润泽科技",
+      "from_blocks": "高科技汇总",
+      "block_count": 1
+    },
+    {
+      "code": "300443",
+      "name": "金雷股份",
+      "from_blocks": "减速器;高科技汇总",
+      "block_count": 2
+    },
+    {
       "code": "300446",
       "name": "航天智造",
-      "from_blocks": "PCB概念;光刻胶;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 5
+      "from_blocks": "PCB概念;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 4
     },
     {
       "code": "300447",
@@ -2934,8 +3001,8 @@
     {
       "code": "300458",
       "name": "全志科技",
-      "from_blocks": "中芯国际概念;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "300460",
@@ -2946,8 +3013,14 @@
     {
       "code": "300470",
       "name": "中密控股",
-      "from_blocks": "氟化工概念;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
+    },
+    {
+      "code": "300472",
+      "name": "*ST新元",
+      "from_blocks": "算力租赁",
+      "block_count": 1
     },
     {
       "code": "300474",
@@ -2964,8 +3037,8 @@
     {
       "code": "300476",
       "name": "胜宏科技",
-      "from_blocks": "AI PC;PCB概念;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 5
+      "from_blocks": "AI PC;PCB概念;产业链精选;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 6
     },
     {
       "code": "300477",
@@ -3016,9 +3089,15 @@
       "block_count": 3
     },
     {
+      "code": "300499",
+      "name": "高澜股份",
+      "from_blocks": "产业链精选",
+      "block_count": 1
+    },
+    {
       "code": "300502",
       "name": "新易盛",
-      "from_blocks": "共封装光学(CPO);高科技汇总",
+      "from_blocks": "产业链精选;高科技汇总",
       "block_count": 2
     },
     {
@@ -3030,8 +3109,8 @@
     {
       "code": "300504",
       "name": "天邑股份",
-      "from_blocks": "F5G概念;高科技汇总",
-      "block_count": 2
+      "from_blocks": "F5G概念;光纤概念;高科技汇总",
+      "block_count": 3
     },
     {
       "code": "300516",
@@ -3060,14 +3139,14 @@
     {
       "code": "300537",
       "name": "广信材料",
-      "from_blocks": "PCB概念;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 4
+      "from_blocks": "PCB概念;光刻胶;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 5
     },
     {
       "code": "300538",
       "name": "同益股份",
-      "from_blocks": "PCB概念;PET铜箔;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 5
+      "from_blocks": "PCB概念;PET铜箔;光刻胶;存储芯片;第三代半导体;英伟达概念;高科技汇总",
+      "block_count": 7
     },
     {
       "code": "300539",
@@ -3084,14 +3163,14 @@
     {
       "code": "300548",
       "name": "长芯博创",
-      "from_blocks": "F5G概念;共封装光学(CPO);铜缆高速连接;高科技汇总",
-      "block_count": 4
+      "from_blocks": "F5G概念;光纤概念;共封装光学(CPO);铜缆高速连接;高科技汇总",
+      "block_count": 5
     },
     {
       "code": "300549",
       "name": "优德精密",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "减速器;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "300551",
@@ -3102,14 +3181,14 @@
     {
       "code": "300554",
       "name": "三超新材",
-      "from_blocks": "中芯国际概念;第三代半导体;高科技汇总",
-      "block_count": 3
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "300557",
       "name": "理工光科",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "光纤概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "300560",
@@ -3138,8 +3217,8 @@
     {
       "code": "300570",
       "name": "太辰光",
-      "from_blocks": "F5G概念;铜缆高速连接;高科技汇总",
-      "block_count": 3
+      "from_blocks": "F5G概念;光纤概念;共封装光学(CPO);铜缆高速连接;高科技汇总",
+      "block_count": 5
     },
     {
       "code": "300571",
@@ -3150,8 +3229,8 @@
     {
       "code": "300576",
       "name": "容大感光",
-      "from_blocks": "PCB概念;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 4
+      "from_blocks": "PCB概念;光刻胶;存储芯片;第三代半导体;英伟达概念;高科技汇总",
+      "block_count": 6
     },
     {
       "code": "300580",
@@ -3186,8 +3265,8 @@
     {
       "code": "300602",
       "name": "飞荣达",
-      "from_blocks": "AI PC;高科技汇总",
-      "block_count": 2
+      "from_blocks": "AI PC;产业链精选;高科技汇总",
+      "block_count": 3
     },
     {
       "code": "300603",
@@ -3198,18 +3277,18 @@
     {
       "code": "300604",
       "name": "长川科技",
-      "from_blocks": "国家大基金持股;高科技汇总",
-      "block_count": 2
+      "from_blocks": "产业链精选;国家大基金持股;高科技汇总",
+      "block_count": 3
     },
     {
       "code": "300606",
       "name": "金太阳",
-      "from_blocks": "PCB概念;第三代半导体;高科技汇总",
-      "block_count": 3
+      "from_blocks": "PCB概念;高科技汇总",
+      "block_count": 2
     },
     {
-      "code": "300609",
-      "name": "汇纳科技",
+      "code": "300608",
+      "name": "思特奇",
       "from_blocks": "算力租赁",
       "block_count": 1
     },
@@ -3234,8 +3313,8 @@
     {
       "code": "300620",
       "name": "光库科技",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "产业链精选;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "300623",
@@ -3248,12 +3327,6 @@
       "name": "光莆股份",
       "from_blocks": "PCB概念;PET铜箔;共封装光学(CPO);存储芯片;第三代半导体;英伟达概念;高科技汇总",
       "block_count": 7
-    },
-    {
-      "code": "300634",
-      "name": "彩讯股份",
-      "from_blocks": "算力租赁",
-      "block_count": 1
     },
     {
       "code": "300637",
@@ -3276,8 +3349,8 @@
     {
       "code": "300655",
       "name": "晶瑞电材",
-      "from_blocks": "光刻胶;国家大基金持股;高科技汇总",
-      "block_count": 3
+      "from_blocks": "中芯国际概念;光刻胶;国家大基金持股;高科技汇总",
+      "block_count": 4
     },
     {
       "code": "300656",
@@ -3294,20 +3367,20 @@
     {
       "code": "300660",
       "name": "江苏雷利",
-      "from_blocks": "减速器;高科技汇总",
-      "block_count": 2
-    },
-    {
-      "code": "300661",
-      "name": "圣邦股份",
       "from_blocks": "高科技汇总",
       "block_count": 1
     },
     {
+      "code": "300661",
+      "name": "圣邦股份",
+      "from_blocks": "共封装光学(CPO);高科技汇总",
+      "block_count": 2
+    },
+    {
       "code": "300666",
       "name": "江丰电子",
-      "from_blocks": "中芯国际概念;光刻机;第三代半导体;高科技汇总",
-      "block_count": 4
+      "from_blocks": "产业链精选;光刻机;高科技汇总",
+      "block_count": 3
     },
     {
       "code": "300667",
@@ -3326,6 +3399,12 @@
       "name": "国科微",
       "from_blocks": "国家大基金持股;高科技汇总",
       "block_count": 2
+    },
+    {
+      "code": "300674",
+      "name": "宇信科技",
+      "from_blocks": "算力租赁",
+      "block_count": 1
     },
     {
       "code": "300679",
@@ -3360,8 +3439,8 @@
     {
       "code": "300689",
       "name": "澄天伟业",
-      "from_blocks": "第三代半导体;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "300697",
@@ -3378,8 +3457,8 @@
     {
       "code": "300700",
       "name": "岱勒新材",
-      "from_blocks": "光刻胶;第三代半导体;高科技汇总",
-      "block_count": 3
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "300706",
@@ -3396,8 +3475,8 @@
     {
       "code": "300709",
       "name": "精研科技",
-      "from_blocks": "减速器;高科技汇总",
-      "block_count": 2
+      "from_blocks": "共封装光学(CPO);减速器;高科技汇总",
+      "block_count": 3
     },
     {
       "code": "300710",
@@ -3414,8 +3493,8 @@
     {
       "code": "300721",
       "name": "怡达股份",
-      "from_blocks": "环氧丙烷;高科技汇总",
-      "block_count": 2
+      "from_blocks": "光刻胶;环氧丙烷;高科技汇总",
+      "block_count": 3
     },
     {
       "code": "300724",
@@ -3432,14 +3511,14 @@
     {
       "code": "300731",
       "name": "科创新源",
-      "from_blocks": "第三代半导体;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "300735",
       "name": "光弘科技",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "AI PC;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "300738",
@@ -3450,25 +3529,19 @@
     {
       "code": "300739",
       "name": "明阳电路",
-      "from_blocks": "PCB概念;共封装光学(CPO);存储芯片;英伟达概念;高科技汇总",
-      "block_count": 5
+      "from_blocks": "PCB概念;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 4
     },
     {
       "code": "300747",
       "name": "锐科激光",
-      "from_blocks": "PCB概念;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 4
+      "from_blocks": "PCB概念;光纤概念;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 5
     },
     {
       "code": "300751",
       "name": "迈为股份",
       "from_blocks": "高科技汇总",
-      "block_count": 1
-    },
-    {
-      "code": "300752",
-      "name": "隆利科技",
-      "from_blocks": "AI PC",
       "block_count": 1
     },
     {
@@ -3480,8 +3553,8 @@
     {
       "code": "300758",
       "name": "七彩化学",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "光刻胶;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "300774",
@@ -3510,8 +3583,8 @@
     {
       "code": "300786",
       "name": "国林科技",
-      "from_blocks": "光刻机;高科技汇总",
-      "block_count": 2
+      "from_blocks": "光刻机;光刻胶;高科技汇总",
+      "block_count": 3
     },
     {
       "code": "300787",
@@ -3532,10 +3605,16 @@
       "block_count": 2
     },
     {
+      "code": "300798",
+      "name": "锦鸡股份",
+      "from_blocks": "算力租赁",
+      "block_count": 1
+    },
+    {
       "code": "300801",
       "name": "泰和科技",
-      "from_blocks": "PCB概念;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 4
+      "from_blocks": "PCB概念;光刻胶;存储芯片;氟化工概念;英伟达概念;高科技汇总",
+      "block_count": 6
     },
     {
       "code": "300802",
@@ -3546,20 +3625,20 @@
     {
       "code": "300806",
       "name": "斯迪克",
-      "from_blocks": "PCB概念;光刻胶;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 5
+      "from_blocks": "PCB概念;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 4
     },
     {
       "code": "300809",
       "name": "华辰装备",
-      "from_blocks": "光刻机;第三代半导体;高科技汇总",
-      "block_count": 3
+      "from_blocks": "光刻机;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "300811",
       "name": "铂科新材",
-      "from_blocks": "共封装光学(CPO);英伟达概念;高科技汇总",
-      "block_count": 3
+      "from_blocks": "英伟达概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "300812",
@@ -3572,6 +3651,12 @@
       "name": "中富电路",
       "from_blocks": "PCB概念;共封装光学(CPO);存储芯片;英伟达概念;铜缆高速连接;高科技汇总",
       "block_count": 6
+    },
+    {
+      "code": "300816",
+      "name": "艾可蓝",
+      "from_blocks": "算力租赁",
+      "block_count": 1
     },
     {
       "code": "300817",
@@ -3588,8 +3673,8 @@
     {
       "code": "300820",
       "name": "英杰电气",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "第三代半导体;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "300825",
@@ -3622,6 +3707,12 @@
       "block_count": 2
     },
     {
+      "code": "300846",
+      "name": "首都在线",
+      "from_blocks": "算力租赁",
+      "block_count": 1
+    },
+    {
       "code": "300852",
       "name": "四会富仕",
       "from_blocks": "PCB概念;存储芯片;英伟达概念;高科技汇总",
@@ -3630,8 +3721,8 @@
     {
       "code": "300857",
       "name": "协创数据",
-      "from_blocks": "算力租赁;高科技汇总",
-      "block_count": 2
+      "from_blocks": "共封装光学(CPO);算力租赁;高科技汇总",
+      "block_count": 3
     },
     {
       "code": "300863",
@@ -3648,38 +3739,50 @@
     {
       "code": "300879",
       "name": "大叶股份",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "减速器;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "300881",
       "name": "盛德鑫泰",
-      "from_blocks": "减速器;高科技汇总",
-      "block_count": 2
-    },
-    {
-      "code": "300885",
-      "name": "海昌新材",
-      "from_blocks": "减速器;高科技汇总",
-      "block_count": 2
-    },
-    {
-      "code": "300903",
-      "name": "科翔股份",
-      "from_blocks": "PCB概念;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 4
-    },
-    {
-      "code": "300904",
-      "name": "威力传动",
       "from_blocks": "高科技汇总",
       "block_count": 1
     },
     {
+      "code": "300885",
+      "name": "海昌新材",
+      "from_blocks": "高科技汇总",
+      "block_count": 1
+    },
+    {
+      "code": "300895",
+      "name": "铜牛信息",
+      "from_blocks": "算力租赁",
+      "block_count": 1
+    },
+    {
+      "code": "300903",
+      "name": "科翔股份",
+      "from_blocks": "PCB概念;共封装光学(CPO);存储芯片;英伟达概念;高科技汇总",
+      "block_count": 5
+    },
+    {
+      "code": "300904",
+      "name": "威力传动",
+      "from_blocks": "减速器;高科技汇总",
+      "block_count": 2
+    },
+    {
       "code": "300905",
       "name": "宝丽迪",
-      "from_blocks": "光刻胶;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
+    },
+    {
+      "code": "300911",
+      "name": "亿田智能",
+      "from_blocks": "算力租赁",
+      "block_count": 1
     },
     {
       "code": "300913",
@@ -3694,15 +3797,15 @@
       "block_count": 1
     },
     {
-      "code": "300921",
-      "name": "南凌科技",
-      "from_blocks": "算力租赁",
-      "block_count": 1
-    },
-    {
       "code": "300923",
       "name": "研奥股份",
       "from_blocks": "电子纸",
+      "block_count": 1
+    },
+    {
+      "code": "300933",
+      "name": "中辰股份",
+      "from_blocks": "算力租赁",
       "block_count": 1
     },
     {
@@ -3780,8 +3883,14 @@
     {
       "code": "301013",
       "name": "利和兴",
-      "from_blocks": "PCB概念;共封装光学(CPO);存储芯片;英伟达概念;高科技汇总",
-      "block_count": 5
+      "from_blocks": "PCB概念;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 4
+    },
+    {
+      "code": "301018",
+      "name": "申菱环境",
+      "from_blocks": "产业链精选",
+      "block_count": 1
     },
     {
       "code": "301021",
@@ -3792,8 +3901,8 @@
     {
       "code": "301023",
       "name": "奕帆传动",
-      "from_blocks": "减速器;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "301026",
@@ -3816,8 +3925,8 @@
     {
       "code": "301036",
       "name": "双乐股份",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "光刻胶;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "301041",
@@ -3846,14 +3955,14 @@
     {
       "code": "301085",
       "name": "亚康股份",
-      "from_blocks": "算力租赁;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "301095",
       "name": "广立微",
-      "from_blocks": "光刻机;第三代半导体;高科技汇总",
-      "block_count": 3
+      "from_blocks": "光刻机;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "301099",
@@ -3870,8 +3979,8 @@
     {
       "code": "301107",
       "name": "瑜欣电子",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "减速器;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "301118",
@@ -3882,14 +3991,14 @@
     {
       "code": "301123",
       "name": "奕东电子",
-      "from_blocks": "PCB概念;共封装光学(CPO);存储芯片;英伟达概念;铜缆高速连接;高科技汇总",
-      "block_count": 6
+      "from_blocks": "PCB概念;存储芯片;英伟达概念;铜缆高速连接;高科技汇总",
+      "block_count": 5
     },
     {
       "code": "301128",
       "name": "强瑞技术",
-      "from_blocks": "PCB概念;光刻机;共封装光学(CPO);存储芯片;英伟达概念;高科技汇总",
-      "block_count": 6
+      "from_blocks": "PCB概念;光刻机;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 5
     },
     {
       "code": "301129",
@@ -3910,6 +4019,12 @@
       "block_count": 4
     },
     {
+      "code": "301139",
+      "name": "元道通信",
+      "from_blocks": "算力租赁",
+      "block_count": 1
+    },
+    {
       "code": "301150",
       "name": "中一科技",
       "from_blocks": "PCB概念;PET铜箔;存储芯片;英伟达概念;高科技汇总",
@@ -3924,8 +4039,8 @@
     {
       "code": "301170",
       "name": "锡南科技",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "减速器;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "301172",
@@ -3952,12 +4067,6 @@
       "block_count": 2
     },
     {
-      "code": "301189",
-      "name": "奥尼电子",
-      "from_blocks": "算力租赁",
-      "block_count": 1
-    },
-    {
       "code": "301191",
       "name": "菲菱科思",
       "from_blocks": "F5G概念",
@@ -3966,8 +4075,8 @@
     {
       "code": "301196",
       "name": "唯科科技",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "光纤概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "301200",
@@ -3984,38 +4093,38 @@
     {
       "code": "301205",
       "name": "联特科技",
-      "from_blocks": "共封装光学(CPO);高科技汇总",
-      "block_count": 2
-    },
-    {
-      "code": "301209",
-      "name": "联合化学",
-      "from_blocks": "光刻机;光刻胶;高科技汇总",
-      "block_count": 3
-    },
-    {
-      "code": "301210",
-      "name": "金杨精密",
-      "from_blocks": "减速器;高科技汇总",
-      "block_count": 2
-    },
-    {
-      "code": "301213",
-      "name": "观想科技",
-      "from_blocks": "第三代半导体;高科技汇总",
-      "block_count": 2
-    },
-    {
-      "code": "301216",
-      "name": "万凯新材",
       "from_blocks": "高科技汇总",
       "block_count": 1
     },
     {
+      "code": "301209",
+      "name": "联合化学",
+      "from_blocks": "光刻机;高科技汇总",
+      "block_count": 2
+    },
+    {
+      "code": "301210",
+      "name": "金杨精密",
+      "from_blocks": "高科技汇总",
+      "block_count": 1
+    },
+    {
+      "code": "301213",
+      "name": "观想科技",
+      "from_blocks": "高科技汇总",
+      "block_count": 1
+    },
+    {
+      "code": "301216",
+      "name": "万凯新材",
+      "from_blocks": "减速器;高科技汇总",
+      "block_count": 2
+    },
+    {
       "code": "301217",
       "name": "铜冠铜箔",
-      "from_blocks": "PCB概念;PET铜箔;高科技汇总",
-      "block_count": 3
+      "from_blocks": "PCB概念;PET铜箔;产业链精选;高科技汇总",
+      "block_count": 4
     },
     {
       "code": "301219",
@@ -4060,6 +4169,12 @@
       "block_count": 2
     },
     {
+      "code": "301248",
+      "name": "杰创智能",
+      "from_blocks": "算力租赁",
+      "block_count": 1
+    },
+    {
       "code": "301251",
       "name": "威尔高",
       "from_blocks": "PCB概念;存储芯片;英伟达概念;高科技汇总",
@@ -4074,14 +4189,14 @@
     {
       "code": "301256",
       "name": "华融化学",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "光刻胶;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "301261",
       "name": "恒工精密",
-      "from_blocks": "减速器;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "301265",
@@ -4122,14 +4237,14 @@
     {
       "code": "301297",
       "name": "富乐德",
-      "from_blocks": "中芯国际概念;光刻机;高科技汇总",
-      "block_count": 3
+      "from_blocks": "光刻机;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "301298",
       "name": "东利机械",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "减速器;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "301306",
@@ -4146,8 +4261,8 @@
     {
       "code": "301308",
       "name": "江波龙",
-      "from_blocks": "AI PC;国家大基金持股;高科技汇总",
-      "block_count": 3
+      "from_blocks": "AI PC;产业链精选;国家大基金持股;高科技汇总",
+      "block_count": 4
     },
     {
       "code": "301310",
@@ -4182,8 +4297,8 @@
     {
       "code": "301322",
       "name": "绿通科技",
-      "from_blocks": "中芯国际概念;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "301325",
@@ -4206,8 +4321,8 @@
     {
       "code": "301338",
       "name": "凯格精机",
-      "from_blocks": "PCB概念;存储芯片;第三代半导体;英伟达概念;高科技汇总",
-      "block_count": 5
+      "from_blocks": "PCB概念;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 4
     },
     {
       "code": "301348",
@@ -4218,14 +4333,14 @@
     {
       "code": "301349",
       "name": "信德新材",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "光纤概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "301353",
       "name": "普莱得",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "减速器;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "301358",
@@ -4254,8 +4369,8 @@
     {
       "code": "301369",
       "name": "联动科技",
-      "from_blocks": "中芯国际概念;第三代半导体;高科技汇总",
-      "block_count": 3
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "301377",
@@ -4284,8 +4399,8 @@
     {
       "code": "301392",
       "name": "汇成真空",
-      "from_blocks": "PET铜箔;第三代半导体;高科技汇总",
-      "block_count": 3
+      "from_blocks": "PET铜箔;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "301396",
@@ -4326,8 +4441,8 @@
     {
       "code": "301489",
       "name": "思泉新材",
-      "from_blocks": "AI PC;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "301499",
@@ -4344,8 +4459,8 @@
     {
       "code": "301509",
       "name": "金凯生科",
-      "from_blocks": "氟化工概念;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "301510",
@@ -4356,8 +4471,8 @@
     {
       "code": "301511",
       "name": "德福科技",
-      "from_blocks": "PCB概念;PET铜箔;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 5
+      "from_blocks": "PCB概念;PET铜箔;产业链精选;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 6
     },
     {
       "code": "301512",
@@ -4374,8 +4489,8 @@
     {
       "code": "301526",
       "name": "国际复材",
-      "from_blocks": "PCB概念;存储芯片;电子布概念;英伟达概念;高科技汇总",
-      "block_count": 5
+      "from_blocks": "PCB概念;产业链精选;存储芯片;电子布概念;英伟达概念;高科技汇总",
+      "block_count": 6
     },
     {
       "code": "301550",
@@ -4398,8 +4513,8 @@
     {
       "code": "301568",
       "name": "思泰克",
-      "from_blocks": "PCB概念;光刻机;光刻胶;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 6
+      "from_blocks": "PCB概念;光刻机;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 5
     },
     {
       "code": "301591",
@@ -4416,14 +4531,14 @@
     {
       "code": "301596",
       "name": "瑞迪智驱",
-      "from_blocks": "减速器;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "301599",
       "name": "",
-      "from_blocks": "光刻胶;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "301601",
@@ -4440,8 +4555,8 @@
     {
       "code": "301607",
       "name": "富特科技",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "第三代半导体;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "301611",
@@ -4474,16 +4589,10 @@
       "block_count": 2
     },
     {
-      "code": "301638",
-      "name": "南网数字",
-      "from_blocks": "算力租赁",
-      "block_count": 1
-    },
-    {
       "code": "301656",
       "name": "联合动力",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "减速器;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "301665",
@@ -4578,14 +4687,14 @@
     {
       "code": "600105",
       "name": "永鼎股份",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "产业链精选;光纤概念;高科技汇总",
+      "block_count": 3
     },
     {
       "code": "600110",
       "name": "诺德股份",
-      "from_blocks": "PCB概念;PET铜箔;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 5
+      "from_blocks": "PCB概念;PET铜箔;产业链精选;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 6
     },
     {
       "code": "600111",
@@ -4596,8 +4705,8 @@
     {
       "code": "600114",
       "name": "东睦股份",
-      "from_blocks": "减速器;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "600116",
@@ -4618,10 +4727,16 @@
       "block_count": 2
     },
     {
+      "code": "600131",
+      "name": "国网信通",
+      "from_blocks": "算力租赁",
+      "block_count": 1
+    },
+    {
       "code": "600141",
       "name": "兴发集团",
-      "from_blocks": "中芯国际概念;氟化工概念;高科技汇总",
-      "block_count": 3
+      "from_blocks": "中芯国际概念;光纤概念;氟化工概念;高科技汇总",
+      "block_count": 4
     },
     {
       "code": "600143",
@@ -4644,8 +4759,8 @@
     {
       "code": "600160",
       "name": "巨化股份",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "中芯国际概念;产业链精选;氟化工概念;高科技汇总",
+      "block_count": 4
     },
     {
       "code": "600169",
@@ -4674,26 +4789,26 @@
     {
       "code": "600176",
       "name": "中国巨石",
-      "from_blocks": "PCB概念;存储芯片;电子布概念;英伟达概念;高科技汇总",
-      "block_count": 5
+      "from_blocks": "PCB概念;产业链精选;存储芯片;电子布概念;英伟达概念;高科技汇总",
+      "block_count": 6
     },
     {
       "code": "600178",
       "name": "东安动力",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "减速器;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "600183",
       "name": "生益科技",
-      "from_blocks": "PCB概念;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 4
+      "from_blocks": "PCB概念;产业链精选;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 5
     },
     {
       "code": "600184",
       "name": "光电股份",
-      "from_blocks": "共封装光学(CPO);高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "600188",
@@ -4704,8 +4819,8 @@
     {
       "code": "600206",
       "name": "有研新材",
-      "from_blocks": "中芯国际概念;国家大基金持股;稀土永磁;高科技汇总",
-      "block_count": 4
+      "from_blocks": "中芯国际概念;产业链精选;光纤概念;国家大基金持股;稀土永磁;高科技汇总",
+      "block_count": 6
     },
     {
       "code": "600217",
@@ -4716,8 +4831,8 @@
     {
       "code": "600218",
       "name": "全柴动力",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "减速器;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "600226",
@@ -4726,10 +4841,16 @@
       "block_count": 3
     },
     {
+      "code": "600234",
+      "name": "科新发展",
+      "from_blocks": "算力租赁",
+      "block_count": 1
+    },
+    {
       "code": "600237",
       "name": "铜峰电子",
-      "from_blocks": "PET铜箔;高科技汇总",
-      "block_count": 2
+      "from_blocks": "PET铜箔;产业链精选;高科技汇总",
+      "block_count": 3
     },
     {
       "code": "600243",
@@ -4754,6 +4875,12 @@
       "name": "中稀有色",
       "from_blocks": "稀土永磁;高科技汇总",
       "block_count": 2
+    },
+    {
+      "code": "600284",
+      "name": "浦东建设",
+      "from_blocks": "算力租赁",
+      "block_count": 1
     },
     {
       "code": "600288",
@@ -4830,8 +4957,8 @@
     {
       "code": "600345",
       "name": "长江通信",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "光纤概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "600346",
@@ -4878,14 +5005,14 @@
     {
       "code": "600372",
       "name": "中航机载",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "光纤概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "600378",
       "name": "昊华科技",
-      "from_blocks": "PCB概念;中芯国际概念;存储芯片;氟化工概念;英伟达概念;高科技汇总",
-      "block_count": 6
+      "from_blocks": "PCB概念;中芯国际概念;产业链精选;存储芯片;氟化工概念;英伟达概念;高科技汇总",
+      "block_count": 7
     },
     {
       "code": "600382",
@@ -4920,8 +5047,8 @@
     {
       "code": "600460",
       "name": "士兰微",
-      "from_blocks": "国家大基金持股;高科技汇总",
-      "block_count": 2
+      "from_blocks": "产业链精选;国家大基金持股;第三代半导体;高科技汇总",
+      "block_count": 4
     },
     {
       "code": "600478",
@@ -4932,8 +5059,8 @@
     {
       "code": "600487",
       "name": "亨通光电",
-      "from_blocks": "F5G概念;高科技汇总",
-      "block_count": 2
+      "from_blocks": "F5G概念;产业链精选;光纤概念;共封装光学(CPO);高科技汇总",
+      "block_count": 5
     },
     {
       "code": "600489",
@@ -4950,14 +5077,14 @@
     {
       "code": "600497",
       "name": "驰宏锌锗",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "光纤概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "600498",
       "name": "烽火通信",
-      "from_blocks": "F5G概念;高科技汇总",
-      "block_count": 2
+      "from_blocks": "F5G概念;产业链精选;光纤概念;共封装光学(CPO);高科技汇总",
+      "block_count": 5
     },
     {
       "code": "600500",
@@ -4968,8 +5095,8 @@
     {
       "code": "600509",
       "name": "天富能源",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "第三代半导体;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "600510",
@@ -4992,8 +5119,8 @@
     {
       "code": "600522",
       "name": "中天科技",
-      "from_blocks": "PCB概念;PET铜箔;存储芯片;英伟达概念;铜缆高速连接;高科技汇总",
-      "block_count": 6
+      "from_blocks": "PCB概念;PET铜箔;产业链精选;光纤概念;共封装光学(CPO);存储芯片;英伟达概念;铜缆高速连接;高科技汇总",
+      "block_count": 9
     },
     {
       "code": "600525",
@@ -5016,20 +5143,20 @@
     {
       "code": "600549",
       "name": "厦门钨业",
-      "from_blocks": "稀土永磁;高科技汇总",
-      "block_count": 2
+      "from_blocks": "产业链精选;稀土永磁;高科技汇总",
+      "block_count": 3
     },
     {
       "code": "600552",
       "name": "凯盛科技",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "产业链精选;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "600563",
       "name": "法拉电子",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "产业链精选;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "600570",
@@ -5052,8 +5179,8 @@
     {
       "code": "600584",
       "name": "长电科技",
-      "from_blocks": "中芯国际概念;国家大基金持股;高科技汇总",
-      "block_count": 3
+      "from_blocks": "中芯国际概念;产业链精选;共封装光学(CPO);国家大基金持股;第三代半导体;高科技汇总",
+      "block_count": 6
     },
     {
       "code": "600587",
@@ -5076,8 +5203,8 @@
     {
       "code": "600596",
       "name": "新安股份",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "光纤概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "600601",
@@ -5094,8 +5221,8 @@
     {
       "code": "600618",
       "name": "氯碱化工",
-      "from_blocks": "环氧丙烷;高科技汇总",
-      "block_count": 2
+      "from_blocks": "氟化工概念;环氧丙烷;高科技汇总",
+      "block_count": 3
     },
     {
       "code": "600619",
@@ -5106,20 +5233,26 @@
     {
       "code": "600623",
       "name": "华谊集团",
-      "from_blocks": "氟化工概念;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "600641",
       "name": "先导基电",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "第三代半导体;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "600655",
       "name": "豫园股份",
       "from_blocks": "培育钻石;高科技汇总",
       "block_count": 2
+    },
+    {
+      "code": "600666",
+      "name": "奥瑞德",
+      "from_blocks": "算力租赁",
+      "block_count": 1
     },
     {
       "code": "600667",
@@ -5130,8 +5263,8 @@
     {
       "code": "600673",
       "name": "东阳光",
-      "from_blocks": "氟化工概念;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "600674",
@@ -5148,13 +5281,19 @@
     {
       "code": "600703",
       "name": "三安光电",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "产业链精选;共封装光学(CPO);第三代半导体;高科技汇总",
+      "block_count": 4
     },
     {
       "code": "600704",
       "name": "物产中大",
       "from_blocks": "高科技汇总",
+      "block_count": 1
+    },
+    {
+      "code": "600707",
+      "name": "彩虹股份",
+      "from_blocks": "产业链精选",
       "block_count": 1
     },
     {
@@ -5226,8 +5365,8 @@
     {
       "code": "600869",
       "name": "远东股份",
-      "from_blocks": "PET铜箔;铜缆高速连接;高科技汇总",
-      "block_count": 3
+      "from_blocks": "PET铜箔;产业链精选;光纤概念;铜缆高速连接;高科技汇总",
+      "block_count": 5
     },
     {
       "code": "600879",
@@ -5292,14 +5431,14 @@
     {
       "code": "600962",
       "name": "国投中鲁",
-      "from_blocks": "中芯国际概念;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "600967",
       "name": "内蒙一机",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "减速器;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "600973",
@@ -5382,8 +5521,8 @@
     {
       "code": "601138",
       "name": "工业富联",
-      "from_blocks": "共封装光学(CPO);算力租赁;英伟达概念;高科技汇总",
-      "block_count": 4
+      "from_blocks": "英伟达概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "601168",
@@ -5400,8 +5539,8 @@
     {
       "code": "601179",
       "name": "中国西电",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "第三代半导体;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "601186",
@@ -5412,8 +5551,8 @@
     {
       "code": "601208",
       "name": "东材科技",
-      "from_blocks": "PCB概念;PET铜箔;光刻胶;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 6
+      "from_blocks": "PCB概念;PET铜箔;产业链精选;光刻胶;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 7
     },
     {
       "code": "601212",
@@ -5448,8 +5587,8 @@
     {
       "code": "601608",
       "name": "中信重工",
-      "from_blocks": "F5G概念;高科技汇总",
-      "block_count": 2
+      "from_blocks": "F5G概念;减速器;高科技汇总",
+      "block_count": 3
     },
     {
       "code": "601609",
@@ -5466,8 +5605,8 @@
     {
       "code": "601678",
       "name": "滨化股份",
-      "from_blocks": "环氧丙烷;高科技汇总",
-      "block_count": 2
+      "from_blocks": "氟化工概念;环氧丙烷;高科技汇总",
+      "block_count": 3
     },
     {
       "code": "601689",
@@ -5478,8 +5617,8 @@
     {
       "code": "601727",
       "name": "上海电气",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "减速器;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "601728",
@@ -5496,8 +5635,8 @@
     {
       "code": "601869",
       "name": "长飞光纤",
-      "from_blocks": "铜缆高速连接;高科技汇总",
-      "block_count": 2
+      "from_blocks": "产业链精选;光纤概念;共封装光学(CPO);第三代半导体;铜缆高速连接;高科技汇总",
+      "block_count": 6
     },
     {
       "code": "601899",
@@ -5514,8 +5653,8 @@
     {
       "code": "601958",
       "name": "金钼股份",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "产业链精选;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "601969",
@@ -5526,8 +5665,8 @@
     {
       "code": "603002",
       "name": "宏昌电子",
-      "from_blocks": "PCB概念;存储芯片;电子布概念;英伟达概念;高科技汇总",
-      "block_count": 5
+      "from_blocks": "PCB概念;产业链精选;存储芯片;电子布概念;英伟达概念;高科技汇总",
+      "block_count": 6
     },
     {
       "code": "603005",
@@ -5544,32 +5683,32 @@
     {
       "code": "603011",
       "name": "合锻智能",
-      "from_blocks": "PCB概念;共封装光学(CPO);高科技汇总",
-      "block_count": 3
+      "from_blocks": "PCB概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "603019",
       "name": "中科曙光",
-      "from_blocks": "算力租赁;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "603026",
       "name": "石大胜华",
-      "from_blocks": "环氧丙烷;高科技汇总",
-      "block_count": 2
+      "from_blocks": "氟化工概念;环氧丙烷;高科技汇总",
+      "block_count": 3
     },
     {
       "code": "603031",
       "name": "XD安孚科",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "AI PC;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "603032",
       "name": "德新科技",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "减速器;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "603039",
@@ -5580,14 +5719,14 @@
     {
       "code": "603042",
       "name": "华脉科技",
-      "from_blocks": "F5G概念;铜缆高速连接;高科技汇总",
-      "block_count": 3
+      "from_blocks": "F5G概念;光纤概念;铜缆高速连接;高科技汇总",
+      "block_count": 4
     },
     {
       "code": "603052",
       "name": "可川科技",
-      "from_blocks": "共封装光学(CPO);高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "603058",
@@ -5616,14 +5755,14 @@
     {
       "code": "603078",
       "name": "江化微",
-      "from_blocks": "氟化工概念;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "603083",
       "name": "剑桥科技",
-      "from_blocks": "F5G概念;共封装光学(CPO);高科技汇总",
-      "block_count": 3
+      "from_blocks": "F5G概念;产业链精选;共封装光学(CPO);高科技汇总",
+      "block_count": 4
     },
     {
       "code": "603110",
@@ -5640,8 +5779,8 @@
     {
       "code": "603119",
       "name": "浙江荣泰",
-      "from_blocks": "减速器;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "603120",
@@ -5676,8 +5815,8 @@
     {
       "code": "603160",
       "name": "汇顶科技",
-      "from_blocks": "电子纸;高科技汇总",
-      "block_count": 2
+      "from_blocks": "中芯国际概念;电子纸;高科技汇总",
+      "block_count": 3
     },
     {
       "code": "603163",
@@ -5718,20 +5857,14 @@
     {
       "code": "603186",
       "name": "华正新材",
-      "from_blocks": "PCB概念;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 4
+      "from_blocks": "PCB概念;产业链精选;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 5
     },
     {
       "code": "603203",
       "name": "快克智能",
-      "from_blocks": "PCB概念;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 4
-    },
-    {
-      "code": "603206",
-      "name": "嘉环科技",
-      "from_blocks": "算力租赁",
-      "block_count": 1
+      "from_blocks": "PCB概念;中芯国际概念;共封装光学(CPO);存储芯片;第三代半导体;英伟达概念;高科技汇总",
+      "block_count": 7
     },
     {
       "code": "603212",
@@ -5748,20 +5881,20 @@
     {
       "code": "603220",
       "name": "中贝通信",
-      "from_blocks": "F5G概念;算力租赁;高科技汇总",
-      "block_count": 3
+      "from_blocks": "F5G概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "603228",
       "name": "景旺电子",
-      "from_blocks": "AI PC;PCB概念;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 5
+      "from_blocks": "PCB概念;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 4
     },
     {
       "code": "603256",
       "name": "宏和科技",
-      "from_blocks": "PCB概念;存储芯片;电子布概念;英伟达概念;高科技汇总",
-      "block_count": 5
+      "from_blocks": "PCB概念;产业链精选;存储芯片;电子布概念;英伟达概念;高科技汇总",
+      "block_count": 6
     },
     {
       "code": "603257",
@@ -5772,8 +5905,8 @@
     {
       "code": "603260",
       "name": "合盛硅业",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "光纤概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "603267",
@@ -5784,8 +5917,8 @@
     {
       "code": "603270",
       "name": "金帝股份",
-      "from_blocks": "减速器;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "603271",
@@ -5832,20 +5965,14 @@
     {
       "code": "603306",
       "name": "华懋科技",
-      "from_blocks": "光刻胶;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "603310",
       "name": "巍华新材",
       "from_blocks": "氟化工概念;高科技汇总",
       "block_count": 2
-    },
-    {
-      "code": "603315",
-      "name": "福鞍股份",
-      "from_blocks": "算力租赁",
-      "block_count": 1
     },
     {
       "code": "603316",
@@ -5860,16 +5987,10 @@
       "block_count": 1
     },
     {
-      "code": "603322",
-      "name": "超讯通信",
-      "from_blocks": "算力租赁",
-      "block_count": 1
-    },
-    {
       "code": "603324",
       "name": "盛剑科技",
-      "from_blocks": "中芯国际概念;光刻胶;高科技汇总",
-      "block_count": 3
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "603327",
@@ -5892,8 +6013,8 @@
     {
       "code": "603333",
       "name": "尚纬股份",
-      "from_blocks": "氟化工概念;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "603341",
@@ -5910,8 +6031,8 @@
     {
       "code": "603358",
       "name": "华达科技",
-      "from_blocks": "中芯国际概念;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "603360",
@@ -5928,8 +6049,8 @@
     {
       "code": "603379",
       "name": "三美股份",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "产业链精选;氟化工概念;高科技汇总",
+      "block_count": 3
     },
     {
       "code": "603386",
@@ -5968,12 +6089,6 @@
       "block_count": 4
     },
     {
-      "code": "603496",
-      "name": "恒为科技",
-      "from_blocks": "算力租赁",
-      "block_count": 1
-    },
-    {
       "code": "603500",
       "name": "祥和实业",
       "from_blocks": "高科技汇总",
@@ -5982,14 +6097,14 @@
     {
       "code": "603501",
       "name": "豪威集团",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "中芯国际概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "603505",
       "name": "金石资源",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "氟化工概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "603519",
@@ -6000,8 +6115,8 @@
     {
       "code": "603520",
       "name": "司太立",
-      "from_blocks": "氟化工概念;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "603527",
@@ -6024,8 +6139,8 @@
     {
       "code": "603595",
       "name": "ST东尼",
-      "from_blocks": "第三代半导体;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "603601",
@@ -6034,16 +6149,10 @@
       "block_count": 1
     },
     {
-      "code": "603602",
-      "name": "纵横通信",
-      "from_blocks": "算力租赁",
-      "block_count": 1
-    },
-    {
       "code": "603618",
       "name": "杭电股份",
-      "from_blocks": "PET铜箔;高科技汇总",
-      "block_count": 2
+      "from_blocks": "PET铜箔;产业链精选;光纤概念;高科技汇总",
+      "block_count": 4
     },
     {
       "code": "603626",
@@ -6060,20 +6169,20 @@
     {
       "code": "603633",
       "name": "徕木股份",
-      "from_blocks": "中芯国际概念;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "603638",
       "name": "艾迪精密",
-      "from_blocks": "减速器;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "603650",
       "name": "彤程新材",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "中芯国际概念;产业链精选;光刻胶;高科技汇总",
+      "block_count": 4
     },
     {
       "code": "603659",
@@ -6096,14 +6205,14 @@
     {
       "code": "603667",
       "name": "五洲新春",
-      "from_blocks": "减速器;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "603678",
       "name": "火炬电子",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "产业链精选;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "603683",
@@ -6120,14 +6229,14 @@
     {
       "code": "603688",
       "name": "石英股份",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "光纤概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "603690",
       "name": "至纯科技",
-      "from_blocks": "中芯国际概念;高科技汇总",
-      "block_count": 2
+      "from_blocks": "中芯国际概念;光纤概念;高科技汇总",
+      "block_count": 3
     },
     {
       "code": "603703",
@@ -6138,8 +6247,8 @@
     {
       "code": "603717",
       "name": "天域生物",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "氟化工概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "603726",
@@ -6150,8 +6259,8 @@
     {
       "code": "603728",
       "name": "鸣志电器",
-      "from_blocks": "减速器;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "603733",
@@ -6162,8 +6271,8 @@
     {
       "code": "603738",
       "name": "泰晶科技",
-      "from_blocks": "光刻机;高科技汇总",
-      "block_count": 2
+      "from_blocks": "光刻机;共封装光学(CPO);高科技汇总",
+      "block_count": 3
     },
     {
       "code": "603759",
@@ -6180,8 +6289,8 @@
     {
       "code": "603773",
       "name": "沃格光电",
-      "from_blocks": "PET铜箔;光刻机;高科技汇总",
-      "block_count": 3
+      "from_blocks": "PET铜箔;产业链精选;光刻机;共封装光学(CPO);高科技汇总",
+      "block_count": 5
     },
     {
       "code": "603776",
@@ -6216,8 +6325,8 @@
     {
       "code": "603809",
       "name": "豪能股份",
-      "from_blocks": "减速器;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "603823",
@@ -6234,14 +6343,14 @@
     {
       "code": "603843",
       "name": "*ST正平",
-      "from_blocks": "算力租赁;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "603881",
       "name": "数据港",
-      "from_blocks": "算力租赁;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "603890",
@@ -6262,12 +6371,6 @@
       "block_count": 1
     },
     {
-      "code": "603912",
-      "name": "佳力图",
-      "from_blocks": "算力租赁",
-      "block_count": 1
-    },
-    {
       "code": "603915",
       "name": "国茂股份",
       "from_blocks": "高科技汇总",
@@ -6282,8 +6385,8 @@
     {
       "code": "603928",
       "name": "兴业股份",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "光刻胶;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "603929",
@@ -6294,8 +6397,8 @@
     {
       "code": "603931",
       "name": "格林达",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "光刻胶;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "603933",
@@ -6306,14 +6409,14 @@
     {
       "code": "603936",
       "name": "博敏电子",
-      "from_blocks": "AI PC;PCB概念;共封装光学(CPO);存储芯片;第三代半导体;英伟达概念;高科技汇总",
-      "block_count": 7
+      "from_blocks": "AI PC;PCB概念;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 5
     },
     {
       "code": "603938",
       "name": "三孚股份",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "光纤概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "603960",
@@ -6342,13 +6445,19 @@
     {
       "code": "603982",
       "name": "泉峰汽车",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "减速器;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "603986",
       "name": "兆易创新",
-      "from_blocks": "高科技汇总",
+      "from_blocks": "产业链精选;高科技汇总",
+      "block_count": 2
+    },
+    {
+      "code": "603989",
+      "name": "艾华集团",
+      "from_blocks": "产业链精选",
       "block_count": 1
     },
     {
@@ -6378,8 +6487,8 @@
     {
       "code": "605020",
       "name": "永和股份",
-      "from_blocks": "环氧丙烷;高科技汇总",
-      "block_count": 2
+      "from_blocks": "氟化工概念;环氧丙烷;高科技汇总",
+      "block_count": 3
     },
     {
       "code": "605055",
@@ -6396,8 +6505,8 @@
     {
       "code": "605111",
       "name": "新洁能",
-      "from_blocks": "第三代半导体;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "605168",
@@ -6414,8 +6523,8 @@
     {
       "code": "605208",
       "name": "永茂泰",
-      "from_blocks": "减速器;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "605258",
@@ -6438,8 +6547,8 @@
     {
       "code": "605358",
       "name": "立昂微",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "产业链精选;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "605366",
@@ -6462,20 +6571,20 @@
     {
       "code": "605580",
       "name": "恒盛能源",
-      "from_blocks": "培育钻石;高科技汇总",
-      "block_count": 2
+      "from_blocks": "培育钻石;第三代半导体;高科技汇总",
+      "block_count": 3
     },
     {
       "code": "605589",
       "name": "圣泉集团",
-      "from_blocks": "PCB概念;光刻胶;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 5
+      "from_blocks": "PCB概念;产业链精选;光刻胶;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 6
     },
     {
       "code": "688003",
       "name": "天准科技",
-      "from_blocks": "PCB概念;存储芯片;第三代半导体;英伟达概念;高科技汇总",
-      "block_count": 5
+      "from_blocks": "PCB概念;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 4
     },
     {
       "code": "688005",
@@ -6498,14 +6607,14 @@
     {
       "code": "688012",
       "name": "中微公司",
-      "from_blocks": "中芯国际概念;国家大基金持股;高科技汇总",
-      "block_count": 3
+      "from_blocks": "中芯国际概念;产业链精选;国家大基金持股;高科技汇总",
+      "block_count": 4
     },
     {
       "code": "688017",
       "name": "绿的谐波",
-      "from_blocks": "减速器;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "688018",
@@ -6516,8 +6625,8 @@
     {
       "code": "688019",
       "name": "安集科技",
-      "from_blocks": "光刻胶;高科技汇总",
-      "block_count": 2
+      "from_blocks": "中芯国际概念;光刻胶;高科技汇总",
+      "block_count": 3
     },
     {
       "code": "688020",
@@ -6564,8 +6673,8 @@
     {
       "code": "688037",
       "name": "芯源微",
-      "from_blocks": "中芯国际概念;光刻胶;高科技汇总",
-      "block_count": 3
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "688039",
@@ -6588,8 +6697,8 @@
     {
       "code": "688048",
       "name": "长光华芯",
-      "from_blocks": "共封装光学(CPO);第三代半导体;高科技汇总",
-      "block_count": 3
+      "from_blocks": "产业链精选;光纤概念;共封装光学(CPO);第三代半导体;高科技汇总",
+      "block_count": 5
     },
     {
       "code": "688052",
@@ -6648,20 +6757,14 @@
     {
       "code": "688082",
       "name": "盛美上海",
-      "from_blocks": "中芯国际概念;第三代半导体;高科技汇总",
-      "block_count": 3
+      "from_blocks": "产业链精选;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "688093",
       "name": "世华科技",
       "from_blocks": "PCB概念;存储芯片;英伟达概念;高科技汇总",
       "block_count": 4
-    },
-    {
-      "code": "688096",
-      "name": "京源环保",
-      "from_blocks": "算力租赁",
-      "block_count": 1
     },
     {
       "code": "688097",
@@ -6678,8 +6781,8 @@
     {
       "code": "688102",
       "name": "斯瑞新材",
-      "from_blocks": "共封装光学(CPO);高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "688103",
@@ -6690,8 +6793,8 @@
     {
       "code": "688106",
       "name": "金宏气体",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "中芯国际概念;第三代半导体;高科技汇总",
+      "block_count": 3
     },
     {
       "code": "688107",
@@ -6738,8 +6841,8 @@
     {
       "code": "688126",
       "name": "沪硅产业",
-      "from_blocks": "国家大基金持股;高科技汇总",
-      "block_count": 2
+      "from_blocks": "中芯国际概念;产业链精选;国家大基金持股;高科技汇总",
+      "block_count": 4
     },
     {
       "code": "688127",
@@ -6756,8 +6859,8 @@
     {
       "code": "688138",
       "name": "清溢光电",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "中芯国际概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "688143",
@@ -6768,8 +6871,8 @@
     {
       "code": "688146",
       "name": "中船特气",
-      "from_blocks": "中芯国际概念;光刻机;国家大基金持股;氟化工概念;高科技汇总",
-      "block_count": 5
+      "from_blocks": "中芯国际概念;产业链精选;光刻机;国家大基金持股;氟化工概念;高科技汇总",
+      "block_count": 6
     },
     {
       "code": "688147",
@@ -6786,26 +6889,26 @@
     {
       "code": "688157",
       "name": "松井股份",
-      "from_blocks": "PCB概念;光刻胶;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 5
+      "from_blocks": "PCB概念;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 4
     },
     {
       "code": "688158",
       "name": "优刻得-W",
-      "from_blocks": "算力租赁;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "688159",
       "name": "有方科技",
-      "from_blocks": "算力租赁;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "688160",
       "name": "步科股份",
-      "from_blocks": "减速器;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "688162",
@@ -6816,8 +6919,8 @@
     {
       "code": "688165",
       "name": "埃夫特-U",
-      "from_blocks": "减速器;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "688167",
@@ -6834,8 +6937,8 @@
     {
       "code": "688172",
       "name": "燕东微",
-      "from_blocks": "国家大基金持股;第三代半导体;高科技汇总",
-      "block_count": 3
+      "from_blocks": "国家大基金持股;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "688173",
@@ -6894,13 +6997,19 @@
     {
       "code": "688205",
       "name": "德科立",
-      "from_blocks": "F5G概念;共封装光学(CPO);高科技汇总",
-      "block_count": 3
+      "from_blocks": "F5G概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "688206",
       "name": "概伦电子",
       "from_blocks": "高科技汇总",
+      "block_count": 1
+    },
+    {
+      "code": "688207",
+      "name": "格灵深瞳",
+      "from_blocks": "AI PC",
       "block_count": 1
     },
     {
@@ -6928,12 +7037,6 @@
       "block_count": 1
     },
     {
-      "code": "688227",
-      "name": "品高股份",
-      "from_blocks": "算力租赁",
-      "block_count": 1
-    },
-    {
       "code": "688230",
       "name": "芯导科技",
       "from_blocks": "高科技汇总",
@@ -6948,8 +7051,8 @@
     {
       "code": "688234",
       "name": "天岳先进",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "第三代半导体;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "688252",
@@ -6972,8 +7075,8 @@
     {
       "code": "688260",
       "name": "昀冢科技",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "光纤概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "688261",
@@ -6996,8 +7099,8 @@
     {
       "code": "688268",
       "name": "华特气体",
-      "from_blocks": "中芯国际概念;光刻机;光刻胶;氟化工概念;高科技汇总",
-      "block_count": 5
+      "from_blocks": "中芯国际概念;光刻机;光刻胶;氟化工概念;第三代半导体;高科技汇总",
+      "block_count": 6
     },
     {
       "code": "688270",
@@ -7008,14 +7111,14 @@
     {
       "code": "688280",
       "name": "精进电动-UW",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "减速器;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "688286",
       "name": "敏芯股份",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "中芯国际概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "688299",
@@ -7038,8 +7141,8 @@
     {
       "code": "688306",
       "name": "均普智能",
-      "from_blocks": "减速器;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "688307",
@@ -7062,8 +7165,8 @@
     {
       "code": "688313",
       "name": "仕佳光子",
-      "from_blocks": "F5G概念;高科技汇总",
-      "block_count": 2
+      "from_blocks": "F5G概念;产业链精选;光纤概念;共封装光学(CPO);高科技汇总",
+      "block_count": 5
     },
     {
       "code": "688323",
@@ -7074,31 +7177,25 @@
     {
       "code": "688327",
       "name": "云从科技-UW",
-      "from_blocks": "AI PC;算力租赁",
-      "block_count": 2
+      "from_blocks": "AI PC",
+      "block_count": 1
     },
     {
       "code": "688328",
       "name": "深科达",
-      "from_blocks": "电子纸;第三代半导体;高科技汇总",
+      "from_blocks": "共封装光学(CPO);电子纸;高科技汇总",
       "block_count": 3
     },
     {
       "code": "688332",
       "name": "中科蓝讯",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "共封装光学(CPO);高科技汇总",
+      "block_count": 2
     },
     {
       "code": "688333",
       "name": "铂力特",
       "from_blocks": "高科技汇总",
-      "block_count": 1
-    },
-    {
-      "code": "688343",
-      "name": "云天励飞-U",
-      "from_blocks": "算力租赁",
       "block_count": 1
     },
     {
@@ -7128,8 +7225,8 @@
     {
       "code": "688361",
       "name": "中科飞测",
-      "from_blocks": "国家大基金持股;高科技汇总",
-      "block_count": 2
+      "from_blocks": "中芯国际概念;国家大基金持股;高科技汇总",
+      "block_count": 3
     },
     {
       "code": "688362",
@@ -7140,8 +7237,8 @@
     {
       "code": "688368",
       "name": "晶丰明源",
-      "from_blocks": "第三代半导体;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "688371",
@@ -7158,14 +7255,14 @@
     {
       "code": "688375",
       "name": "国博电子",
-      "from_blocks": "第三代半导体;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "688376",
       "name": "美埃科技",
-      "from_blocks": "光刻机;高科技汇总",
-      "block_count": 2
+      "from_blocks": "中芯国际概念;光刻机;高科技汇总",
+      "block_count": 3
     },
     {
       "code": "688378",
@@ -7176,8 +7273,8 @@
     {
       "code": "688379",
       "name": "华光新材",
-      "from_blocks": "共封装光学(CPO);高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "688380",
@@ -7218,14 +7315,14 @@
     {
       "code": "688396",
       "name": "华润微",
-      "from_blocks": "国家大基金持股;高科技汇总",
-      "block_count": 2
+      "from_blocks": "共封装光学(CPO);国家大基金持股;第三代半导体;高科技汇总",
+      "block_count": 4
     },
     {
       "code": "688400",
       "name": "凌云光",
-      "from_blocks": "共封装光学(CPO);高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "688401",
@@ -7284,8 +7381,8 @@
     {
       "code": "688450",
       "name": "光格科技",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "光纤概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "688456",
@@ -7326,8 +7423,8 @@
     {
       "code": "688485",
       "name": "九州一轨",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "光纤概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "688496",
@@ -7338,8 +7435,8 @@
     {
       "code": "688498",
       "name": "源杰科技",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "产业链精选;光纤概念;共封装光学(CPO);高科技汇总",
+      "block_count": 4
     },
     {
       "code": "688499",
@@ -7348,22 +7445,16 @@
       "block_count": 2
     },
     {
-      "code": "688500",
-      "name": "慧辰股份",
-      "from_blocks": "算力租赁",
-      "block_count": 1
-    },
-    {
       "code": "688502",
       "name": "茂莱光学",
-      "from_blocks": "光刻机;光刻胶;高科技汇总",
-      "block_count": 3
+      "from_blocks": "光刻机;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "688503",
       "name": "聚和材料",
-      "from_blocks": "光刻胶;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "688508",
@@ -7398,8 +7489,8 @@
     {
       "code": "688519",
       "name": "南亚新材",
-      "from_blocks": "PCB概念;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 4
+      "from_blocks": "PCB概念;产业链精选;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 5
     },
     {
       "code": "688521",
@@ -7410,8 +7501,8 @@
     {
       "code": "688525",
       "name": "佰维存储",
-      "from_blocks": "AI PC;国家大基金持股;高科技汇总",
-      "block_count": 3
+      "from_blocks": "AI PC;产业链精选;国家大基金持股;高科技汇总",
+      "block_count": 4
     },
     {
       "code": "688530",
@@ -7440,8 +7531,8 @@
     {
       "code": "688545",
       "name": "兴福电子",
-      "from_blocks": "国家大基金持股;高科技汇总",
-      "block_count": 2
+      "from_blocks": "中芯国际概念;光刻胶;国家大基金持股;高科技汇总",
+      "block_count": 4
     },
     {
       "code": "688548",
@@ -7452,32 +7543,32 @@
     {
       "code": "688549",
       "name": "中巨芯-U",
-      "from_blocks": "中芯国际概念;国家大基金持股;氟化工概念;高科技汇总",
+      "from_blocks": "中芯国际概念;产业链精选;国家大基金持股;高科技汇总",
       "block_count": 4
     },
     {
       "code": "688550",
       "name": "瑞联新材",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "光刻胶;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "688556",
       "name": "高测股份",
-      "from_blocks": "减速器;第三代半导体;高科技汇总",
-      "block_count": 3
+      "from_blocks": "减速器;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "688559",
       "name": "海目星",
-      "from_blocks": "PCB概念;存储芯片;电子纸;第三代半导体;英伟达概念;高科技汇总",
-      "block_count": 6
+      "from_blocks": "PCB概念;存储芯片;电子纸;英伟达概念;高科技汇总",
+      "block_count": 5
     },
     {
       "code": "688571",
       "name": "杭华股份",
-      "from_blocks": "PCB概念;光刻胶;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 5
+      "from_blocks": "PCB概念;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 4
     },
     {
       "code": "688573",
@@ -7488,8 +7579,8 @@
     {
       "code": "688589",
       "name": "力合微",
-      "from_blocks": "中芯国际概念;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "688591",
@@ -7512,14 +7603,14 @@
     {
       "code": "688596",
       "name": "正帆科技",
-      "from_blocks": "氟化工概念;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "688598",
       "name": "金博股份",
-      "from_blocks": "第三代半导体;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "688601",
@@ -7530,7 +7621,7 @@
     {
       "code": "688602",
       "name": "康鹏科技",
-      "from_blocks": "氟化工概念;高科技汇总",
+      "from_blocks": "光刻胶;高科技汇总",
       "block_count": 2
     },
     {
@@ -7596,14 +7687,14 @@
     {
       "code": "688630",
       "name": "芯碁微装",
-      "from_blocks": "PCB概念;光刻机;光刻胶;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 6
+      "from_blocks": "PCB概念;光刻机;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 5
     },
     {
       "code": "688635",
       "name": "",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "光纤概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "688646",
@@ -7620,8 +7711,8 @@
     {
       "code": "688655",
       "name": "迅捷兴",
-      "from_blocks": "PCB概念;共封装光学(CPO);存储芯片;英伟达概念;高科技汇总",
-      "block_count": 5
+      "from_blocks": "PCB概念;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 4
     },
     {
       "code": "688659",
@@ -7638,8 +7729,8 @@
     {
       "code": "688668",
       "name": "鼎通科技",
-      "from_blocks": "共封装光学(CPO);铜缆高速连接;高科技汇总",
-      "block_count": 3
+      "from_blocks": "铜缆高速连接;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "688669",
@@ -7656,8 +7747,8 @@
     {
       "code": "688685",
       "name": "迈信林",
-      "from_blocks": "共封装光学(CPO);算力租赁;高科技汇总",
-      "block_count": 3
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "688689",
@@ -7668,14 +7759,14 @@
     {
       "code": "688691",
       "name": "灿芯股份",
-      "from_blocks": "中芯国际概念;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "688693",
       "name": "锴威特",
-      "from_blocks": "第三代半导体;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "688699",
@@ -7710,8 +7801,8 @@
     {
       "code": "688720",
       "name": "艾森股份",
-      "from_blocks": "PCB概念;中芯国际概念;光刻胶;国家大基金持股;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 7
+      "from_blocks": "PCB概念;国家大基金持股;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 5
     },
     {
       "code": "688726",
@@ -7794,14 +7885,14 @@
     {
       "code": "688807",
       "name": "优迅股份",
-      "from_blocks": "共封装光学(CPO);高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "688808",
       "name": "",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "共封装光学(CPO);高科技汇总",
+      "block_count": 2
     },
     {
       "code": "688809",
@@ -7812,8 +7903,8 @@
     {
       "code": "688813",
       "name": "",
-      "from_blocks": "PCB概念;PET铜箔;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 5
+      "from_blocks": "PCB概念;PET铜箔;共封装光学(CPO);存储芯片;英伟达概念;高科技汇总",
+      "block_count": 6
     },
     {
       "code": "688820",
@@ -7830,8 +7921,8 @@
     {
       "code": "920006",
       "name": "晟楠科技",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "减速器;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "920008",
@@ -7842,8 +7933,8 @@
     {
       "code": "920012",
       "name": "",
-      "from_blocks": "第三代半导体;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "920015",
@@ -7872,14 +7963,14 @@
     {
       "code": "920045",
       "name": "蘅东光",
-      "from_blocks": "共封装光学(CPO);高科技汇总",
-      "block_count": 2
+      "from_blocks": "光纤概念;共封装光学(CPO);高科技汇总",
+      "block_count": 3
     },
     {
       "code": "920060",
       "name": "万源通",
-      "from_blocks": "PCB概念;存储芯片;英伟达概念;高科技汇总",
-      "block_count": 4
+      "from_blocks": "AI PC;PCB概念;存储芯片;英伟达概念;高科技汇总",
+      "block_count": 5
     },
     {
       "code": "920061",
@@ -7896,8 +7987,14 @@
     {
       "code": "920083",
       "name": "",
-      "from_blocks": "共封装光学(CPO);高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
+    },
+    {
+      "code": "920092",
+      "name": "汉鑫科技",
+      "from_blocks": "算力租赁",
+      "block_count": 1
     },
     {
       "code": "920099",
@@ -7908,14 +8005,14 @@
     {
       "code": "920100",
       "name": "三协电机",
-      "from_blocks": "减速器;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "920124",
       "name": "南特科技",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "减速器;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "920125",
@@ -7932,8 +8029,8 @@
     {
       "code": "920139",
       "name": "华岭股份",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "中芯国际概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "920152",
@@ -7944,8 +8041,8 @@
     {
       "code": "920171",
       "name": "志晟信息",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "光纤概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "920178",
@@ -7962,8 +8059,8 @@
     {
       "code": "920186",
       "name": "",
-      "from_blocks": "中芯国际概念;国家大基金持股;高科技汇总",
-      "block_count": 3
+      "from_blocks": "国家大基金持股;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "920190",
@@ -7980,8 +8077,8 @@
     {
       "code": "920221",
       "name": "易实精密",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "减速器;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "920223",
@@ -8034,14 +8131,14 @@
     {
       "code": "920378",
       "name": "泰德股份",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "减速器;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "920418",
       "name": "苏轴股份",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "减速器;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "920427",
@@ -8070,8 +8167,8 @@
     {
       "code": "920489",
       "name": "佳先股份",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "光刻胶;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "920509",
@@ -8082,8 +8179,8 @@
     {
       "code": "920510",
       "name": "丰光精密",
-      "from_blocks": "减速器;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "920522",
@@ -8112,14 +8209,14 @@
     {
       "code": "920580",
       "name": "科创新材",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "第三代半导体;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "920593",
       "name": "鼎智科技",
-      "from_blocks": "减速器;高科技汇总",
-      "block_count": 2
+      "from_blocks": "高科技汇总",
+      "block_count": 1
     },
     {
       "code": "920640",
@@ -8130,8 +8227,8 @@
     {
       "code": "920663",
       "name": "明阳科技",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "减速器;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "920665",
@@ -8142,8 +8239,8 @@
     {
       "code": "920682",
       "name": "球冠电缆",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "光纤概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "920690",
@@ -8154,14 +8251,14 @@
     {
       "code": "920719",
       "name": "宁新新材",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "第三代半导体;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "920720",
       "name": "吉冈精密",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "减速器;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "920725",
@@ -8196,8 +8293,8 @@
     {
       "code": "920839",
       "name": "万通液压",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "减速器;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "920870",
@@ -8206,21 +8303,33 @@
       "block_count": 1
     },
     {
+      "code": "920876",
+      "name": "慧为智能",
+      "from_blocks": "AI PC",
+      "block_count": 1
+    },
+    {
       "code": "920879",
       "name": "基康技术",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "光纤概念;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "920896",
       "name": "旺成科技",
-      "from_blocks": "高科技汇总",
-      "block_count": 1
+      "from_blocks": "减速器;高科技汇总",
+      "block_count": 2
     },
     {
       "code": "920914",
       "name": "远航精密",
       "from_blocks": "高科技汇总",
+      "block_count": 1
+    },
+    {
+      "code": "920924",
+      "name": "广脉科技",
+      "from_blocks": "算力租赁",
       "block_count": 1
     },
     {

@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
-"""mode38 区间扫描：大牛股关键位回踩。
+"""mode40 区间扫描：新高回调踩60线回升。
 
 用法:
-  python3 scripts/scan_mode38_period.py --start 2026-06-01 --end 2026-06-17
-  python3 scripts/scan_mode38_period.py --support-ma 20 --start 2026-06-01 --end 2026-06-24
-  python3 scripts/scan_mode38_period.py --support-ma 10 --start 2026-06-01 --end 2026-06-24
-  python3 scripts/scan_mode38_period.py --code 603929 --start 2025-11-01 --end 2026-06-17
+  python3 scripts/scan_mode40_period.py --start 2026-05-01 --end 2026-06-18
+  python3 scripts/scan_mode40_period.py --code 688361 --start 2026-05-01 --end 2026-06-18
+  python3 scripts/scan_mode40_period.py --high-tech --start 2026-06-01 --end 2026-06-18
 """
 from __future__ import annotations
 
@@ -20,12 +19,12 @@ if ROOT not in sys.path:
     sys.path.insert(0, ROOT)
 
 from app.eastmoney import list_cached_stocks_flat, load_stock_list_csv, read_cached_kline_by_code
-from app.mode38_bull_ma_pullback import (
-    MODE38_DISPLAY_NAME,
-    dedupe_mode38_hits,
-    mode38_kw_from_scan_config,
-    mode38_signal_metrics,
-    score_mode38_bull_ma_pullback,
+from app.mode40_high_pullback_ma60_rebound import (
+    MODE40_DISPLAY_NAME,
+    dedupe_mode40_hits,
+    mode40_kw_from_scan_config,
+    mode40_signal_metrics,
+    score_mode40_high_pullback_ma60_rebound,
 )
 from app.paths import GPT_DATA_DIR
 from app.high_tech_universe import HIGH_TECH_STOCK_LIST_CSV, high_tech_code_set
@@ -43,16 +42,10 @@ def _trade_days(start_ymd: str, end_ymd: str) -> List[str]:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description=f"{MODE38_DISPLAY_NAME} 区间扫描")
+    ap = argparse.ArgumentParser(description=f"{MODE40_DISPLAY_NAME} 区间扫描")
     ap.add_argument("--start", required=True)
     ap.add_argument("--end", required=True)
     ap.add_argument("--code", default="", help="仅扫单股")
-    ap.add_argument(
-        "--support-ma",
-        type=int,
-        default=0,
-        help="仅回踩指定均线（如 20 表示只筛 MA20）；0 为自动选最深关键位",
-    )
     ap.add_argument(
         "--high-tech",
         action="store_true",
@@ -71,9 +64,7 @@ def main() -> None:
         print("区间内无交易日")
         sys.exit(1)
 
-    kw = mode38_kw_from_scan_config(ScanConfig(min_score=args.min_score))
-    if args.support_ma > 0:
-        kw["support_ma_only"] = int(args.support_ma)
+    kw = mode40_kw_from_scan_config(ScanConfig(min_score=args.min_score))
     stock_list_path = HIGH_TECH_STOCK_LIST_CSV if args.high_tech else STOCK_LIST
     name_map = load_stock_list_csv(stock_list_path) if os.path.exists(stock_list_path) else {}
     if args.high_tech:
@@ -98,7 +89,7 @@ def main() -> None:
         if args.skip_bj and code.startswith("920"):
             continue
         rows = read_cached_kline_by_code(CACHE_DIR, code)
-        if not rows or len(rows) < 150:
+        if not rows or len(rows) < 180:
             continue
         idx_map = {r.date[:10]: i for i, r in enumerate(rows)}
 
@@ -106,10 +97,10 @@ def main() -> None:
             idx = idx_map.get(d)
             if idx is None:
                 continue
-            score = score_mode38_bull_ma_pullback(rows, idx, code, name, **kw)
+            score = score_mode40_high_pullback_ma60_rebound(rows, idx, code, name, **kw)
             if score < args.min_score:
                 continue
-            m = mode38_signal_metrics(rows, idx, code, name, **kw)
+            m = mode40_signal_metrics(rows, idx, code, name, **kw)
             if not m:
                 continue
             hits.append(
@@ -122,17 +113,13 @@ def main() -> None:
                 }
             )
 
-    hits = dedupe_mode38_hits(hits)
+    hits = dedupe_mode40_hits(hits)
 
     out_dir = os.path.join(GPT_DATA_DIR, "results")
     os.makedirs(out_dir, exist_ok=True)
     out_path = args.out.strip() or os.path.join(
         out_dir,
-        (
-            f"mode38_ma{args.support_ma}_pullback_{start_ymd[:7].replace('-', '_')}.csv"
-            if args.support_ma > 0
-            else f"mode38_bull_ma_pullback_{start_ymd[:7].replace('-', '_')}.csv"
-        ),
+        f"mode40_high_pullback_ma60_{start_ymd[:7].replace('-', '_')}.csv",
     )
     fields = [
         "date",
@@ -140,14 +127,20 @@ def main() -> None:
         "name",
         "score",
         "peak_date",
-        "rally_pct",
+        "peak_high",
+        "trough_date",
+        "trough_low",
+        "ma_touch_dist_pct",
+        "pullback_days",
         "pullback_pct",
-        "support_ma",
-        "support_ma_val",
-        "low_dist_ma_pct",
-        "close_dist_ma_pct",
+        "rebound_pct",
+        "signal_date",
+        "exec_buy_date",
+        "exec_buy_open",
+        "buy_trigger_above",
         "pct_chg",
-        "vol_shrink_ratio",
+        "ma60",
+        "ma60_slope_pct",
     ]
     with open(out_path, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=fields, extrasaction="ignore")
@@ -155,14 +148,11 @@ def main() -> None:
         for h in sorted(hits, key=lambda x: (-x["score"], x["date"])):
             w.writerow(h)
 
-    label = MODE38_DISPLAY_NAME
-    if args.support_ma > 0:
-        label += f"（回踩MA{args.support_ma}）"
-    print(f"{label}: {len(hits)} 条 → {out_path}")
+    print(f"{MODE40_DISPLAY_NAME}: {len(hits)} 条 → {out_path}")
     for h in sorted(hits, key=lambda x: (-x["score"], x["date"]))[:20]:
         print(
             f"  {h['date']} {h['code']} {h['name']} score={h['score']} "
-            f"MA{h['support_ma']} 回撤{h['pullback_pct']:.1f}% 前涨{h['rally_pct']:.0f}%"
+            f"新高{h['peak_date']} 回踩{h['pullback_days']}日 买点{h['exec_buy_date']}"
         )
 
 

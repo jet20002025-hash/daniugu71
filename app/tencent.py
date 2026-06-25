@@ -57,8 +57,22 @@ def fetch_kline(
     symbol = f"{_prefix(code)}{code}"
     end_date = dt.date.today().strftime("%Y-%m-%d")
     params = {"param": f"{symbol},day,2020-01-01,{end_date},{count},"}
-    resp = session.get(KLINE_URL, params=params, timeout=20)
-    resp.raise_for_status()
+    last_resp = None
+    for attempt in range(3):
+        resp = session.get(KLINE_URL, params=params, timeout=20)
+        last_resp = resp
+        if resp.status_code in (429, 501, 503):
+            time.sleep(0.6 * (attempt + 1))
+            continue
+        if resp.status_code != 200:
+            return []
+        break
+    else:
+        if last_resp is not None and last_resp.status_code != 200:
+            return []
+    resp = last_resp
+    if resp is None or resp.status_code != 200:
+        return []
     payload = resp.json()
     if not isinstance(payload, dict):
         return []
@@ -168,8 +182,27 @@ def write_cached_kline(cache_path: str, rows: List[KlineRow]) -> None:
             )
 
 
+def merge_kline_cached(
+    cached: List[KlineRow], new_rows: List[KlineRow]
+) -> List[KlineRow]:
+    """合并缓存与拉取结果：保留历史，用新数据覆盖同日期并追加更晚的 K 线。"""
+    if not cached:
+        return list(new_rows)
+    if not new_rows:
+        return list(cached)
+    by_date: dict[str, KlineRow] = {r.date[:10]: r for r in cached}
+    for r in new_rows:
+        by_date[r.date[:10]] = r
+    return [by_date[d] for d in sorted(by_date)]
+
+
 def kline_is_fresh(rows: List[KlineRow], max_age_days: int = 2) -> bool:
-    """缓存视为新鲜仅当已包含「今天」的 K 线，否则会一直用旧缓存拿不到当日数据。"""
+    """缓存视为新鲜仅当已包含「今天」的 K 线，否则会一直用旧缓存拿不到当日数据。
+
+    max_age_days<=0 表示强制刷新（prefetch --max-age-days 0），不视为新鲜。
+    """
+    if max_age_days <= 0:
+        return False
     if not rows:
         return False
     try:
@@ -200,7 +233,11 @@ def get_kline_cached(
 
     rows = fetch_kline(code=code, count=count, session=session)
     if rows:
-        write_cached_kline(cache_path, rows)
+        merged = merge_kline_cached(cached or [], rows)
+        write_cached_kline(cache_path, merged)
+        rows = merged
+    elif cached:
+        rows = cached
     if pause:
         time.sleep(pause)
     return rows

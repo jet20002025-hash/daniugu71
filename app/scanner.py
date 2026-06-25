@@ -317,6 +317,57 @@ class ScanConfig:
     # mode39（大阳锚点回踩再升）：放量大阳锚点 + 回踩企稳 / 长下影探底
     mode39_min_score: int = 60
 
+    # mode40（新高回调踩60线回升）：阶段新高后回调7～10日触MA60回升
+    mode40_min_score: int = 60
+
+
+def _mode40_kw_from_config(config: ScanConfig) -> Dict[str, Any]:
+    from app.mode40_high_pullback_ma60_rebound import mode40_kw_from_scan_config
+
+    return mode40_kw_from_scan_config(config)
+
+
+def _mode40_signal_at(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    **kwargs: Any,
+) -> bool:
+    from app.mode40_high_pullback_ma60_rebound import match_mode40_high_pullback_ma60_rebound
+
+    return match_mode40_high_pullback_ma60_rebound(rows, idx, code, name, **kwargs) is not None
+
+
+def _score_mode40(
+    rows: List[KlineRow],
+    idx: int,
+    ma10: np.ndarray,
+    ma20: np.ndarray,
+    ma60: np.ndarray,
+    vol20: np.ndarray,
+    code: str = "",
+    name: str = "",
+    breakdown: Optional[List[tuple]] = None,
+    **kwargs: Any,
+) -> int:
+    _ = (ma10, ma20, ma60, vol20, breakdown)
+    from app.mode40_high_pullback_ma60_rebound import score_mode40_high_pullback_ma60_rebound
+
+    return score_mode40_high_pullback_ma60_rebound(rows, idx, code, name, **kwargs)
+
+
+def _mode40_metrics(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    **kwargs: Any,
+) -> Dict[str, Any]:
+    from app.mode40_high_pullback_ma60_rebound import mode40_signal_metrics
+
+    return mode40_signal_metrics(rows, idx, code, name, **kwargs)
+
 
 def _mode38_kw_from_config(config: ScanConfig) -> Dict[str, Any]:
     from app.mode38_bull_ma_pullback import mode38_kw_from_scan_config
@@ -5721,6 +5772,7 @@ def scan_with_mode3(
     use_mode37: bool = False,
     use_mode38: bool = False,
     use_mode39: bool = False,
+    use_mode40: bool = False,
     sector_ak_cache_dir: Optional[str] = None,
     sector_fund_flow_max_points: int = 5,
     sector_fund_flow_yi_per_point: float = 3.0,
@@ -5899,6 +5951,10 @@ def scan_with_mode3(
         signal_fn = _mode3_signals
         score_fn = _score_mode39
         mode_label = "mode39"
+    elif use_mode40:
+        signal_fn = _mode3_signals
+        score_fn = _score_mode40
+        mode_label = "mode40"
     elif use_mode37:
         signal_fn = _mode3_signals
         score_fn = _score_mode37
@@ -6082,6 +6138,9 @@ def scan_with_mode3(
     mode39_kw: Dict[str, Any] = {}
     if use_mode39:
         mode39_kw = _mode39_kw_from_config(config)
+    mode40_kw: Dict[str, Any] = {}
+    if use_mode40:
+        mode40_kw = _mode40_kw_from_config(config)
 
     mode37_kw: Dict[str, Any] = {}
     if use_mode37:
@@ -6135,6 +6194,7 @@ def scan_with_mode3(
                         or use_mode37
                         or use_mode38
                         or use_mode39
+                        or use_mode40
                     )
                     else (
                         max(130, int(getattr(config, "mode5_half_year_bars", 120)) + 5)
@@ -6201,7 +6261,7 @@ def scan_with_mode3(
             end_dt = _parse_date(end_date)
             scan_end_dt = end_dt
             # mode39 等信号日 T+1 企稳确认，截止日当日也需多读几天 K 线
-            if end_dt and (use_mode39 or use_mode38):
+            if end_dt and (use_mode39 or use_mode38 or use_mode40):
                 scan_end_dt = end_dt + timedelta(days=8)
             if end_dt:
                 for row in rows:
@@ -6267,6 +6327,26 @@ def scan_with_mode3(
                 if ed and d > ed:
                     continue
                 if _mode39_signal_at(rows, i, item.code, item.name, **mode39_kw):
+                    signals.append(i)
+        elif use_mode40:
+            st = str(start_date).strip()[:10] if start_date else ""
+            ed = str(end_date).strip()[:10] if end_date else ""
+            start_i = max(
+                160,
+                int(mode40_kw.get("peak_lookback", 60) or 60)
+                + int(mode40_kw.get("ma_period", 60) or 60)
+                + int(mode40_kw.get("pullback_days_max", 10) or 10)
+                + int(mode40_kw.get("rebound_window", 3) or 3)
+                + 5,
+            )
+            signals = []
+            for i in range(start_i, len(rows)):
+                d = str(rows[i].date)[:10]
+                if st and d < st:
+                    continue
+                if ed and d > ed:
+                    continue
+                if _mode40_signal_at(rows, i, item.code, item.name, **mode40_kw):
                     signals.append(i)
         elif use_mode37:
             st = str(start_date).strip()[:10] if start_date else ""
@@ -6887,6 +6967,7 @@ def scan_with_mode3(
                 or use_mode37
                 or use_mode38
                 or use_mode39
+                or use_mode40
                 or (use_mode88 and score_fn is _score_mode88)
         or (use_mode93 and score_fn is _score_mode93)
                 or use_mode_bottom_big_yang
@@ -6980,6 +7061,19 @@ def scan_with_mode3(
                         item.name,
                         None,
                         **mode39_kw,
+                    )
+                elif use_mode40:
+                    score = _score_mode40(
+                        rows,
+                        idx,
+                        ma10,
+                        ma20,
+                        ma60,
+                        vol20,
+                        item.code,
+                        item.name,
+                        None,
+                        **mode40_kw,
                     )
                 elif use_mode37:
                     score = _score_mode37(
@@ -7194,6 +7288,13 @@ def scan_with_mode3(
                 reasons.append(
                     f"大阳锚点{label} MA45向上({slope_s}) 买点日{m39.get('exec_buy_date', buy_date)}开盘"
                 )
+            elif use_mode40:
+                m40 = _mode40_metrics(rows, idx, item.code, item.name, **mode40_kw)
+                reasons.append(
+                    f"新高{m40.get('peak_date', '')}后回调{m40.get('pullback_days', '—')}日"
+                    f"踩MA60({float(m40.get('ma_touch_dist_pct', 0) or 0):.1f}%)"
+                    f"回升 买点日{m40.get('exec_buy_date', buy_date)}开盘"
+                )
             elif use_mode37:
                 reasons.append("回踩向上跳空缺口支撑区")
             elif use_mode36:
@@ -7353,6 +7454,13 @@ def scan_with_mode3(
                 m_extra["event_type"] = (
                     "锚点回踩" if st == "near_anchor" else "长下影探底"
                 )
+                m_extra["buy_mode"] = "next_open"
+            if use_mode40:
+                m_extra.update(
+                    _mode40_metrics(rows, idx, item.code, item.name, **mode40_kw)
+                )
+                m_extra["signal_date"] = str(signal_date)[:10]
+                m_extra["event_type"] = "新高回踩MA60"
                 m_extra["buy_mode"] = "next_open"
             if use_mode37:
                 m_extra.update(

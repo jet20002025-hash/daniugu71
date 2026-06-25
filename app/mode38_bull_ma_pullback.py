@@ -48,6 +48,7 @@ def mode38_default_kw() -> Dict[str, Any]:
         require_trough_confirm=True,
         require_above_ma120_250=True,
         min_score=60,
+        support_ma_only=0,
     )
 
 
@@ -86,6 +87,34 @@ def _min_pullback_for_ma(sup_period: int, kw: Dict[str, Any]) -> float:
     if key in kw:
         return float(kw[key])
     return MIN_PULLBACK_BY_MA.get(sup_period, float(kw["pullback_min_pct"]))
+
+
+def _support_at_period(
+    closes: np.ndarray,
+    idx: int,
+    low: float,
+    period: int,
+    *,
+    ma_slope_days: int,
+    max_ma_dist_pct: float,
+) -> Optional[Dict[str, float]]:
+    if idx < period - 1:
+        return None
+    ma = _ma_at(closes, idx, period)
+    if np.isnan(ma) or ma <= 0:
+        return None
+    slope = _ma_slope_pct(closes, idx, period, ma_slope_days)
+    if slope <= 0:
+        return None
+    dist = (low / ma - 1.0) * 100.0
+    if abs(dist) > max_ma_dist_pct:
+        return None
+    return {
+        "support_ma": float(period),
+        "support_ma_val": ma,
+        "low_dist_ma_pct": dist,
+        "support_ma_slope_pct": _ma_slope_pct(closes, idx, period, ma_slope_days),
+    }
 
 
 def _pick_support_ma(
@@ -202,13 +231,26 @@ def match_mode38_bull_ma_pullback(
     if cur_low < ma120 * (1.0 - float(kw["max_break_ma120_pct"]) / 100.0):
         return None
 
-    support = _pick_support_ma(
-        closes,
-        idx,
-        cur_low,
-        ma_slope_days=int(kw["ma_slope_days"]),
-        max_ma_dist_pct=float(kw["max_ma_dist_pct"]),
-    )
+    ma_slope_days = int(kw["ma_slope_days"])
+    max_ma_dist = float(kw["max_ma_dist_pct"])
+    support_ma_only = int(kw.get("support_ma_only", 0) or 0)
+    if support_ma_only > 0:
+        support = _support_at_period(
+            closes,
+            idx,
+            cur_low,
+            support_ma_only,
+            ma_slope_days=ma_slope_days,
+            max_ma_dist_pct=max_ma_dist,
+        )
+    else:
+        support = _pick_support_ma(
+            closes,
+            idx,
+            cur_low,
+            ma_slope_days=ma_slope_days,
+            max_ma_dist_pct=max_ma_dist,
+        )
     if not support:
         return None
 

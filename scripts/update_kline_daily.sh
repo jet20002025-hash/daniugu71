@@ -19,5 +19,6 @@ echo "[$(date)] 开始每日 K 线更新"
 # 低并发 + 较长 pause，避免与 Web 同机时打满磁盘 IO（可用环境变量覆盖）
 W="${KLINE_PREFETCH_WORKERS:-2}"
 P="${KLINE_PREFETCH_PAUSE:-0.15}"
-$PYTHON -m scripts.prefetch_kline_tencent --count 100 --max-age-days 0 --workers "$W" --pause "$P"
+# count 仅拉最近一段，merge_kline_cached 会保留更长历史，勿再整文件覆盖
+$PYTHON -m scripts.prefetch_kline_tencent --count 120 --max-age-days 0 --workers "$W" --pause "$P"
 echo "[$(date)] 每日 K 线更新完成"

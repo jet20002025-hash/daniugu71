@@ -15,7 +15,7 @@ from app.scanner import KlineRow, _is_st, _vol_ratio_at
 MODE38_ID = "mode38"
 MODE38_FULL_NAME = "大牛股关键位回踩"
 MODE38_DISPLAY_NAME = f"{MODE38_ID}（{MODE38_FULL_NAME}）"
-MODE38_ONE_LINE = "前期大涨后回调，股价站稳 MA120/MA250 之上，低点踩 MA10/20/30/60/120"
+MODE38_ONE_LINE = "前期大涨后回调，低点踩 MA10/20/30/60/120 附近（±容差），不要求按均线档位最低回撤"
 
 SUPPORT_MAS: tuple[int, ...] = (10, 20, 30, 60, 120)
 MIN_PULLBACK_BY_MA: Dict[int, float] = {10: 10.0, 20: 12.0, 30: 16.0, 60: 22.0, 120: 28.0}
@@ -27,8 +27,9 @@ def mode38_default_kw() -> Dict[str, Any]:
         peak_lookback=45,
         peak_end_offset=1,
         min_rally_pct=80.0,
-        pullback_min_pct=12.0,
-        pullback_max_pct=38.0,
+        pullback_min_pct=3.0,
+        pullback_max_pct=45.0,
+        require_min_pullback_by_ma=False,
         min_pullback_ma10_pct=10.0,
         min_pullback_ma20_pct=12.0,
         min_pullback_ma30_pct=16.0,
@@ -255,8 +256,9 @@ def match_mode38_bull_ma_pullback(
         return None
 
     sup_period = int(support["support_ma"])
-    if pullback_pct < _min_pullback_for_ma(sup_period, kw):
-        return None
+    if kw.get("require_min_pullback_by_ma", False):
+        if pullback_pct < _min_pullback_for_ma(sup_period, kw):
+            return None
 
     if kw.get("require_pullback_trough", True):
         seg_low = float(np.min(lows[peak_i : idx + 1]))

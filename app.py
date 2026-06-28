@@ -859,6 +859,7 @@ def run_mode3_scan(
     use_mode43: bool = False,
     use_mode44: bool = False,
     use_mode45: bool = False,
+    user_id: Optional[int] = None,
     throttle_free_user: bool = False,
     high_tech_only: bool = False,
 ) -> None:

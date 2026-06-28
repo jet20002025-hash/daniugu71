@@ -320,6 +320,261 @@ class ScanConfig:
     # mode40（新高回调踩60线回升）：阶段新高后回调7～10日触MA60回升
     mode40_min_score: int = 60
 
+    # mode41（周线关键位回踩缩量）：周低点踩周均线 + 量能近5周最低附近
+    mode41_min_score: int = 60
+
+    # mode42（周线短均线回踩缩量回升）：踩周 MA5/10 + 当周阳线
+    mode42_min_score: int = 60
+
+    # mode43（周线爆量洗盘周）：主升途中放量分歧，收盘在周 MA10 之上
+    mode43_min_score: int = 60
+
+    # mode44（三连阴量价背离）：连续3阴、成交量逐日放大
+    mode44_min_score: int = 60
+
+    # mode45（涨停新高后缓升）：涨停/强阳放量创新高后横盘缓升
+    mode45_min_score: int = 60
+
+
+def _mode45_kw_from_config(config: ScanConfig) -> Dict[str, Any]:
+    from app.mode45_limitup_grind import mode45_kw_from_scan_config
+
+    return mode45_kw_from_scan_config(config)
+
+
+def _mode45_signal_at(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    **kwargs: Any,
+) -> bool:
+    from app.mode45_limitup_grind import match_mode45_limitup_grind
+
+    return match_mode45_limitup_grind(rows, idx, code, name, **kwargs) is not None
+
+
+def _score_mode45(
+    rows: List[KlineRow],
+    idx: int,
+    ma10: np.ndarray,
+    ma20: np.ndarray,
+    ma60: np.ndarray,
+    vol20: np.ndarray,
+    code: str = "",
+    name: str = "",
+    breakdown: Optional[List[tuple]] = None,
+    **kwargs: Any,
+) -> int:
+    _ = (ma10, ma20, ma60, vol20, breakdown)
+    from app.mode45_limitup_grind import score_mode45_limitup_grind
+
+    return score_mode45_limitup_grind(rows, idx, code, name, **kwargs)
+
+
+def _mode45_metrics(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    **kwargs: Any,
+) -> Dict[str, Any]:
+    from app.mode45_limitup_grind import mode45_signal_metrics
+
+    return mode45_signal_metrics(rows, idx, code, name, **kwargs)
+
+
+def _mode44_kw_from_config(config: ScanConfig) -> Dict[str, Any]:
+    from app.mode44_triple_yin_vol_rise import mode44_kw_from_scan_config
+
+    return mode44_kw_from_scan_config(config)
+
+
+def _mode44_signal_at(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    **kwargs: Any,
+) -> bool:
+    from app.mode44_triple_yin_vol_rise import match_mode44_triple_yin_vol_rise
+
+    return match_mode44_triple_yin_vol_rise(rows, idx, code, name, **kwargs) is not None
+
+
+def _score_mode44(
+    rows: List[KlineRow],
+    idx: int,
+    ma10: np.ndarray,
+    ma20: np.ndarray,
+    ma60: np.ndarray,
+    vol20: np.ndarray,
+    code: str = "",
+    name: str = "",
+    breakdown: Optional[List[tuple]] = None,
+    **kwargs: Any,
+) -> int:
+    _ = (ma10, ma20, ma60, vol20, breakdown)
+    from app.mode44_triple_yin_vol_rise import score_mode44_triple_yin_vol_rise
+
+    return score_mode44_triple_yin_vol_rise(rows, idx, code, name, **kwargs)
+
+
+def _mode44_metrics(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    **kwargs: Any,
+) -> Dict[str, Any]:
+    from app.mode44_triple_yin_vol_rise import mode44_signal_metrics
+
+    return mode44_signal_metrics(rows, idx, code, name, **kwargs)
+
+
+def _mode43_kw_from_config(config: ScanConfig) -> Dict[str, Any]:
+    from app.mode43_weekly_burst_churn import mode43_kw_from_scan_config
+
+    return mode43_kw_from_scan_config(config)
+
+
+def _mode43_signal_at(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    **kwargs: Any,
+) -> bool:
+    from app.mode43_weekly_burst_churn import match_mode43_weekly_burst_churn
+
+    return match_mode43_weekly_burst_churn(rows, idx, code, name, **kwargs) is not None
+
+
+def _score_mode43(
+    rows: List[KlineRow],
+    idx: int,
+    ma10: np.ndarray,
+    ma20: np.ndarray,
+    ma60: np.ndarray,
+    vol20: np.ndarray,
+    code: str = "",
+    name: str = "",
+    breakdown: Optional[List[tuple]] = None,
+    **kwargs: Any,
+) -> int:
+    _ = (ma10, ma20, ma60, vol20, breakdown)
+    from app.mode43_weekly_burst_churn import score_mode43_weekly_burst_churn
+
+    return score_mode43_weekly_burst_churn(rows, idx, code, name, **kwargs)
+
+
+def _mode43_metrics(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    **kwargs: Any,
+) -> Dict[str, Any]:
+    from app.mode43_weekly_burst_churn import mode43_signal_metrics
+
+    return mode43_signal_metrics(rows, idx, code, name, **kwargs)
+
+
+def _mode42_kw_from_config(config: ScanConfig) -> Dict[str, Any]:
+    from app.mode42_weekly_short_ma_rebound import mode42_kw_from_scan_config
+
+    return mode42_kw_from_scan_config(config)
+
+
+def _mode42_signal_at(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    **kwargs: Any,
+) -> bool:
+    from app.mode42_weekly_short_ma_rebound import match_mode42_weekly_short_ma_rebound
+
+    return match_mode42_weekly_short_ma_rebound(rows, idx, code, name, **kwargs) is not None
+
+
+def _score_mode42(
+    rows: List[KlineRow],
+    idx: int,
+    ma10: np.ndarray,
+    ma20: np.ndarray,
+    ma60: np.ndarray,
+    vol20: np.ndarray,
+    code: str = "",
+    name: str = "",
+    breakdown: Optional[List[tuple]] = None,
+    **kwargs: Any,
+) -> int:
+    _ = (ma10, ma20, ma60, vol20, breakdown)
+    from app.mode42_weekly_short_ma_rebound import score_mode42_weekly_short_ma_rebound
+
+    return score_mode42_weekly_short_ma_rebound(rows, idx, code, name, **kwargs)
+
+
+def _mode42_metrics(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    **kwargs: Any,
+) -> Dict[str, Any]:
+    from app.mode42_weekly_short_ma_rebound import mode42_signal_metrics
+
+    return mode42_signal_metrics(rows, idx, code, name, **kwargs)
+
+
+def _mode41_kw_from_config(config: ScanConfig) -> Dict[str, Any]:
+    from app.mode41_weekly_ma_pullback import mode41_kw_from_scan_config
+
+    return mode41_kw_from_scan_config(config)
+
+
+def _mode41_signal_at(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    **kwargs: Any,
+) -> bool:
+    from app.mode41_weekly_ma_pullback import match_mode41_weekly_ma_pullback
+
+    return match_mode41_weekly_ma_pullback(rows, idx, code, name, **kwargs) is not None
+
+
+def _score_mode41(
+    rows: List[KlineRow],
+    idx: int,
+    ma10: np.ndarray,
+    ma20: np.ndarray,
+    ma60: np.ndarray,
+    vol20: np.ndarray,
+    code: str = "",
+    name: str = "",
+    breakdown: Optional[List[tuple]] = None,
+    **kwargs: Any,
+) -> int:
+    _ = (ma10, ma20, ma60, vol20, breakdown)
+    from app.mode41_weekly_ma_pullback import score_mode41_weekly_ma_pullback
+
+    return score_mode41_weekly_ma_pullback(rows, idx, code, name, **kwargs)
+
+
+def _mode41_metrics(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    **kwargs: Any,
+) -> Dict[str, Any]:
+    from app.mode41_weekly_ma_pullback import mode41_signal_metrics
+
+    return mode41_signal_metrics(rows, idx, code, name, **kwargs)
+
 
 def _mode40_kw_from_config(config: ScanConfig) -> Dict[str, Any]:
     from app.mode40_high_pullback_ma60_rebound import mode40_kw_from_scan_config
@@ -5773,6 +6028,11 @@ def scan_with_mode3(
     use_mode38: bool = False,
     use_mode39: bool = False,
     use_mode40: bool = False,
+    use_mode41: bool = False,
+    use_mode42: bool = False,
+    use_mode43: bool = False,
+    use_mode44: bool = False,
+    use_mode45: bool = False,
     sector_ak_cache_dir: Optional[str] = None,
     sector_fund_flow_max_points: int = 5,
     sector_fund_flow_yi_per_point: float = 3.0,
@@ -5955,6 +6215,26 @@ def scan_with_mode3(
         signal_fn = _mode3_signals
         score_fn = _score_mode40
         mode_label = "mode40"
+    elif use_mode41:
+        signal_fn = _mode3_signals
+        score_fn = _score_mode41
+        mode_label = "mode41"
+    elif use_mode42:
+        signal_fn = _mode3_signals
+        score_fn = _score_mode42
+        mode_label = "mode42"
+    elif use_mode43:
+        signal_fn = _mode3_signals
+        score_fn = _score_mode43
+        mode_label = "mode43"
+    elif use_mode44:
+        signal_fn = _mode3_signals
+        score_fn = _score_mode44
+        mode_label = "mode44"
+    elif use_mode45:
+        signal_fn = _mode3_signals
+        score_fn = _score_mode45
+        mode_label = "mode45"
     elif use_mode37:
         signal_fn = _mode3_signals
         score_fn = _score_mode37
@@ -6141,6 +6421,21 @@ def scan_with_mode3(
     mode40_kw: Dict[str, Any] = {}
     if use_mode40:
         mode40_kw = _mode40_kw_from_config(config)
+    mode41_kw: Dict[str, Any] = {}
+    if use_mode41:
+        mode41_kw = _mode41_kw_from_config(config)
+    mode42_kw: Dict[str, Any] = {}
+    if use_mode42:
+        mode42_kw = _mode42_kw_from_config(config)
+    mode43_kw: Dict[str, Any] = {}
+    if use_mode43:
+        mode43_kw = _mode43_kw_from_config(config)
+    mode44_kw: Dict[str, Any] = {}
+    if use_mode44:
+        mode44_kw = _mode44_kw_from_config(config)
+    mode45_kw: Dict[str, Any] = {}
+    if use_mode45:
+        mode45_kw = _mode45_kw_from_config(config)
 
     mode37_kw: Dict[str, Any] = {}
     if use_mode37:
@@ -6195,6 +6490,11 @@ def scan_with_mode3(
                         or use_mode38
                         or use_mode39
                         or use_mode40
+                        or use_mode41
+                        or use_mode42
+                        or use_mode43
+                        or use_mode44
+                        or use_mode45
                     )
                     else (
                         max(130, int(getattr(config, "mode5_half_year_bars", 120)) + 5)
@@ -6261,7 +6561,7 @@ def scan_with_mode3(
             end_dt = _parse_date(end_date)
             scan_end_dt = end_dt
             # mode39 等信号日 T+1 企稳确认，截止日当日也需多读几天 K 线
-            if end_dt and (use_mode39 or use_mode38 or use_mode40):
+            if end_dt and (use_mode39 or use_mode38 or use_mode40 or use_mode41 or use_mode42 or use_mode43 or use_mode44 or use_mode45):
                 scan_end_dt = end_dt + timedelta(days=8)
             if end_dt:
                 for row in rows:
@@ -6347,6 +6647,88 @@ def scan_with_mode3(
                 if ed and d > ed:
                     continue
                 if _mode40_signal_at(rows, i, item.code, item.name, **mode40_kw):
+                    signals.append(i)
+        elif use_mode41:
+            st = str(start_date).strip()[:10] if start_date else ""
+            ed = str(end_date).strip()[:10] if end_date else ""
+            start_i = max(
+                320,
+                int(mode41_kw.get("phase_lookback_weeks", 48) or 48) * 5
+                + int(mode41_kw.get("peak_lookback_weeks", 20) or 20) * 5
+                + 20,
+            )
+            signals = []
+            for i in range(start_i, len(rows)):
+                d = str(rows[i].date)[:10]
+                if st and d < st:
+                    continue
+                if ed and d > ed:
+                    continue
+                if _mode41_signal_at(rows, i, item.code, item.name, **mode41_kw):
+                    signals.append(i)
+        elif use_mode42:
+            st = str(start_date).strip()[:10] if start_date else ""
+            ed = str(end_date).strip()[:10] if end_date else ""
+            start_i = max(
+                280,
+                int(mode42_kw.get("phase_lookback_weeks", 48) or 48) * 5
+                + int(mode42_kw.get("peak_lookback_weeks", 20) or 20) * 5
+                + 20,
+            )
+            signals = []
+            for i in range(start_i, len(rows)):
+                d = str(rows[i].date)[:10]
+                if st and d < st:
+                    continue
+                if ed and d > ed:
+                    continue
+                if _mode42_signal_at(rows, i, item.code, item.name, **mode42_kw):
+                    signals.append(i)
+        elif use_mode43:
+            st = str(start_date).strip()[:10] if start_date else ""
+            ed = str(end_date).strip()[:10] if end_date else ""
+            start_i = max(
+                280,
+                int(mode43_kw.get("min_weeks_history", 16) or 16) * 5 + 20,
+            )
+            signals = []
+            for i in range(start_i, len(rows)):
+                d = str(rows[i].date)[:10]
+                if st and d < st:
+                    continue
+                if ed and d > ed:
+                    continue
+                if _mode43_signal_at(rows, i, item.code, item.name, **mode43_kw):
+                    signals.append(i)
+        elif use_mode44:
+            st = str(start_date).strip()[:10] if start_date else ""
+            ed = str(end_date).strip()[:10] if end_date else ""
+            streak = int(mode44_kw.get("streak_days", 3) or 3)
+            ma120_n = int(mode44_kw.get("ma120_period", 120) or 120)
+            start_i = max(80, streak + 5, ma120_n)
+            signals = []
+            for i in range(start_i, len(rows)):
+                d = str(rows[i].date)[:10]
+                if st and d < st:
+                    continue
+                if ed and d > ed:
+                    continue
+                if _mode44_signal_at(rows, i, item.code, item.name, **mode44_kw):
+                    signals.append(i)
+        elif use_mode45:
+            st = str(start_date).strip()[:10] if start_date else ""
+            ed = str(end_date).strip()[:10] if end_date else ""
+            max_g = int(mode45_kw.get("max_grind_days", 10) or 10)
+            high_lb = int(mode45_kw.get("high_lookback", 60) or 60)
+            start_i = max(high_lb + max_g + 5, 130)
+            signals = []
+            for i in range(start_i, len(rows)):
+                d = str(rows[i].date)[:10]
+                if st and d < st:
+                    continue
+                if ed and d > ed:
+                    continue
+                if _mode45_signal_at(rows, i, item.code, item.name, **mode45_kw):
                     signals.append(i)
         elif use_mode37:
             st = str(start_date).strip()[:10] if start_date else ""
@@ -6968,6 +7350,11 @@ def scan_with_mode3(
                 or use_mode38
                 or use_mode39
                 or use_mode40
+                or use_mode41
+                or use_mode42
+                or use_mode43
+                or use_mode44
+                or use_mode45
                 or (use_mode88 and score_fn is _score_mode88)
         or (use_mode93 and score_fn is _score_mode93)
                 or use_mode_bottom_big_yang
@@ -7074,6 +7461,71 @@ def scan_with_mode3(
                         item.name,
                         None,
                         **mode40_kw,
+                    )
+                elif use_mode41:
+                    score = _score_mode41(
+                        rows,
+                        idx,
+                        ma10,
+                        ma20,
+                        ma60,
+                        vol20,
+                        item.code,
+                        item.name,
+                        None,
+                        **mode41_kw,
+                    )
+                elif use_mode42:
+                    score = _score_mode42(
+                        rows,
+                        idx,
+                        ma10,
+                        ma20,
+                        ma60,
+                        vol20,
+                        item.code,
+                        item.name,
+                        None,
+                        **mode42_kw,
+                    )
+                elif use_mode43:
+                    score = _score_mode43(
+                        rows,
+                        idx,
+                        ma10,
+                        ma20,
+                        ma60,
+                        vol20,
+                        item.code,
+                        item.name,
+                        None,
+                        **mode43_kw,
+                    )
+                elif use_mode44:
+                    score = _score_mode44(
+                        rows,
+                        idx,
+                        ma10,
+                        ma20,
+                        ma60,
+                        vol20,
+                        item.code,
+                        item.name,
+                        None,
+                        **mode44_kw,
+                    )
+                elif use_mode45:
+                    score = _score_mode45(
+                        rows,
+                        idx,
+                        ma10,
+                        ma20,
+                        ma60,
+                        vol20,
+                        item.code,
+                        item.name,
+                        None,
+                        **mode45_kw,
                     )
                 elif use_mode37:
                     score = _score_mode37(
@@ -7295,6 +7747,45 @@ def scan_with_mode3(
                     f"踩MA60({float(m40.get('ma_touch_dist_pct', 0) or 0):.1f}%)"
                     f"回升 买点日{m40.get('exec_buy_date', buy_date)}开盘"
                 )
+            elif use_mode41:
+                m41 = _mode41_metrics(rows, idx, item.code, item.name, **mode41_kw)
+                reasons.append(
+                    f"周线回踩周MA{int(m41.get('support_ma', 0) or 0)}关键位"
+                    f"量能近5周低(+{float(m41.get('vol_vs_min_pct', 0) or 0):.1f}%)"
+                    f" 买点日{m41.get('exec_buy_date', buy_date)}开盘"
+                )
+            elif use_mode42:
+                m42 = _mode42_metrics(rows, idx, item.code, item.name, **mode42_kw)
+                reasons.append(
+                    f"阴转阳回踩周MA{int(m42.get('support_ma', 0) or 0)}"
+                    f"({m42.get('probe_week_date', '')}探底)"
+                    f"量+{float(m42.get('vol_vs_min_pct', 0) or 0):.1f}%"
+                    f"周涨{float(m42.get('week_chg_pct', 0) or 0):.1f}%"
+                    f" 买点日{m42.get('exec_buy_date', buy_date)}开盘"
+                )
+            elif use_mode43:
+                m43 = _mode43_metrics(rows, idx, item.code, item.name, **mode43_kw)
+                reasons.append(
+                    f"爆量洗盘周(量{float(m43.get('vol_vs_ma5', 0) or 0):.1f}x5周均)"
+                    f"振幅{float(m43.get('amplitude_pct', 0) or 0):.0f}%"
+                    f"前4周+{float(m43.get('prior_4w_gain_pct', 0) or 0):.0f}%"
+                    f" 买点日{m43.get('exec_buy_date', buy_date)}开盘"
+                )
+            elif use_mode44:
+                m44 = _mode44_metrics(rows, idx, item.code, item.name, **mode44_kw)
+                reasons.append(
+                    f"三连阴量增(量{float(m44.get('vol_ramp_total', 0) or 0):.2f}x)"
+                    f"跌{float(m44.get('cum_drop_pct', 0) or 0):.1f}%"
+                    f" 买点日{m44.get('exec_buy_date', buy_date)}开盘"
+                )
+            elif use_mode45:
+                m45 = _mode45_metrics(rows, idx, item.code, item.name, **mode45_kw)
+                reasons.append(
+                    f"涨停新高后缓升(启动{m45.get('launch_date', '')}"
+                    f"量{float(m45.get('launch_vol_ratio', 0) or 0):.1f}x"
+                    f"回撤{float(m45.get('grind_close_pullback_pct', 0) or 0):.1f}%)"
+                    f" 买点日{m45.get('exec_buy_date', buy_date)}开盘"
+                )
             elif use_mode37:
                 reasons.append("回踩向上跳空缺口支撑区")
             elif use_mode36:
@@ -7461,6 +7952,41 @@ def scan_with_mode3(
                 )
                 m_extra["signal_date"] = str(signal_date)[:10]
                 m_extra["event_type"] = "新高回踩MA60"
+                m_extra["buy_mode"] = "next_open"
+            if use_mode41:
+                m_extra.update(
+                    _mode41_metrics(rows, idx, item.code, item.name, **mode41_kw)
+                )
+                m_extra["signal_date"] = str(signal_date)[:10]
+                m_extra["event_type"] = "周线关键位回踩"
+                m_extra["buy_mode"] = "next_open"
+            if use_mode42:
+                m_extra.update(
+                    _mode42_metrics(rows, idx, item.code, item.name, **mode42_kw)
+                )
+                m_extra["signal_date"] = str(signal_date)[:10]
+                m_extra["event_type"] = "阴转阳回踩"
+                m_extra["buy_mode"] = "next_open"
+            if use_mode43:
+                m_extra.update(
+                    _mode43_metrics(rows, idx, item.code, item.name, **mode43_kw)
+                )
+                m_extra["signal_date"] = str(signal_date)[:10]
+                m_extra["event_type"] = "爆量洗盘周"
+                m_extra["buy_mode"] = "next_open"
+            if use_mode44:
+                m_extra.update(
+                    _mode44_metrics(rows, idx, item.code, item.name, **mode44_kw)
+                )
+                m_extra["signal_date"] = str(signal_date)[:10]
+                m_extra["event_type"] = "三连阴量增背离"
+                m_extra["buy_mode"] = "next_open"
+            if use_mode45:
+                m_extra.update(
+                    _mode45_metrics(rows, idx, item.code, item.name, **mode45_kw)
+                )
+                m_extra["signal_date"] = str(signal_date)[:10]
+                m_extra["event_type"] = "涨停新高后缓升"
                 m_extra["buy_mode"] = "next_open"
             if use_mode37:
                 m_extra.update(

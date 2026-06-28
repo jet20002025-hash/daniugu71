@@ -145,6 +145,11 @@ SCAN_MODE_OPTIONS: List[Tuple[str, str]] = [
     ("mode38", "mode38（大牛股关键位回踩）"),
     ("mode39", "mode39（大阳锚点回踩再升）"),
     ("mode40", "mode40（新高回调踩60线回升）"),
+    ("mode41", "mode41（周线关键位回踩缩量）"),
+    ("mode42", "mode42（周线短均线回踩缩量回升）"),
+    ("mode43", "mode43（周线爆量洗盘周）"),
+    ("mode44", "mode44（三连阴量价背离）"),
+    ("mode45", "mode45（涨停新高后缓升）"),
     ("mode3", "71倍原版(mode3)"),
 ]
 SCAN_MODE_VALUES = frozenset(
@@ -849,7 +854,11 @@ def run_mode3_scan(
     use_mode38: bool = False,
     use_mode39: bool = False,
     use_mode40: bool = False,
-    user_id: Optional[int] = None,
+    use_mode41: bool = False,
+    use_mode42: bool = False,
+    use_mode43: bool = False,
+    use_mode44: bool = False,
+    use_mode45: bool = False,
     throttle_free_user: bool = False,
     high_tech_only: bool = False,
 ) -> None:
@@ -984,6 +993,16 @@ def run_mode3_scan(
             mode_label = "mode39"
         elif use_mode40:
             mode_label = "mode40"
+        elif use_mode41:
+            mode_label = "mode41"
+        elif use_mode42:
+            mode_label = "mode42"
+        elif use_mode43:
+            mode_label = "mode43"
+        elif use_mode44:
+            mode_label = "mode44"
+        elif use_mode45:
+            mode_label = "mode45"
         elif use_mode37:
             mode_label = "mode37"
         elif use_mode36:
@@ -1078,6 +1097,11 @@ def run_mode3_scan(
             use_mode38=use_mode38,
             use_mode39=use_mode39,
             use_mode40=use_mode40,
+            use_mode41=use_mode41,
+            use_mode42=use_mode42,
+            use_mode43=use_mode43,
+            use_mode44=use_mode44,
+            use_mode45=use_mode45,
         )
         if model_tag_override:
             model_tag = model_tag_override
@@ -1101,6 +1125,16 @@ def run_mode3_scan(
             model_tag = "mode39"
         elif use_mode40:
             model_tag = "mode40"
+        elif use_mode41:
+            model_tag = "mode41"
+        elif use_mode42:
+            model_tag = "mode42"
+        elif use_mode43:
+            model_tag = "mode43"
+        elif use_mode44:
+            model_tag = "mode44"
+        elif use_mode45:
+            model_tag = "mode45"
         elif use_mode37:
             model_tag = "mode37"
         elif use_mode36:
@@ -1503,7 +1537,7 @@ def scan():
         max_market_cap=cap_limit,
     )
     use_startup_data = True
-    use_71x_standard = mode in ("mode3", "mode8", "mode9", "mode10", "mode11", "mode12", "mode90", "mode93", "mode底部大阳线", "mode平台突破首阳", "mode中位大阳线", "mode底部支撑", "mode最后震仓", "mode98", "mode32", "mode34", "mode35", "mode36", "mode37", "mode38", "mode39", "mode40")
+    use_71x_standard = mode in ("mode3", "mode8", "mode9", "mode10", "mode11", "mode12", "mode90", "mode93", "mode底部大阳线", "mode平台突破首阳", "mode中位大阳线", "mode底部支撑", "mode最后震仓", "mode98", "mode32", "mode34", "mode35", "mode36", "mode37", "mode38", "mode39", "mode40", "mode41", "mode42", "mode43", "mode44", "mode45")
     is_paid = (
         g.current_user.is_activated and not getattr(g.current_user, "subscription_expired", True)
         or getattr(g.current_user, "is_super_admin", False)
@@ -1550,6 +1584,11 @@ def scan():
             mode == "mode38",
             mode == "mode39",
             mode == "mode40",
+            mode == "mode41",
+            mode == "mode42",
+            mode == "mode43",
+            mode == "mode44",
+            mode == "mode45",
             user_id,
             not is_paid,
             high_tech_only,

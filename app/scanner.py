@@ -335,6 +335,57 @@ class ScanConfig:
     # mode45（涨停新高后缓升）：涨停/强阳放量创新高后横盘缓升
     mode45_min_score: int = 60
 
+    # mode46（前高附近二次攻击）：回撤后再上攻贴近前高、收盘未突破
+    mode46_min_score: int = 60
+
+
+def _mode46_kw_from_config(config: ScanConfig) -> Dict[str, Any]:
+    from app.mode46_prior_high_retest import mode46_kw_from_scan_config
+
+    return mode46_kw_from_scan_config(config)
+
+
+def _mode46_signal_at(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    **kwargs: Any,
+) -> bool:
+    from app.mode46_prior_high_retest import match_mode46_prior_high_retest
+
+    return match_mode46_prior_high_retest(rows, idx, code, name, **kwargs) is not None
+
+
+def _score_mode46(
+    rows: List[KlineRow],
+    idx: int,
+    ma10: np.ndarray,
+    ma20: np.ndarray,
+    ma60: np.ndarray,
+    vol20: np.ndarray,
+    code: str = "",
+    name: str = "",
+    breakdown: Optional[List[tuple]] = None,
+    **kwargs: Any,
+) -> int:
+    _ = (ma10, ma20, ma60, vol20, breakdown)
+    from app.mode46_prior_high_retest import score_mode46_prior_high_retest
+
+    return score_mode46_prior_high_retest(rows, idx, code, name, **kwargs)
+
+
+def _mode46_metrics(
+    rows: List[KlineRow],
+    idx: int,
+    code: str,
+    name: str,
+    **kwargs: Any,
+) -> Dict[str, Any]:
+    from app.mode46_prior_high_retest import mode46_signal_metrics
+
+    return mode46_signal_metrics(rows, idx, code, name, **kwargs)
+
 
 def _mode45_kw_from_config(config: ScanConfig) -> Dict[str, Any]:
     from app.mode45_limitup_grind import mode45_kw_from_scan_config
@@ -6033,6 +6084,7 @@ def scan_with_mode3(
     use_mode43: bool = False,
     use_mode44: bool = False,
     use_mode45: bool = False,
+    use_mode46: bool = False,
     sector_ak_cache_dir: Optional[str] = None,
     sector_fund_flow_max_points: int = 5,
     sector_fund_flow_yi_per_point: float = 3.0,
@@ -6235,6 +6287,10 @@ def scan_with_mode3(
         signal_fn = _mode3_signals
         score_fn = _score_mode45
         mode_label = "mode45"
+    elif use_mode46:
+        signal_fn = _mode3_signals
+        score_fn = _score_mode46
+        mode_label = "mode46"
     elif use_mode37:
         signal_fn = _mode3_signals
         score_fn = _score_mode37
@@ -6436,6 +6492,9 @@ def scan_with_mode3(
     mode45_kw: Dict[str, Any] = {}
     if use_mode45:
         mode45_kw = _mode45_kw_from_config(config)
+    mode46_kw: Dict[str, Any] = {}
+    if use_mode46:
+        mode46_kw = _mode46_kw_from_config(config)
 
     mode37_kw: Dict[str, Any] = {}
     if use_mode37:
@@ -6495,6 +6554,7 @@ def scan_with_mode3(
                         or use_mode43
                         or use_mode44
                         or use_mode45
+                        or use_mode46
                     )
                     else (
                         max(130, int(getattr(config, "mode5_half_year_bars", 120)) + 5)
@@ -6561,7 +6621,7 @@ def scan_with_mode3(
             end_dt = _parse_date(end_date)
             scan_end_dt = end_dt
             # mode39 等信号日 T+1 企稳确认，截止日当日也需多读几天 K 线
-            if end_dt and (use_mode39 or use_mode38 or use_mode40 or use_mode41 or use_mode42 or use_mode43 or use_mode44 or use_mode45):
+            if end_dt and (use_mode39 or use_mode38 or use_mode40 or use_mode41 or use_mode42 or use_mode43 or use_mode44 or use_mode45 or use_mode46):
                 scan_end_dt = end_dt + timedelta(days=8)
             if end_dt:
                 for row in rows:
@@ -6729,6 +6789,20 @@ def scan_with_mode3(
                 if ed and d > ed:
                     continue
                 if _mode45_signal_at(rows, i, item.code, item.name, **mode45_kw):
+                    signals.append(i)
+        elif use_mode46:
+            st = str(start_date).strip()[:10] if start_date else ""
+            ed = str(end_date).strip()[:10] if end_date else ""
+            peak_lb = int(mode46_kw.get("peak_lookback", 100) or 100)
+            start_i = max(peak_lb + 15, 120)
+            signals = []
+            for i in range(start_i, len(rows)):
+                d = str(rows[i].date)[:10]
+                if st and d < st:
+                    continue
+                if ed and d > ed:
+                    continue
+                if _mode46_signal_at(rows, i, item.code, item.name, **mode46_kw):
                     signals.append(i)
         elif use_mode37:
             st = str(start_date).strip()[:10] if start_date else ""
@@ -7355,6 +7429,7 @@ def scan_with_mode3(
                 or use_mode43
                 or use_mode44
                 or use_mode45
+                or use_mode46
                 or (use_mode88 and score_fn is _score_mode88)
         or (use_mode93 and score_fn is _score_mode93)
                 or use_mode_bottom_big_yang
@@ -7526,6 +7601,19 @@ def scan_with_mode3(
                         item.name,
                         None,
                         **mode45_kw,
+                    )
+                elif use_mode46:
+                    score = _score_mode46(
+                        rows,
+                        idx,
+                        ma10,
+                        ma20,
+                        ma60,
+                        vol20,
+                        item.code,
+                        item.name,
+                        None,
+                        **mode46_kw,
                     )
                 elif use_mode37:
                     score = _score_mode37(
@@ -7786,6 +7874,15 @@ def scan_with_mode3(
                     f"回撤{float(m45.get('grind_close_pullback_pct', 0) or 0):.1f}%)"
                     f" 买点日{m45.get('exec_buy_date', buy_date)}开盘"
                 )
+            elif use_mode46:
+                m46 = _mode46_metrics(rows, idx, item.code, item.name, **mode46_kw)
+                reasons.append(
+                    f"前高附近二次攻击(前高{m46.get('peak_date', '')}"
+                    f"高{float(m46.get('prior_high', 0) or 0):.2f}"
+                    f"距高{float(m46.get('high_dist_pct', 0) or 0):.1f}%"
+                    f"回撤{float(m46.get('pullback_pct', 0) or 0):.1f}%)"
+                    f" 突破试仓>{float(m46.get('buy_trigger_above', 0) or 0):.2f}"
+                )
             elif use_mode37:
                 reasons.append("回踩向上跳空缺口支撑区")
             elif use_mode36:
@@ -7988,6 +8085,13 @@ def scan_with_mode3(
                 m_extra["signal_date"] = str(signal_date)[:10]
                 m_extra["event_type"] = "涨停新高后缓升"
                 m_extra["buy_mode"] = "next_open"
+            if use_mode46:
+                m_extra.update(
+                    _mode46_metrics(rows, idx, item.code, item.name, **mode46_kw)
+                )
+                m_extra["signal_date"] = str(signal_date)[:10]
+                m_extra["event_type"] = "前高附近二次攻击"
+                m_extra["buy_mode"] = "break_prior_high"
             if use_mode37:
                 m_extra.update(
                     _mode37_metrics(rows, idx, item.code, item.name, **mode37_kw)

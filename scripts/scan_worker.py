@@ -84,7 +84,7 @@ def run_one():
             mode4_filters=(mode == "mode4"),
             model_tag_override="mode3ok" if mode == "mode3ok" else None,
             use_startup_modes_data=True,
-            use_71x_standard=(mode in ("mode3", "mode8", "mode9", "mode10", "mode11", "mode12", "mode90", "mode93", "mode底部大阳线", "mode平台突破首阳", "mode中位大阳线", "mode底部支撑", "mode最后震仓", "mode98", "mode32", "mode33", "mode34", "mode35", "mode36", "mode37", "mode38", "mode39", "mode40", "mode41", "mode42", "mode43", "mode44", "mode45")),
+            use_71x_standard=(mode in ("mode3", "mode8", "mode9", "mode10", "mode11", "mode12", "mode90", "mode93", "mode底部大阳线", "mode平台突破首阳", "mode中位大阳线", "mode底部支撑", "mode最后震仓", "mode98", "mode32", "mode33", "mode34", "mode35", "mode36", "mode37", "mode38", "mode39", "mode40", "mode41", "mode42", "mode43", "mode44", "mode45", "mode46")),
             use_mode8=False,  # 网络版 mode8 用 mode88 替代
             use_mode88=(mode == "mode8"),
             use_mode9=(mode == "mode9"),
@@ -113,6 +113,7 @@ def run_one():
             use_mode43=(mode == "mode43"),
             use_mode44=(mode == "mode44"),
             use_mode45=(mode == "mode45"),
+            use_mode46=(mode == "mode46"),
             user_id=user_id,
             throttle_free_user=payload.get("throttle_free_user", True),
             high_tech_only=high_tech_only,

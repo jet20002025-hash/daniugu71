@@ -253,6 +253,8 @@
       '选股原则（mode44 三连阴量价背离）：连续3个交易日阴线（收<开）且收盘逐日走低，成交量逐日放大（价跌量增）；信号日收盘须在MA120之上；第三日收盘确认，次日开盘买。参考：国投中鲁600962（2026-06-22～24）。建议最低分≥60。';
     const HINT_MODE45 =
       '选股原则（mode45 涨停新高后缓升）：启动日涨停或强阳（主板≥4.5%/科创≥7%）且放量（≥1.8×20日均量）创60日新高；之后2～10日横盘缓升、收盘回撤≤4.5%、日均波动小；信号日贴近缓升高点、非涨停；次日开盘买。参考：国联股份603613（2025-08-21启动→8/25缓升买点）。建议最低分≥60。';
+    const HINT_MODE46 =
+      '选股原则（mode46 前高附近二次攻击）：阶段前高回撤12%～40%后再上攻；信号日最高贴近前高（默认≤6%）、收盘未突破前高；收阳且在MA20/MA60之上。突破前高试仓或次日开盘买。参考：深科技000021、中科飞测688361（2026-06-18）。与mode35区别：本模式为贴近前高、尚未有效突破。建议最低分≥60。';
     function updateModeHint() {
       const el = document.getElementById('scan-hint');
       const modeEl = document.getElementById('mode');
@@ -268,6 +270,7 @@
       else if (modeEl.value === 'mode43') el.textContent = HINT_MODE43;
       else if (modeEl.value === 'mode44') el.textContent = HINT_MODE44;
       else if (modeEl.value === 'mode45') el.textContent = HINT_MODE45;
+      else if (modeEl.value === 'mode46') el.textContent = HINT_MODE46;
       else if (modeEl.value === 'mode37') el.textContent = HINT_MODE37;
       else el.textContent = HINT_DEFAULT;
     }

@@ -26,7 +26,7 @@ def mode38_default_kw() -> Dict[str, Any]:
         phase_lookback=120,
         peak_lookback=45,
         peak_end_offset=1,
-        min_rally_pct=80.0,
+        min_rally_pct=70.0,
         pullback_min_pct=3.0,
         pullback_max_pct=60.0,
         require_min_pullback_by_ma=False,

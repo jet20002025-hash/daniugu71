@@ -2,13 +2,15 @@
 """
 本地批量更新 K 线缓存并写入统一目录（与在线更新一致，东财/腾讯/新浪/本地共用 code.csv）。
 已有完整历史时只拉最近约 10 根（含今天）并与缓存合并，不重拉全量；新股票或缓存不足时仍拉 300 根。
+默认腾讯单源；写入前用接口返回值覆盖最近 10 日成交量（手），避免单位漂移。
 默认 2 线程并发 + 0.2s 限速（小内存机器可改用 --workers 1）；可加大 --workers 以提速。
 用法：
-  python scripts/update_kline_cache.py                  # 默认 2 线程，轮流尝试多源
+  python scripts/update_kline_cache.py                  # 默认腾讯单源 + 近10日量对齐
   python scripts/update_kline_cache.py --workers 1     # 单线程（慢，兼容旧行为）
-  python scripts/update_kline_cache.py --source eastmoney --delay 0.05  # 单源可适当减小 delay
-  python scripts/update_kline_cache.py --source sina --delay 0.15       # 新浪易限流建议 0.15
+  python scripts/update_kline_cache.py --source auto   # 轮流尝试多源（旧行为）
+  python scripts/update_kline_cache.py --source eastmoney --delay 0.05
   python scripts/update_kline_cache.py --force --limit 100
+  python scripts/update_kline_cache.py --no-volume-align  # 不写回近端成交量
 """
 import argparse
 import os
@@ -138,14 +140,18 @@ def main():
     if _HAS_AKSHARE:
         choices.append("akshare")
     parser = argparse.ArgumentParser(description="更新本地 K 线缓存，写入统一 code.csv")
-    parser.add_argument("--source", choices=choices, default="auto",
-                        help="数据源：auto=轮流尝试多源（默认），或单选其一")
+    parser.add_argument("--source", choices=choices, default="tencent",
+                        help="数据源：默认 tencent；auto=轮流尝试多源")
     parser.add_argument("--force", action="store_true", help="强制刷新，忽略已有今日数据")
     parser.add_argument("--delay", type=float, default=0.2, help="每只股票请求间隔秒（多线程时为全局限速），低配建议 0.25～0.35")
     parser.add_argument("--workers", type=int, default=2, help="并发请求数；2 vCPU/4G 建议 1～2")
     parser.add_argument("--limit", type=int, default=0, help="最多更新 N 只，0 表示全部")
     parser.add_argument("--list", choices=["csv", "cache"], default="csv",
                         help="股票列表来源：csv=stock_list.csv，cache=已有缓存目录")
+    parser.add_argument("--volume-align-days", type=int, default=10,
+                        help="写入前用本次接口返回值覆盖最近 N 日成交量，0=关闭")
+    parser.add_argument("--no-volume-align", action="store_true",
+                        help="等同 --volume-align-days 0")
     args = parser.parse_args()
     from app.kline_resource_lock import acquire_heavy_kline, release_heavy_kline
 
@@ -159,6 +165,7 @@ def main():
 def _kline_update_main_impl(args):
     cache_dir = os.path.join(GPT_DATA_DIR, "kline_cache_tencent")
     os.makedirs(cache_dir, exist_ok=True)
+    volume_align_days = 0 if args.no_volume_align else max(0, int(args.volume_align_days))
 
     if args.list == "csv":
         stock_list_path = os.path.join(GPT_DATA_DIR, "stock_list.csv")
@@ -190,7 +197,25 @@ def _kline_update_main_impl(args):
     use_akshare = args.source == "akshare"
     auto_sources = "新浪→网易→东财→腾讯" + ("→AKShare" if _HAS_AKSHARE else "")
     print(f"数据源: {'轮流尝试 ' + auto_sources if use_auto else '新浪' if use_sina else '网易' if use_netease else '东财' if args.source == 'eastmoney' else '腾讯' if use_tencent else 'AKShare'}（已有缓存时仅拉最近约 10 根并合并，不重拉全量）")
+    if volume_align_days > 0:
+        print(f"成交量: 写入前用本次接口覆盖最近 {volume_align_days} 日")
     print(f"并发: {args.workers} 线程，请求间隔 {args.delay}s")
+
+    def prepare_rows(cached, live_rows):
+        """合并、历史纠偏、近端成交量以接口为准。"""
+        from app.kline_volume import (
+            align_recent_volumes_from_api_inplace,
+            normalize_kline_volumes_inplace,
+        )
+
+        if cached and len(cached) >= 100:
+            rows = merge_tail(cached, live_rows)
+        else:
+            rows = live_rows
+        normalize_kline_volumes_inplace(rows)
+        if volume_align_days > 0:
+            align_recent_volumes_from_api_inplace(rows, live_rows, volume_align_days)
+        return rows
 
     def fetch_one(item, count, _session=None):
         s = _session if _session is not None else session
@@ -233,6 +258,12 @@ def _kline_update_main_impl(args):
         extra = [r for r in new_rows if r.date[:10] > last_date]
         if not extra:
             return cached
+        from app.kline_volume import tencent_volume_to_cache_lots
+
+        ref_vol = float(cached[-1].volume or 0)
+        for r in extra:
+            r.volume = tencent_volume_to_cache_lots(float(r.volume or 0), ref_vol)
+            ref_vol = float(r.volume or ref_vol)
         return cached + extra
 
     # 先扫一遍：分出需要更新的 vs 跳过的（不请求接口）
@@ -259,10 +290,9 @@ def _kline_update_main_impl(args):
     if args.workers <= 1:
         # 单线程：按原逻辑逐只请求并 sleep
         for i, (item, path, cached, count) in enumerate(to_update):
-            rows, _ = fetch_one(item, count)
-            if rows:
-                if cached and len(cached) >= 100:
-                    rows = merge_tail(cached, rows)
+            live_rows, _ = fetch_one(item, count)
+            if live_rows:
+                rows = prepare_rows(cached, live_rows)
                 write_cached_kline(path, rows)
                 updated += 1
             else:
@@ -283,10 +313,9 @@ def _kline_update_main_impl(args):
             rate_limiter.wait()
             my_session = requests.Session()
             my_session.trust_env = False
-            rows, _ = fetch_one(item, count, _session=my_session)
-            if rows:
-                if cached and len(cached) >= 100:
-                    rows = merge_tail(cached, rows)
+            live_rows, _ = fetch_one(item, count, _session=my_session)
+            if live_rows:
+                rows = prepare_rows(cached, live_rows)
                 write_cached_kline(path, rows)
                 with counter_lock:
                     nonlocal updated

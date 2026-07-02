@@ -28,7 +28,7 @@ def mode38_default_kw() -> Dict[str, Any]:
         peak_end_offset=1,
         min_rally_pct=80.0,
         pullback_min_pct=3.0,
-        pullback_max_pct=45.0,
+        pullback_max_pct=60.0,
         require_min_pullback_by_ma=False,
         min_pullback_ma10_pct=10.0,
         min_pullback_ma20_pct=12.0,

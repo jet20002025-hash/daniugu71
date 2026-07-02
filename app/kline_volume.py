@@ -53,6 +53,33 @@ def _legacy_volume_cutoff(ref: float) -> float:
     return max(ref * _LEGACY_SCALE_VS_REF, _MIN_LEGACY_VOLUME)
 
 
+def _fix_intermittent_100x_spikes(volumes: List[float]) -> bool:
+    """部分日期误存×100：与前后正常交易日相比约 ×100 时 ÷100。"""
+    n = len(volumes)
+    changed = False
+    for i in range(n):
+        v = float(volumes[i])
+        if v <= 0:
+            continue
+        nb = [
+            float(volumes[j])
+            for j in range(max(0, i - 8), min(n, i + 9))
+            if j != i and float(volumes[j]) > 0
+        ]
+        if not nb:
+            continue
+        scaled = v / _LEGACY_DIVISOR
+        for b in nb:
+            if b <= 0:
+                continue
+            ratio = v / b
+            if 80.0 <= ratio <= 120.0 and abs(scaled - b) / b <= 0.35:
+                volumes[i] = scaled
+                changed = True
+                break
+    return changed
+
+
 def _fix_volumes_by_neighbors(volumes: List[float]) -> bool:
     """单日相对前后中位数约 ×100 时 ÷100（补 225万～500万 漏网）。"""
     n = len(volumes)
@@ -74,6 +101,60 @@ def _fix_volumes_by_neighbors(volumes: List[float]) -> bool:
         scaled = v / _LEGACY_DIVISOR
         if v > med * _NEIGHBOR_RATIO_MIN and scaled < med * _NEIGHBOR_DIV100_MAX:
             volumes[i] = scaled
+            changed = True
+    return changed
+
+
+def _volume_ratio_ok(a: float, b: float, lo: float = 0.15, hi: float = 5.0) -> bool:
+    if a <= 0 or b <= 0:
+        return False
+    r = a / b
+    return lo <= r <= hi
+
+
+def _log_coherence_std(volumes: List[float], lo: int, hi: int) -> float:
+    """近几日成交量数量级一致性（标准差越小越好）。"""
+    vals = [float(volumes[j]) for j in range(lo, hi + 1) if float(volumes[j]) > 0]
+    if len(vals) < 3:
+        return 1e9
+    logs = [np.log10(v) for v in vals]
+    return float(np.std(logs))
+
+
+def _fix_spike_day_pair_100x(volumes: List[float], min_spike: float = 50.0) -> bool:
+    """今/昨量比极大(>=10)时纠偏：在「今÷100」「昨×100」「双向」中选数量级最一致者。"""
+    n = len(volumes)
+    changed = False
+    for i in range(1, n):
+        vp = float(volumes[i - 1])
+        vt = float(volumes[i])
+        if vp <= 0 or vt <= 0 or vt / vp < min_spike:
+            continue
+        lo = max(0, i - 6)
+        base_std = _log_coherence_std(volumes, lo, i)
+        best_std = base_std
+        best_pair: tuple[float, float] | None = None
+
+        for new_vp, new_vt in (
+            (vp, vt / _LEGACY_DIVISOR),
+            (vp * _LEGACY_DIVISOR, vt),
+            (vp * _LEGACY_DIVISOR, vt / _LEGACY_DIVISOR),
+        ):
+            if new_vp <= 0 or new_vt <= 0:
+                continue
+            ratio = new_vt / new_vp
+            if ratio < 0.08 or ratio > 8.0:
+                continue
+            old_vp, old_vt = volumes[i - 1], volumes[i]
+            volumes[i - 1], volumes[i] = new_vp, new_vt
+            std = _log_coherence_std(volumes, lo, i)
+            volumes[i - 1], volumes[i] = old_vp, old_vt
+            if std < best_std - 1e-6:
+                best_std = std
+                best_pair = (new_vp, new_vt)
+
+        if best_pair is not None:
+            volumes[i - 1], volumes[i] = best_pair
             changed = True
     return changed
 
@@ -114,7 +195,17 @@ def normalize_kline_volumes_inplace(rows: List[T]) -> List[T]:
                     r.volume = v / _LEGACY_DIVISOR
                     changed = True
         vols = [float(getattr(r, "volume", 0) or 0) for r in rows]
+        if _fix_intermittent_100x_spikes(vols):
+            for r, v in zip(rows, vols):
+                r.volume = v
+            changed = True
+        vols = [float(getattr(r, "volume", 0) or 0) for r in rows]
         if _fix_volumes_by_neighbors(vols):
+            for r, v in zip(rows, vols):
+                r.volume = v
+            changed = True
+        vols = [float(getattr(r, "volume", 0) or 0) for r in rows]
+        if _fix_spike_day_pair_100x(vols):
             for r, v in zip(rows, vols):
                 r.volume = v
             changed = True
@@ -139,6 +230,36 @@ def tencent_volume_to_cache_lots(
     if lv > 50_000_000:
         return lv / _LEGACY_DIVISOR
     return lv
+
+
+def align_recent_volumes_from_api_inplace(
+    rows: List[T],
+    api_rows: Sequence[T],
+    lookback: int = 10,
+) -> int:
+    """用 api_rows 最近 lookback 个交易日成交量（手）覆盖 rows 中同名日期。
+
+    写入缓存前的最终步骤：以接口返回为准，避免启发式纠偏污染近端成交量。
+    """
+    if not rows or not api_rows or lookback <= 0:
+        return 0
+    api_vol = {
+        str(getattr(r, "date", ""))[:10]: float(getattr(r, "volume", 0) or 0)
+        for r in api_rows[-lookback:]
+    }
+    if not api_vol:
+        return 0
+    changed = 0
+    for row in rows:
+        d = str(getattr(row, "date", ""))[:10]
+        if d not in api_vol:
+            continue
+        nv = api_vol[d]
+        ov = float(getattr(row, "volume", 0) or 0)
+        if abs(ov - nv) > max(1.0, nv * 1e-6):
+            row.volume = nv
+            changed += 1
+    return changed
 
 
 def normalize_kline_volumes(rows: Sequence[T]) -> List[T]:
